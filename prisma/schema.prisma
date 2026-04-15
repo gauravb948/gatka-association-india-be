@@ -1,0 +1,893 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  NATIONAL_ADMIN
+  STATE_ADMIN
+  DISTRICT_ADMIN
+  TRAINING_CENTER
+  COACH
+  REFEREE
+  PLAYER
+  VOLUNTEER
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  BOYS
+  GIRLS
+}
+
+enum MaritalStatus {
+  SINGLE
+  MARRIED
+  DIVORCED
+  WIDOWED
+  SEPARATED
+  OTHER
+}
+
+enum TShirtSize {
+  XS
+  S
+  M
+  L
+  XL
+  XXL
+  XXXL
+}
+
+enum PlayingHand {
+  LEFT
+  RIGHT
+  BOTH
+}
+
+enum AgeBandType {
+  SUB_JUNIOR
+  JUNIOR
+  SENIOR
+  VETERAN
+  OPEN
+}
+
+enum CompetitionLevel {
+  DISTRICT
+  STATE
+  NATIONAL
+}
+
+enum PaymentStatus {
+  PENDING
+  AUTHORIZED
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PaymentPurpose {
+  PLAYER_REGISTRATION
+  PLAYER_RENEWAL
+  COACH_REGISTRATION
+  COACH_RENEWAL
+  REFEREE_REGISTRATION
+  REFEREE_RENEWAL
+  VOLUNTEER_REGISTRATION
+  VOLUNTEER_RENEWAL
+  TRAINING_CENTER_REGISTRATION
+  TRAINING_CENTER_RENEWAL
+  TOURNAMENT_REGISTRATION
+  CAMP_REGISTRATION
+  STATE_REGISTRATION
+  DISTRICT_REGISTRATION
+  STATE_MEMBERSHIP_RENEWAL
+  DISTRICT_MEMBERSHIP_RENEWAL
+  OTHER
+}
+
+enum CampLevel {
+  NATIONAL
+  STATE
+  DISTRICT
+}
+
+enum CampAudience {
+  PLAYERS
+  VOLUNTEERS
+  COACHES
+  REFEREES
+  ALL
+}
+
+enum MigrationStatus {
+  DRAFT
+  PENDING_ORIGIN
+  PENDING_DESTINATION
+  APPROVED
+  REJECTED
+}
+
+enum ComplaintStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum EntityStatus {
+  PENDING
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+  BLOCKED
+  EXPIRED
+}
+
+enum MembershipStatus {
+  ACTIVE
+  EXPIRED
+}
+
+enum CoachAppliedFor {
+  SENIOR_COACH
+  ASSISTANT_COACH
+}
+
+enum GatkaExperience {
+  LT_1_YEAR
+  Y1_3
+  Y3_5
+  Y5_10
+  GT_10
+}
+
+enum SmsTemplateKey {
+  REGISTRATION
+  RENEWAL
+  MEMBERSHIP_EXPIRY
+  PAYMENT_SUCCESS
+  OTP
+}
+
+model GlobalSettings {
+  id                   String    @id @default("singleton")
+  ageCalculationDate   DateTime?
+  membershipExpiryDate DateTime?
+  updatedAt            DateTime  @updatedAt
+}
+
+/// National-scope registration fee per user role (paise). No row for NATIONAL_ADMIN.
+model RolePaymentFeeConfig {
+  role           Role     @id
+  feeAmountPaise Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model State {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique
+  isEnabled Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  districts          District[]
+  users              User[]
+  playerProfiles     PlayerProfile[]
+  paymentConfig      StatePaymentConfig?
+  competitions       Competition[]
+  camps              Camp[]
+  notices            Notice[]
+  migrationFrom      MigrationRequest[] @relation("MigrationFromState")
+  migrationTo        MigrationRequest[] @relation("MigrationToState")
+  refereeProfiles    RefereeProfile[]
+  volunteerProfiles  VolunteerProfile[]
+  payments           Payment[]
+  registration       StateRegistration?
+  districtRegistrationsApplyingFrom DistrictRegistration[] @relation("DistrictRegistrationStatePick")
+  galleryImages      GalleryImage[]
+  messages           Message[]
+  pagesContents      PagesContent[]
+}
+
+model District {
+  id        String   @id @default(cuid())
+  stateId   String
+  state     State    @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  name      String
+  isEnabled Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  trainingCenters TrainingCenter[]
+  users           User[]
+  playerProfiles  PlayerProfile[]
+  competitions    Competition[]
+  camps           Camp[]
+  notices         Notice[]
+  registration    DistrictRegistration?
+  refereeProfiles RefereeProfile[]
+
+  @@unique([stateId, name])
+  @@index([stateId])
+}
+
+model TrainingCenter {
+  id         String   @id @default(cuid())
+  districtId String
+  district   District @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  name       String
+  address    String?
+  registrarNumber String?
+  headName   String?
+  headAadharNumber String?
+  registrationCertificateUrl String?
+  headPassportPhotoUrl String?
+  headAadharFrontUrl String?
+  headAadharBackUrl String?
+  isEnabled  Boolean  @default(true)
+  status     EntityStatus @default(ACCEPTED)
+  statusReason String?
+  termsAcceptedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  users          User[]
+  playerProfiles PlayerProfile[]
+  coachProfiles  CoachProfile[]
+  notices        Notice[]
+
+  @@index([districtId])
+}
+
+model User {
+  id               String          @id @default(cuid())
+  username         String?         @unique
+  email            String          @unique
+  phone            String?
+  passwordHash     String
+  role             Role
+  isActive         Boolean         @default(true)
+  disabledReason   String?
+  status           EntityStatus    @default(ACCEPTED)
+  statusReason     String?
+  isSuperNational  Boolean         @default(false)
+  stateId          String?
+  state            State?          @relation(fields: [stateId], references: [id])
+  districtId       String?
+  district         District?       @relation(fields: [districtId], references: [id])
+  trainingCenterId String?
+  trainingCenter   TrainingCenter? @relation(fields: [trainingCenterId], references: [id])
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  playerProfile          PlayerProfile?
+  coachProfile           CoachProfile?
+  refereeProfile         RefereeProfile?
+  volunteerProfile       VolunteerProfile?
+  noticesAuthored        Notice[]                 @relation("NoticeAuthor")
+  otpCodes               OtpCode[]
+  payments               Payment[]
+  tournamentRegs         TournamentRegistration[] @relation("TournamentPlayer")
+  tournamentRegsBy       TournamentRegistration[] @relation("TournamentRegistrar")
+  campRegs               CampRegistration[]
+  attendanceMarked       Attendance[]             @relation("AttendanceMarker")
+  attendanceAsSubject    Attendance[]             @relation("AttendanceSubject")
+  participations         ParticipationRecord[]
+  migrationRequests      MigrationRequest[]
+  complaints             Complaint[]
+  competitionResults     CompetitionResult[]
+  smsOutbox              SmsOutbox[]
+  memberships                  Membership[]
+  stateRegistrationApplicant   StateRegistration?   @relation("StateRegistrationApplicant")
+  districtRegistrationApplicant DistrictRegistration? @relation("DistrictRegistrationApplicant")
+
+  @@index([role])
+  @@index([stateId])
+  @@index([districtId])
+  @@index([trainingCenterId])
+}
+
+model PlayerProfile {
+  userId               String         @id
+  user                 User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stateId              String
+  state                State          @relation(fields: [stateId], references: [id])
+  districtId           String
+  district             District       @relation(fields: [districtId], references: [id])
+  trainingCenterId     String
+  trainingCenter       TrainingCenter @relation(fields: [trainingCenterId], references: [id])
+  fullName             String
+  fatherName           String?
+  motherName           String?
+  aadharNumber         String?
+  maritalStatus        MaritalStatus?
+  whatsappNo           String?
+  tShirtSize           TShirtSize?
+  playingHand          PlayingHand?
+  photoUrl             String?
+  aadharFrontUrl       String?
+  aadharBackUrl        String?
+  address              String?
+  gender               Gender
+  dateOfBirth          DateTime
+  termsAcceptedAt      DateTime?
+  registrationNumber   String?        @unique
+  membershipValidFrom  DateTime?
+  membershipValidUntil DateTime?
+  registrationStatus   String         @default("PENDING_PAYMENT")
+  documentsVerifiedAt  DateTime?
+  isBlacklisted        Boolean        @default(false)
+  blacklistRemarks     String?
+  tcDisabled           Boolean        @default(false)
+  tcDisabledRemarks    String?
+  dateOfJoining        DateTime       @default(now())
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  @@index([stateId])
+  @@index([districtId])
+  @@index([trainingCenterId])
+}
+
+model CoachProfile {
+  userId               String         @id
+  user                 User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trainingCenterId     String
+  trainingCenter       TrainingCenter @relation(fields: [trainingCenterId], references: [id])
+  fullName             String
+  fatherName           String?
+  aadharNumber         String?
+  address              String?
+  education            String?
+  appliedFor           CoachAppliedFor?
+  experienceInGatka    GatkaExperience?
+  photoUrl             String?
+  aadharFrontUrl       String?
+  aadharBackUrl        String?
+  gender               Gender
+  membershipValidUntil DateTime?
+  isBlacklisted        Boolean        @default(false)
+  blacklistRemarks     String?
+  termsAcceptedAt      DateTime?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+}
+
+model RefereeProfile {
+  userId               String            @id
+  user                 User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stateId              String
+  state                State             @relation(fields: [stateId], references: [id])
+  districtId           String?
+  district             District?         @relation(fields: [districtId], references: [id], onDelete: SetNull)
+  fullName             String
+  fatherName           String?
+  aadharNumber         String?
+  alternatePhone       String?
+  address              String?
+  appliedFor           String?
+  education            String?
+  experienceInGatka    GatkaExperience?
+  photoUrl             String?
+  aadharFrontUrl       String?
+  aadharBackUrl        String?
+  gender               Gender
+  membershipValidUntil DateTime?
+  isBlacklisted        Boolean           @default(false)
+  blacklistRemarks     String?
+  termsAcceptedAt      DateTime?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  @@index([stateId])
+  @@index([districtId])
+}
+
+model VolunteerProfile {
+  userId               String   @id
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stateId              String
+  state                State    @relation(fields: [stateId], references: [id])
+  fullName             String
+  photoUrl             String?
+  gender               Gender
+  membershipValidUntil DateTime?
+  isBlacklisted        Boolean  @default(false)
+  blacklistRemarks     String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  competitions       Competition[]
+  participations     ParticipationRecord[]
+  payments           Payment[]
+  camps              Camp[]
+}
+
+model AgeCategory {
+  id          String       @id @default(cuid())
+  name        String
+  ageFrom     Int?
+  ageTo       Int?
+  bandType    AgeBandType?
+  sortOrder   Int          @default(0)
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  eventGroups   EventGroup[]
+  competitions  Competition[]
+}
+
+model EventGroup {
+  id             String       @id @default(cuid())
+  segment        String
+  gender         Gender
+  ageCategoryId  String
+  ageCategory    AgeCategory  @relation(fields: [ageCategoryId], references: [id])
+  sortOrder      Int          @default(0)
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  events Event[]
+
+  @@unique([segment, gender, ageCategoryId])
+  @@index([ageCategoryId])
+}
+
+model Event {
+  id           String     @id @default(cuid())
+  eventGroupId String
+  eventGroup   EventGroup @relation(fields: [eventGroupId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  sortOrder    Int        @default(0)
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  competitionEvents CompetitionEvent[]
+  tournamentRegs      TournamentRegistration[]
+  results             CompetitionResult[]
+
+  @@index([eventGroupId])
+}
+
+model StatePaymentConfig {
+  id               String   @id @default(cuid())
+  stateId          String   @unique
+  state            State    @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  razorpayKeyId    String
+  razorpayKeySecret String
+  webhookSecret    String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model Payment {
+  id                String         @id @default(cuid())
+  userId            String
+  user              User           @relation(fields: [userId], references: [id])
+  stateId           String
+  state             State          @relation(fields: [stateId], references: [id])
+  purpose           PaymentPurpose
+  amountPaise       Int
+  currency          String         @default("INR")
+  status            PaymentStatus  @default(PENDING)
+  razorpayOrderId   String?        @unique
+  razorpayPaymentId String?
+  sessionId         String?
+  session           Session?       @relation(fields: [sessionId], references: [id])
+  metadata          Json?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  tournamentRegs        TournamentRegistration[]
+  campRegs              CampRegistration[]
+  stateRegistrations    StateRegistration[]
+  districtRegistrations DistrictRegistration[]
+  memberships           Membership[]
+
+  @@index([userId])
+  @@index([stateId])
+  @@index([status])
+}
+
+model Membership {
+  id         String           @id @default(cuid())
+  userId     String
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type       Role
+  validFrom  DateTime
+  validUntil DateTime
+  status     MembershipStatus @default(ACTIVE)
+  paymentId  String?
+  payment    Payment?         @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([validUntil])
+}
+
+model Competition {
+  id                       String           @id @default(cuid())
+  sessionId                String
+  session                  Session          @relation(fields: [sessionId], references: [id])
+  level                    CompetitionLevel
+  stateId                  String?
+  state                    State?           @relation(fields: [stateId], references: [id])
+  districtId               String?
+  district                 District?        @relation(fields: [districtId], references: [id])
+  name                     String
+  gender                   Gender
+  ageCategoryId            String?
+  ageCategory              AgeCategory?     @relation(fields: [ageCategoryId], references: [id])
+  startDate                DateTime?
+  endDate                  DateTime?
+  registrationOpensAt      DateTime?
+  registrationClosesAt     DateTime?
+  finalSubmitRequiresPayment Boolean        @default(true)
+  createdAt                DateTime         @default(now())
+  updatedAt                DateTime         @updatedAt
+
+  events           CompetitionEvent[]
+  tournamentRegs   TournamentRegistration[]
+  participations   ParticipationRecord[]
+  attendance       Attendance[]
+  results          CompetitionResult[]
+
+  @@index([sessionId])
+  @@index([level])
+}
+
+model CompetitionEvent {
+  id            String      @id @default(cuid())
+  competitionId String
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  eventId       String
+  event         Event       @relation(fields: [eventId], references: [id])
+  maxPlayers    Int?
+  minPlayers    Int?
+
+  @@unique([competitionId, eventId])
+}
+
+model TournamentRegistration {
+  id               String      @id @default(cuid())
+  competitionId    String
+  competition      Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  playerUserId     String
+  playerUser       User        @relation("TournamentPlayer", fields: [playerUserId], references: [id])
+  registeredById   String
+  registeredBy     User        @relation("TournamentRegistrar", fields: [registeredById], references: [id])
+  eventId          String
+  event            Event       @relation(fields: [eventId], references: [id])
+  paymentId        String?
+  payment          Payment?    @relation(fields: [paymentId], references: [id])
+  finalSubmittedAt DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@unique([competitionId, playerUserId, eventId])
+  @@index([competitionId])
+  @@index([playerUserId])
+}
+
+model ParticipationRecord {
+  id            String           @id @default(cuid())
+  sessionId     String
+  session       Session          @relation(fields: [sessionId], references: [id])
+  playerUserId  String
+  playerUser    User             @relation(fields: [playerUserId], references: [id])
+  level         CompetitionLevel
+  competitionId String
+  competition   Competition      @relation(fields: [competitionId], references: [id])
+  participated  Boolean          @default(true)
+  createdAt     DateTime         @default(now())
+
+  @@index([sessionId, playerUserId, level])
+}
+
+model Camp {
+  id          String       @id @default(cuid())
+  sessionId   String?
+  session     Session?     @relation(fields: [sessionId], references: [id])
+  level       CampLevel
+  stateId     String?
+  state       State?       @relation(fields: [stateId], references: [id])
+  districtId  String?
+  district    District?    @relation(fields: [districtId], references: [id])
+  name        String
+  description String?
+  startDate   DateTime
+  endDate     DateTime
+  audience    CampAudience
+  feeAmountPaise Int?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  registrations CampRegistration[]
+  attendance    Attendance[]
+
+  @@index([level])
+}
+
+model CampRegistration {
+  id        String   @id @default(cuid())
+  campId    String
+  camp      Camp     @relation(fields: [campId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  paymentId String?
+  payment   Payment? @relation(fields: [paymentId], references: [id])
+  status    String   @default("REGISTERED")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([campId, userId])
+}
+
+model Attendance {
+  id           String       @id @default(cuid())
+  type         String
+  date         DateTime     @db.Date
+  userId       String
+  user         User         @relation("AttendanceSubject", fields: [userId], references: [id])
+  markedById   String
+  markedBy     User         @relation("AttendanceMarker", fields: [markedById], references: [id])
+  present      Boolean      @default(true)
+  competitionId String?
+  competition   Competition? @relation(fields: [competitionId], references: [id])
+  campId       String?
+  camp         Camp?        @relation(fields: [campId], references: [id])
+  trainingCenterId String?
+  notes        String?
+  createdAt    DateTime     @default(now())
+
+  @@index([userId, date])
+  @@index([competitionId])
+  @@index([campId])
+}
+
+model CompetitionResult {
+  id            String      @id @default(cuid())
+  competitionId String
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  eventId       String
+  event         Event       @relation(fields: [eventId], references: [id])
+  playerUserId  String
+  playerUser    User        @relation(fields: [playerUserId], references: [id])
+  rank          Int?
+  score         String?
+  certificateQrPayload String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([competitionId, eventId, playerUserId])
+}
+
+model Notice {
+  id               String          @id @default(cuid())
+  authorId         String
+  author           User            @relation("NoticeAuthor", fields: [authorId], references: [id])
+  title            String
+  body             String
+  stateId          String?
+  state            State?          @relation(fields: [stateId], references: [id])
+  districtId       String?
+  district         District?       @relation(fields: [districtId], references: [id])
+  trainingCenterId String?
+  trainingCenter   TrainingCenter? @relation(fields: [trainingCenterId], references: [id])
+  targetRole       Role?
+  createdAt        DateTime        @default(now())
+
+  @@index([stateId])
+  @@index([districtId])
+}
+
+model OtpCode {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  phoneOrEmail String
+  codeHash   String
+  purpose    String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([phoneOrEmail])
+}
+
+model MigrationRequest {
+  id              String           @id @default(cuid())
+  userId          String
+  user            User             @relation(fields: [userId], references: [id])
+  fromStateId     String
+  fromState       State            @relation("MigrationFromState", fields: [fromStateId], references: [id])
+  fromDistrictId  String?
+  fromTcId        String?
+  toStateId       String
+  toState         State            @relation("MigrationToState", fields: [toStateId], references: [id])
+  toDistrictId    String?
+  toTcId          String?
+  status          MigrationStatus  @default(PENDING_ORIGIN)
+  remarks         String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([userId])
+}
+
+model Complaint {
+  id        String          @id @default(cuid())
+  userId    String
+  user      User            @relation(fields: [userId], references: [id])
+  subject   String
+  body      String
+  status    ComplaintStatus @default(OPEN)
+  response  String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@index([userId])
+}
+
+model SmsTemplate {
+  id        String         @id @default(cuid())
+  key       SmsTemplateKey @unique
+  template  String
+  updatedAt DateTime       @updatedAt
+}
+
+model SmsOutbox {
+  id          String   @id @default(cuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  phone       String
+  body        String
+  status      String   @default("QUEUED")
+  providerRef String?
+  createdAt   DateTime @default(now())
+
+  @@index([status])
+}
+
+model Banner {
+  id        String   @id @default(cuid())
+  imageUrl  String
+  title     String?
+  subtitle  String?
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([sortOrder])
+}
+
+model PagesContent {
+  id                  String   @id @default(cuid())
+  page                String
+  title               String
+  detailedDescription String
+  stateId             String
+  state               State    @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  isEnabled           Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([stateId, page])
+  @@index([stateId])
+  @@index([isEnabled])
+}
+
+model StateRegistration {
+  id                 String       @id @default(cuid())
+  stateId            String       @unique
+  state              State        @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  userId             String?      @unique
+  user               User?        @relation("StateRegistrationApplicant", fields: [userId], references: [id], onDelete: SetNull)
+  firstName          String
+  lastName           String
+  userName           String
+  email              String
+  mobileNo           String
+  address            String
+  passportPhotoUrl   String?
+  status             EntityStatus @default(PENDING)
+  statusReason       String?
+  paymentId          String?
+  payment            Payment?     @relation(fields: [paymentId], references: [id])
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  @@index([status])
+  @@index([email])
+  @@index([userName])
+}
+
+model DistrictRegistration {
+  id               String       @id @default(cuid())
+  stateId          String
+  state            State        @relation("DistrictRegistrationStatePick", fields: [stateId], references: [id], onDelete: Cascade)
+  districtId       String       @unique
+  district         District     @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  userId           String?      @unique
+  user             User?        @relation("DistrictRegistrationApplicant", fields: [userId], references: [id], onDelete: SetNull)
+  firstName        String
+  lastName         String
+  userName         String
+  email            String
+  mobileNo         String
+  address          String
+  passportPhotoUrl String?
+  status           EntityStatus @default(PENDING)
+  statusReason     String?
+  paymentId        String?
+  payment          Payment?     @relation(fields: [paymentId], references: [id])
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@index([status])
+  @@index([stateId])
+  @@index([email])
+  @@index([userName])
+}
+
+model GalleryImage {
+  id        String   @id @default(cuid())
+  imageUrl  String
+  stateId   String
+  state     State    @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  caption   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([stateId])
+}
+
+model Message {
+  id          String   @id @default(cuid())
+  imageUrl    String?
+  name        String
+  message     String
+  designation String?
+  stateId     String
+  state       State    @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([stateId])
+}
+
+model NationalPaymentConfig {
+  id                String   @id @default("singleton")
+  razorpayKeyId     String
+  razorpayKeySecret String
+  webhookSecret     String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}

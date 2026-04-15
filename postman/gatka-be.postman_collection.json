@@ -1,0 +1,1294 @@
+{
+  "info": {
+    "name": "Gatka Association India BE",
+    "description": "API collection (baseUrl includes `/api`). Rate limits: 429 with `code: RATE_LIMITED`. Auth routes use stricter limits; R2 upload/presign are public with upload rate limits.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4000/api"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "bannerId",
+      "value": ""
+    },
+    {
+      "key": "targetUserId",
+      "value": ""
+    },
+    {
+      "key": "stateId",
+      "value": "<stateId>"
+    },
+    {
+      "key": "districtId",
+      "value": "<districtId>"
+    },
+    {
+      "key": "trainingCenterId",
+      "value": "<trainingCenterId>"
+    },
+    {
+      "key": "stateRegistrationId",
+      "value": ""
+    },
+    {
+      "key": "districtRegistrationId",
+      "value": ""
+    },
+    {
+      "key": "galleryImageId",
+      "value": ""
+    },
+    {
+      "key": "messageId",
+      "value": ""
+    },
+    {
+      "key": "ageCategoryId",
+      "value": ""
+    },
+    {
+      "key": "paymentId",
+      "value": ""
+    },
+    {
+      "key": "razorpay_order_id",
+      "value": ""
+    },
+    {
+      "key": "razorpay_payment_id",
+      "value": ""
+    },
+    {
+      "key": "razorpay_signature",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET /health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login (national seed)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const payload = j.data !== undefined && j.data !== null ? j.data : j;",
+                  "if (payload.accessToken) pm.collectionVariables.set('accessToken', payload.accessToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"national@gatka.local\",\n  \"password\": \"ChangeMe123!\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        }
+        ,
+        {
+          "name": "Me — current user by token",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/auth/me"
+          }
+        },
+        {
+          "name": "Register — Player",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Test Player\",\n  \"fatherName\": \"Father Name\",\n  \"motherName\": \"Mother Name\",\n  \"aadharNumber\": \"123456789012\",\n  \"maritalStatus\": \"SINGLE\",\n  \"userName\": \"testplayer01\",\n  \"email\": \"testplayer01@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"mobileNo\": \"9999999999\",\n  \"whatsappNo\": \"9999999999\",\n  \"address\": \"Full postal address line 1 and 2\",\n  \"gender\": \"MALE\",\n  \"dateOfBirth\": \"2005-01-01T00:00:00.000Z\",\n  \"stateId\": \"{{stateId}}\",\n  \"districtId\": \"{{districtId}}\",\n  \"trainingCenterId\": \"{{trainingCenterId}}\",\n  \"photoUrl\": \"https://example.com/uploads/player-photo.png\",\n  \"aadharFrontUrl\": \"https://example.com/uploads/aadhar-front.png\",\n  \"aadharBackUrl\": \"https://example.com/uploads/aadhar-back.png\",\n  \"tShirtSize\": \"M\",\n  \"playingHand\": \"RIGHT\",\n  \"acceptTerms\": true\n}"
+            },
+            "url": "{{baseUrl}}/auth/register/player"
+          }
+        },
+        {
+          "name": "Register — Coach",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Test Coach\",\n  \"fatherName\": \"Father Name\",\n  \"aadharNumber\": \"123456789012\",\n  \"address\": \"Full postal address\",\n  \"education\": \"Bachelor of Physical Education\",\n  \"stateId\": \"{{stateId}}\",\n  \"districtId\": \"{{districtId}}\",\n  \"trainingCenterId\": \"{{trainingCenterId}}\",\n  \"email\": \"testcoach01@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"phone\": \"9999999999\",\n  \"appliedFor\": \"ASSISTANT_COACH\",\n  \"experienceInGatka\": \"Y1_3\",\n  \"photoUrl\": \"https://example.com/uploads/coach-photo.png\",\n  \"aadharFrontUrl\": \"https://example.com/uploads/coach-aadhar-front.png\",\n  \"aadharBackUrl\": \"https://example.com/uploads/coach-aadhar-back.png\",\n  \"gender\": \"MALE\",\n  \"acceptTerms\": true\n}"
+            },
+            "url": "{{baseUrl}}/auth/register/coach"
+          }
+        },
+        {
+          "name": "Register — Referee",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Test Referee\",\n  \"fatherName\": \"Father Name\",\n  \"aadharNumber\": \"123456789012\",\n  \"address\": \"Full postal address\",\n  \"education\": \"Graduate\",\n  \"appliedFor\": \"District referee\",\n  \"experienceInGatka\": \"Y1_3\",\n  \"email\": \"testreferee01@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"phone\": \"9999999999\",\n  \"gender\": \"MALE\",\n  \"stateId\": \"{{stateId}}\",\n  \"districtId\": \"{{districtId}}\",\n  \"photoUrl\": \"https://example.com/uploads/referee-photo.png\",\n  \"aadharFrontUrl\": \"https://example.com/uploads/referee-aadhar-front.png\",\n  \"aadharBackUrl\": \"https://example.com/uploads/referee-aadhar-back.png\",\n  \"acceptTerms\": true\n}"
+            },
+            "url": "{{baseUrl}}/auth/register/referee"
+          }
+        },
+        {
+          "name": "Register — Volunteer",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"testvolunteer01@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"phone\": \"9999999999\",\n  \"fullName\": \"Test Volunteer\",\n  \"gender\": \"MALE\",\n  \"stateId\": \"{{stateId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/register/volunteer"
+          }
+        },
+        {
+          "name": "Register — Training Center",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"testtc01@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"phone\": \"9999999999\",\n  \"name\": \"Test Training Center\",\n  \"address\": \"Full training center address\",\n  \"stateId\": \"{{stateId}}\",\n  \"districtId\": \"{{districtId}}\",\n  \"headName\": \"Head Name\",\n  \"headAadharNumber\": \"123456789012\",\n  \"registrarNumber\": null,\n  \"registrationCertificateUrl\": null,\n  \"headPassportPhotoUrl\": \"https://example.com/uploads/tc-head-photo.png\",\n  \"headAadharFrontUrl\": \"https://example.com/uploads/tc-aadhar-front.png\",\n  \"headAadharBackUrl\": \"https://example.com/uploads/tc-aadhar-back.png\",\n  \"acceptTerms\": true\n}"
+            },
+            "url": "{{baseUrl}}/auth/register/training-center"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "POST — create Razorpay order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const payload = j.data !== undefined && j.data !== null ? j.data : j;",
+                  "if (payload.paymentId) pm.collectionVariables.set('paymentId', payload.paymentId);",
+                  "if (payload.razorpayOrderId) pm.collectionVariables.set('razorpay_order_id', payload.razorpayOrderId);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stateId\": \"{{stateId}}\",\n  \"purpose\": \"PLAYER_REGISTRATION\",\n  \"amountPaise\": 10000,\n  \"metadata\": {}\n}"
+            },
+            "url": "{{baseUrl}}/payments/razorpay/order"
+          }
+        },
+        {
+          "name": "POST — verify payment (client signature)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"razorpay_order_id\": \"{{razorpay_order_id}}\",\n  \"razorpay_payment_id\": \"{{razorpay_payment_id}}\",\n  \"razorpay_signature\": \"{{razorpay_signature}}\"\n}"
+            },
+            "url": "{{baseUrl}}/payments/verify"
+          }
+        },
+        {
+          "name": "GET — my payments",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/payments/me"
+          }
+        }
+        ,
+        {
+          "name": "GET — my state payment config (state admin)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/payments/state-config"
+          }
+        },
+        {
+          "name": "PUT — upsert my state payment config (state admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"razorpayKeyId\": \"rzp_test_XXXX\",\n  \"razorpayKeySecret\": \"secret_XXXX\",\n  \"webhookSecret\": \"whsec_XXXX\"\n}"
+            },
+            "url": "{{baseUrl}}/payments/state-config"
+          }
+        },
+        {
+          "name": "GET — state payment config by stateId (own state admin)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/payments/state-config/{{stateId}}"
+          }
+        },
+        {
+          "name": "PUT — upsert state payment config by stateId (own state admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"razorpayKeyId\": \"rzp_test_XXXX\",\n  \"razorpayKeySecret\": \"secret_XXXX\",\n  \"webhookSecret\": \"whsec_XXXX\"\n}"
+            },
+            "url": "{{baseUrl}}/payments/state-config/{{stateId}}"
+          }
+        },
+        {
+          "name": "GET — list state payment configs (national)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/payments/state-configs?page=1&pageSize=20"
+          }
+        },
+        {
+          "name": "PUT — upsert state payment config (national)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"razorpayKeyId\": \"rzp_test_XXXX\",\n  \"razorpayKeySecret\": \"secret_XXXX\",\n  \"webhookSecret\": \"whsec_XXXX\"\n}"
+            },
+            "url": "{{baseUrl}}/payments/state-configs/{{stateId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin users",
+      "item": [
+        {
+          "name": "GET — list users (national, paginated)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/admin/users?page=1&pageSize=20&userType=PLAYER&status=PENDING"
+          }
+        }
+      ]
+    },
+    {
+      "name": "User directory (hierarchy)",
+      "item": [
+        {
+          "name": "GET — list players",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/users/players?page=1&pageSize=20&status=PENDING"
+          }
+        },
+        {
+          "name": "GET — list coaches",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/users/coaches?page=1&pageSize=20"
+          }
+        },
+        {
+          "name": "GET — list referees",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/users/referees?page=1&pageSize=20"
+          }
+        },
+        {
+          "name": "GET — list volunteers",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/users/volunteers?page=1&pageSize=20"
+          }
+        },
+        {
+          "name": "GET — list training centers (accounts)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/users/training-centers?page=1&pageSize=20"
+          }
+        },
+        {
+          "name": "GET — list district admins",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/users/district-admins?page=1&pageSize=20"
+          }
+        },
+        {
+          "name": "GET — list state admins",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/users/state-admins?page=1&pageSize=20"
+          }
+        },
+        {
+          "name": "GET — list national admins",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/users/national-admins?page=1&pageSize=20"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Banners",
+      "item": [
+        {
+          "name": "GET public — active banners",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/banners/public"
+          }
+        },
+        {
+          "name": "GET admin — all banners",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/banners/admin"
+          }
+        },
+        {
+          "name": "POST admin — create banner",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.id) pm.collectionVariables.set('bannerId', j.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"imageUrl\": \"https://example.com/banner.jpg\",\n  \"title\": \"Welcome\",\n  \"subtitle\": \"Gatka Association\",\n  \"isActive\": true,\n  \"sortOrder\": 0\n}"
+            },
+            "url": "{{baseUrl}}/banners"
+          }
+        },
+        {
+          "name": "GET admin — banner by id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/banners/{{bannerId}}"
+          }
+        },
+        {
+          "name": "PATCH admin — update banner",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sortOrder\": 1,\n  \"isActive\": true\n}"
+            },
+            "url": "{{baseUrl}}/banners/{{bannerId}}"
+          }
+        },
+        {
+          "name": "DELETE admin — banner",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/banners/{{bannerId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Uploads — R2",
+      "item": [
+        {
+          "name": "POST backend upload (multipart)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "prefix", "value": "banners", "type": "text" },
+                { "key": "file", "type": "file", "src": [] }
+              ]
+            },
+            "url": "{{baseUrl}}/uploads/r2/upload"
+          }
+        },
+        {
+          "name": "POST presign PUT",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contentType\": \"image/png\",\n  \"prefix\": \"banners\"\n}"
+            },
+            "url": "{{baseUrl}}/uploads/r2/presign-put"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Profile photos",
+      "item": [
+        {
+          "name": "POST /profile-photos/me (multipart)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "body": {
+              "mode": "formdata",
+              "formdata": [{ "key": "file", "type": "file", "src": [] }]
+            },
+            "url": "{{baseUrl}}/profile-photos/me"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Status",
+      "item": [
+        {
+          "name": "PATCH user status (targetUserId)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"ACCEPTED\",\n  \"statusReason\": \"Approved\"\n}"
+            },
+            "url": "{{baseUrl}}/status/users/{{targetUserId}}/status"
+          }
+        },
+        {
+          "name": "PATCH training center status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"ACCEPTED\",\n  \"statusReason\": \"Approved\"\n}"
+            },
+            "url": "{{baseUrl}}/status/training-centers/{{trainingCenterId}}/status"
+          }
+        }
+      ]
+    },
+    {
+      "name": "State Registrations",
+      "item": [
+        {
+          "name": "POST — submit state registration",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const payload = j.data !== undefined && j.data !== null ? j.data : j;",
+                  "if (payload.accessToken) pm.collectionVariables.set('accessToken', payload.accessToken);",
+                  "if (payload.registration && payload.registration.id) pm.collectionVariables.set('stateRegistrationId', payload.registration.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stateId\": \"{{stateId}}\",\n  \"firstName\": \"State\",\n  \"lastName\": \"Admin\",\n  \"userName\": \"stateadmin_pb\",\n  \"email\": \"stateadmin_pb@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"mobileNo\": \"9999999999\",\n  \"address\": \"State office address\",\n  \"passportPhotoUrl\": null\n}"
+            },
+            "url": "{{baseUrl}}/state-registrations"
+          }
+        },
+        {
+          "name": "GET — list state registrations (national, paginated)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/state-registrations?page=1&pageSize=20&status=PENDING"
+          }
+        },
+        {
+          "name": "GET — state registration by stateId",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/state-registrations/state/{{stateId}}"
+          }
+        },
+        {
+          "name": "PATCH — approve/reject state registration",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"ACCEPTED\",\n  \"statusReason\": \"Approved by national admin\"\n}"
+            },
+            "url": "{{baseUrl}}/state-registrations/{{stateRegistrationId}}/status"
+          }
+        },
+        {
+          "name": "PATCH — accept/reject state registration (decision)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"ACCEPT\",\n  \"reason\": \"Approved by national admin\"\n}"
+            },
+            "url": "{{baseUrl}}/state-registrations/{{stateRegistrationId}}/decision"
+          }
+        }
+      ]
+    },
+    {
+      "name": "District Registrations",
+      "item": [
+        {
+          "name": "POST — submit district registration",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const payload = j.data !== undefined && j.data !== null ? j.data : j;",
+                  "if (payload.accessToken) pm.collectionVariables.set('accessToken', payload.accessToken);",
+                  "if (payload.registration && payload.registration.id) pm.collectionVariables.set('districtRegistrationId', payload.registration.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stateId\": \"{{stateId}}\",\n  \"districtId\": \"{{districtId}}\",\n  \"firstName\": \"District\",\n  \"lastName\": \"Admin\",\n  \"userName\": \"districtadmin01\",\n  \"email\": \"districtadmin01@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"mobileNo\": \"9999999998\",\n  \"address\": \"District office address\",\n  \"passportPhotoUrl\": null\n}"
+            },
+            "url": "{{baseUrl}}/district-registrations"
+          }
+        },
+        {
+          "name": "GET — list district registrations (paginated)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/district-registrations?page=1&pageSize=20&status=PENDING"
+          }
+        },
+        {
+          "name": "GET — district registration by districtId",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/district-registrations/district/{{districtId}}"
+          }
+        },
+        {
+          "name": "PATCH — approve/reject district registration",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"ACCEPTED\",\n  \"statusReason\": \"Approved by state admin\"\n}"
+            },
+            "url": "{{baseUrl}}/district-registrations/{{districtRegistrationId}}/status"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Gallery",
+      "item": [
+        {
+          "name": "GET public — gallery by state",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/gallery/public/by-state/{{stateId}}"
+          }
+        },
+        {
+          "name": "GET admin — all gallery images",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/gallery"
+          }
+        },
+        {
+          "name": "POST — add gallery image",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.id) pm.collectionVariables.set('galleryImageId', j.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"imageUrl\": \"https://example.com/gallery/image1.jpg\",\n  \"stateId\": \"{{stateId}}\",\n  \"caption\": \"Gatka event 2026\"\n}"
+            },
+            "url": "{{baseUrl}}/gallery"
+          }
+        },
+        {
+          "name": "DELETE — remove gallery image",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/gallery/{{galleryImageId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Messages",
+      "item": [
+        {
+          "name": "GET public — messages by state",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/messages/public/by-state/{{stateId}}"
+          }
+        },
+        {
+          "name": "GET admin — all messages",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/messages"
+          }
+        },
+        {
+          "name": "POST — create message",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.id) pm.collectionVariables.set('messageId', j.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"imageUrl\": \"https://example.com/photo.jpg\",\n  \"name\": \"John Doe\",\n  \"message\": \"Welcome to Gatka Association\",\n  \"designation\": \"State President\",\n  \"stateId\": \"{{stateId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/messages"
+          }
+        },
+        {
+          "name": "GET — message by id",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/messages/{{messageId}}"
+          }
+        },
+        {
+          "name": "PATCH — update message",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Updated welcome message\"\n}"
+            },
+            "url": "{{baseUrl}}/messages/{{messageId}}"
+          }
+        },
+        {
+          "name": "DELETE — remove message",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/messages/{{messageId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Age categories",
+      "item": [
+        {
+          "name": "GET public — active age categories",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/age-categories"
+          }
+        },
+        {
+          "name": "GET admin — all age categories (national)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/age-categories/admin?page=1&pageSize=50"
+          }
+        },
+        {
+          "name": "POST — create age category (national)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.id) pm.collectionVariables.set('ageCategoryId', j.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Under 17 Years\",\n  \"ageFrom\": 0,\n  \"ageTo\": 16,\n  \"bandType\": \"SUB_JUNIOR\",\n  \"sortOrder\": 1,\n  \"isActive\": true\n}"
+            },
+            "url": "{{baseUrl}}/age-categories"
+          }
+        },
+        {
+          "name": "PATCH — update age category (national)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": false\n}"
+            },
+            "url": "{{baseUrl}}/age-categories/{{ageCategoryId}}"
+          }
+        },
+        {
+          "name": "DELETE — age category (national)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/age-categories/{{ageCategoryId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "States",
+      "item": [
+        {
+          "name": "GET public — enabled states",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/states/public?page=1&pageSize=50"
+          }
+        },
+        {
+          "name": "GET public — enabled states + accepted registration + payment config",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const inner = j.data !== undefined && j.data !== null ? j.data : j;",
+                  "const rows = Array.isArray(inner) ? inner : (inner.items || []);",
+                  "if (rows[0]?.id) pm.collectionVariables.set('stateId', rows[0].id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/states/public/registration-accepted?page=1&pageSize=50"
+          }
+        },
+        {
+          "name": "GET all — states (national admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/states?page=1&pageSize=50"
+          }
+        },
+        {
+          "name": "GET — state by id (relations)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/states/{{stateId}}"
+          }
+        },
+        {
+          "name": "POST — create state (national admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.id) pm.collectionVariables.set('stateId', j.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Punjab\",\n  \"code\": \"PB\",\n  \"isEnabled\": false\n}"
+            },
+            "url": "{{baseUrl}}/states"
+          }
+        },
+        {
+          "name": "PATCH — update state (enable/disable/rename)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isEnabled\": true\n}"
+            },
+            "url": "{{baseUrl}}/states/{{stateId}}"
+          }
+        },
+        {
+          "name": "GET — state payment config (own state admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/states/{{stateId}}/payment-config"
+          }
+        },
+        {
+          "name": "PUT — upsert state payment config (own state admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"razorpayKeyId\": \"rzp_test_XXXX\",\n  \"razorpayKeySecret\": \"secret_XXXX\",\n  \"webhookSecret\": \"whsec_XXXX\"\n}"
+            },
+            "url": "{{baseUrl}}/states/{{stateId}}/payment-config"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Districts",
+      "item": [
+        {
+          "name": "GET public — enabled districts by state",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/districts/public/by-state/{{stateId}}?page=1&pageSize=50"
+          }
+        },
+        {
+          "name": "GET public — enabled districts + accepted district registration",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const inner = j.data !== undefined && j.data !== null ? j.data : j;",
+                  "const rows = Array.isArray(inner) ? inner : (inner.items || []);",
+                  "if (rows[0]?.id) pm.collectionVariables.set('districtId', rows[0].id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/districts/public/by-state/{{stateId}}/registration-accepted?page=1&pageSize=50"
+          }
+        },
+        {
+          "name": "GET admin — all districts by state",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/districts/by-state/{{stateId}}?page=1&pageSize=50"
+          }
+        },
+        {
+          "name": "GET — district by id (relations)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/districts/{{districtId}}"
+          }
+        },
+        {
+          "name": "POST — create district under state",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.id) pm.collectionVariables.set('districtId', j.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Amritsar\",\n  \"isEnabled\": false\n}"
+            },
+            "url": "{{baseUrl}}/districts/state/{{stateId}}"
+          }
+        },
+        {
+          "name": "PATCH — update district (enable/disable/rename)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isEnabled\": true\n}"
+            },
+            "url": "{{baseUrl}}/districts/{{districtId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reference — existing endpoints",
+      "item": [
+        {
+          "name": "Event groups",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/event-groups"
+          }
+        },
+        {
+          "name": "Settings — Global (auth)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/settings/global"
+          }
+        },
+        {
+          "name": "Settings — PATCH membership expiry date (super national)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"membershipExpiryDate\": \"2027-03-31T23:59:59.000Z\"\n}"
+            },
+            "url": "{{baseUrl}}/settings/global/membership-expiry-date"
+          }
+        },
+        {
+          "name": "Settings — GET role payment fees (public)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/settings/role-payment-fees"
+          }
+        },
+        {
+          "name": "Settings — PATCH role payment fees (national admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fees\": [\n    { \"role\": \"PLAYER\", \"feeAmountPaise\": 100600 },\n    { \"role\": \"COACH\", \"feeAmountPaise\": 200400 }\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/settings/role-payment-fees"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Memberships",
+      "item": [
+        {
+          "name": "GET — my memberships",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/memberships/me"
+          }
+        },
+        {
+          "name": "GET — list all memberships (admin)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/memberships?page=1&pageSize=20&status=ACTIVE"
+          }
+        },
+        {
+          "name": "GET — memberships by userId (admin)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/memberships/user/{{userId}}"
+          }
+        },
+        {
+          "name": "GET — single membership (admin)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/memberships/{{membershipId}}"
+          }
+        },
+        {
+          "name": "POST — trigger membership expiry (national admin)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/memberships/expire"
+          }
+        }
+      ]
+    }
+  ]
+}

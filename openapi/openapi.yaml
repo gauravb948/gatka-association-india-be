@@ -1,0 +1,2735 @@
+openapi: 3.0.3
+info:
+  title: Gatka Association India API
+  version: 1.0.0
+  description: |
+    REST API for centralized Gatka management (roles, geography, registrations, Razorpay, competitions, camps, attendance, results, notices, migration).
+
+    **Banners:** carousel items with `imageUrl`, optional `title` / `subtitle`, ordering via `sortOrder`.
+
+    **Uploads:** Cloudflare R2 — `POST /uploads/r2/upload` (multipart) and `POST /uploads/r2/presign-put` (JSON) are **public** (no JWT); protected by **rate limits**. Store returned `publicUrl` on entities (e.g. banners, registration photos).
+
+    **Rate limiting:** per-IP limits on `/api` (and stricter limits on auth and upload presign). Exceeded limits return **429** with JSON `{ error, code: RATE_LIMITED, kind, retryAfterSec }`. Use `TRUST_PROXY=1` behind a reverse proxy.
+servers:
+  - url: http://localhost:4000/api
+    description: Local
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    userListPage:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    userListPageSize:
+      name: pageSize
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    userListStatus:
+      name: status
+      in: query
+      schema: { type: string }
+      description: Filter by `EntityStatus`; comma-separated (e.g. `PENDING,ACCEPTED`).
+    userListStateId:
+      name: stateId
+      in: query
+      schema: { type: string }
+      description: Optional geography filter (national; state/district admins only when it matches their scope).
+    userListDistrictId:
+      name: districtId
+      in: query
+      schema: { type: string }
+      description: Optional district filter (national; state admin must be in-state; district admin must be own district).
+    userListTrainingCenterId:
+      name: trainingCenterId
+      in: query
+      schema: { type: string }
+      description: Optional training center filter (national; state/district when TC is in scope).
+  schemas:
+    Membership:
+      type: object
+      properties:
+        id: { type: string }
+        userId: { type: string }
+        type: { type: string, enum: [NATIONAL_ADMIN, STATE_ADMIN, DISTRICT_ADMIN, TRAINING_CENTER, COACH, REFEREE, PLAYER, VOLUNTEER] }
+        validFrom: { type: string, format: date-time }
+        validUntil: { type: string, format: date-time }
+        status: { type: string, enum: [ACTIVE, EXPIRED] }
+        paymentId: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+    RateLimitedError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Too many requests
+        code:
+          type: string
+          example: RATE_LIMITED
+        kind:
+          type: string
+          enum: [api, auth, upload]
+        retryAfterSec:
+          type: integer
+    Banner:
+      type: object
+      properties:
+        id:
+          type: string
+        imageUrl:
+          type: string
+        title:
+          type: string
+          nullable: true
+        subtitle:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+        sortOrder:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    BannerCreate:
+      type: object
+      required: [imageUrl]
+      properties:
+        imageUrl:
+          type: string
+        title:
+          type: string
+          nullable: true
+        subtitle:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+        sortOrder:
+          type: integer
+    BannerPatch:
+      type: object
+      properties:
+        imageUrl:
+          type: string
+        title:
+          type: string
+          nullable: true
+        subtitle:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+        sortOrder:
+          type: integer
+    R2PresignPutRequest:
+      type: object
+      required: [contentType]
+      properties:
+        contentType:
+          type: string
+          description: Allowed image MIME types (e.g. image/png, image/jpeg, image/webp, image/gif, image/svg+xml)
+        prefix:
+          type: string
+          description: Object key prefix (default "banners")
+          default: banners
+    R2PresignPutResponse:
+      type: object
+      properties:
+        key:
+          type: string
+        publicUrl:
+          type: string
+          format: uri
+        uploadUrl:
+          type: string
+          format: uri
+        expiresInSeconds:
+          type: integer
+    EntityStatus:
+      type: string
+      enum: [PENDING, SUBMITTED, ACCEPTED, REJECTED, BLOCKED]
+    Gender:
+      type: string
+      enum: [MALE, FEMALE, BOYS, GIRLS]
+    MaritalStatus:
+      type: string
+      enum: [SINGLE, MARRIED, DIVORCED, WIDOWED, SEPARATED, OTHER]
+    TShirtSize:
+      type: string
+      enum: [XS, S, M, L, XL, XXL, XXXL]
+    PlayingHand:
+      type: string
+      enum: [LEFT, RIGHT, BOTH]
+    CoachAppliedFor:
+      type: string
+      enum: [SENIOR_COACH, ASSISTANT_COACH]
+    GatkaExperience:
+      type: string
+      enum: [LT_1_YEAR, Y1_3, Y3_5, Y5_10, GT_10]
+    Role:
+      type: string
+      enum:
+        [
+          NATIONAL_ADMIN,
+          STATE_ADMIN,
+          DISTRICT_ADMIN,
+          TRAINING_CENTER,
+          COACH,
+          REFEREE,
+          PLAYER,
+          VOLUNTEER,
+        ]
+    ConfigurableFeeRole:
+      type: string
+      description: Roles that have a configurable national fee (excludes NATIONAL_ADMIN)
+      enum:
+        [
+          STATE_ADMIN,
+          DISTRICT_ADMIN,
+          TRAINING_CENTER,
+          COACH,
+          REFEREE,
+          PLAYER,
+          VOLUNTEER,
+        ]
+    RolePaymentFeeConfig:
+      type: object
+      properties:
+        role: { $ref: "#/components/schemas/ConfigurableFeeRole" }
+        feeAmountPaise:
+          type: integer
+          description: Amount in paise (INR); 100 paise = 1 INR
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    RolePaymentFeesPatchBody:
+      type: object
+      required: [fees]
+      properties:
+        fees:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [role, feeAmountPaise]
+            properties:
+              role: { $ref: "#/components/schemas/ConfigurableFeeRole" }
+              feeAmountPaise: { type: integer, minimum: 0 }
+    LoginStateSummary:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        code: { type: string }
+        isEnabled: { type: boolean }
+    LoginDistrictSummary:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        isEnabled: { type: boolean }
+        state:
+          type: object
+          properties:
+            id: { type: string }
+            isEnabled: { type: boolean }
+    LoginTrainingCenterSummary:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        isEnabled: { type: boolean }
+        status: { $ref: "#/components/schemas/EntityStatus" }
+        statusReason: { type: string, nullable: true }
+        termsAcceptedAt: { type: string, format: date-time, nullable: true }
+        district:
+          type: object
+          properties:
+            id: { type: string }
+            isEnabled: { type: boolean }
+            state:
+              type: object
+              properties:
+                id: { type: string }
+                isEnabled: { type: boolean }
+    LoginPlayerProfile:
+      type: object
+      nullable: true
+      properties:
+        fullName: { type: string }
+        fatherName: { type: string, nullable: true }
+        motherName: { type: string, nullable: true }
+        aadharNumber: { type: string, nullable: true }
+        maritalStatus: { $ref: "#/components/schemas/MaritalStatus", nullable: true }
+        whatsappNo: { type: string, nullable: true }
+        tShirtSize: { $ref: "#/components/schemas/TShirtSize", nullable: true }
+        playingHand: { $ref: "#/components/schemas/PlayingHand", nullable: true }
+        photoUrl: { type: string, nullable: true }
+        aadharFrontUrl: { type: string, nullable: true }
+        aadharBackUrl: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        gender: { $ref: "#/components/schemas/Gender" }
+        dateOfBirth: { type: string, format: date-time }
+        registrationNumber: { type: string, nullable: true }
+        membershipValidFrom: { type: string, format: date-time, nullable: true }
+        membershipValidUntil: { type: string, format: date-time, nullable: true }
+        registrationStatus: { type: string }
+        documentsVerifiedAt: { type: string, format: date-time, nullable: true }
+        isBlacklisted: { type: boolean }
+        stateId: { type: string }
+        districtId: { type: string }
+        trainingCenterId: { type: string }
+        dateOfJoining: { type: string, format: date-time }
+        termsAcceptedAt: { type: string, format: date-time, nullable: true }
+    LoginCoachProfile:
+      type: object
+      nullable: true
+      properties:
+        fullName: { type: string }
+        fatherName: { type: string, nullable: true }
+        aadharNumber: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        education: { type: string, nullable: true }
+        photoUrl: { type: string, nullable: true }
+        aadharFrontUrl: { type: string, nullable: true }
+        aadharBackUrl: { type: string, nullable: true }
+        gender: { $ref: "#/components/schemas/Gender" }
+        appliedFor: { $ref: "#/components/schemas/CoachAppliedFor", nullable: true }
+        experienceInGatka: { $ref: "#/components/schemas/GatkaExperience", nullable: true }
+        membershipValidUntil: { type: string, format: date-time, nullable: true }
+        trainingCenterId: { type: string }
+        isBlacklisted: { type: boolean }
+        termsAcceptedAt: { type: string, format: date-time, nullable: true }
+    LoginRefereeProfile:
+      type: object
+      nullable: true
+      properties:
+        fullName: { type: string }
+        fatherName: { type: string, nullable: true }
+        aadharNumber: { type: string, nullable: true }
+        alternatePhone: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        appliedFor: { type: string, nullable: true }
+        education: { type: string, nullable: true }
+        experienceInGatka: { $ref: "#/components/schemas/GatkaExperience", nullable: true }
+        photoUrl: { type: string, nullable: true }
+        aadharFrontUrl: { type: string, nullable: true }
+        aadharBackUrl: { type: string, nullable: true }
+        gender: { $ref: "#/components/schemas/Gender" }
+        stateId: { type: string }
+        districtId: { type: string, nullable: true }
+        membershipValidUntil: { type: string, format: date-time, nullable: true }
+        isBlacklisted: { type: boolean }
+        termsAcceptedAt: { type: string, format: date-time, nullable: true }
+    LoginVolunteerProfile:
+      type: object
+      nullable: true
+      properties:
+        fullName: { type: string }
+        photoUrl: { type: string, nullable: true }
+        gender: { $ref: "#/components/schemas/Gender" }
+        stateId: { type: string }
+        membershipValidUntil: { type: string, format: date-time, nullable: true }
+        isBlacklisted: { type: boolean }
+    LoginUser:
+      type: object
+      properties:
+        id: { type: string }
+        username: { type: string, nullable: true }
+        email: { type: string, format: email }
+        phone: { type: string, nullable: true }
+        role: { $ref: "#/components/schemas/Role" }
+        isActive: { type: boolean }
+        disabledReason: { type: string, nullable: true }
+        status: { $ref: "#/components/schemas/EntityStatus" }
+        statusReason: { type: string, nullable: true }
+        isSuperNational: { type: boolean }
+        stateId: { type: string, nullable: true }
+        districtId: { type: string, nullable: true }
+        trainingCenterId: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        state:
+          allOf:
+            - $ref: "#/components/schemas/LoginStateSummary"
+          nullable: true
+        district:
+          allOf:
+            - $ref: "#/components/schemas/LoginDistrictSummary"
+          nullable: true
+        trainingCenter:
+          allOf:
+            - $ref: "#/components/schemas/LoginTrainingCenterSummary"
+          nullable: true
+        playerProfile: { $ref: "#/components/schemas/LoginPlayerProfile" }
+        coachProfile: { $ref: "#/components/schemas/LoginCoachProfile" }
+        refereeProfile: { $ref: "#/components/schemas/LoginRefereeProfile" }
+        volunteerProfile: { $ref: "#/components/schemas/LoginVolunteerProfile" }
+    LoginResponse:
+      type: object
+      properties:
+        accessToken: { type: string }
+        user: { $ref: "#/components/schemas/LoginUser" }
+    AdminUserListItem:
+      type: object
+      description: User directory row (no password)
+      properties:
+        id: { type: string }
+        username: { type: string, nullable: true }
+        email: { type: string, format: email }
+        phone: { type: string, nullable: true }
+        role: { $ref: "#/components/schemas/Role" }
+        isActive: { type: boolean }
+        disabledReason: { type: string, nullable: true }
+        status: { $ref: "#/components/schemas/EntityStatus" }
+        statusReason: { type: string, nullable: true }
+        isSuperNational: { type: boolean }
+        stateId: { type: string, nullable: true }
+        districtId: { type: string, nullable: true }
+        trainingCenterId: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        state:
+          type: object
+          nullable: true
+          properties:
+            id: { type: string }
+            name: { type: string }
+            code: { type: string }
+        district:
+          type: object
+          nullable: true
+          properties:
+            id: { type: string }
+            name: { type: string }
+        trainingCenter:
+          type: object
+          nullable: true
+          properties:
+            id: { type: string }
+            name: { type: string }
+    AdminUserListResponse:
+      type: object
+      required: [items, page, pageSize, total, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AdminUserListItem" }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+    HierarchyUserListResponse:
+      description: Admin user list shape plus the requested `role` for this endpoint.
+      allOf:
+        - $ref: "#/components/schemas/AdminUserListResponse"
+        - type: object
+          required: [role]
+          properties:
+            role:
+              $ref: "#/components/schemas/Role"
+    RegistrationApplicantUser:
+      type: object
+      description: Linked applicant account (subset of fields; no password)
+      properties:
+        id: { type: string }
+        email: { type: string, format: email }
+        username: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+        role: { $ref: "#/components/schemas/Role" }
+        status: { $ref: "#/components/schemas/EntityStatus" }
+        stateId: { type: string, nullable: true }
+        districtId: { type: string, nullable: true }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+    StateRegistrationAuthResponse:
+      type: object
+      required: [accessToken, user, registration]
+      properties:
+        accessToken: { type: string }
+        user: { $ref: "#/components/schemas/LoginUser" }
+        registration: { $ref: "#/components/schemas/StateRegistration" }
+    DistrictRegistrationAuthResponse:
+      type: object
+      required: [accessToken, user, registration]
+      properties:
+        accessToken: { type: string }
+        user: { $ref: "#/components/schemas/LoginUser" }
+        registration: { $ref: "#/components/schemas/DistrictRegistration" }
+    RegisterPlayerRequest:
+      type: object
+      required:
+        [
+          fullName,
+          fatherName,
+          motherName,
+          aadharNumber,
+          maritalStatus,
+          userName,
+          email,
+          password,
+          mobileNo,
+          whatsappNo,
+          address,
+          gender,
+          dateOfBirth,
+          stateId,
+          districtId,
+          trainingCenterId,
+          photoUrl,
+          aadharFrontUrl,
+          aadharBackUrl,
+          tShirtSize,
+          playingHand,
+          acceptTerms,
+        ]
+      properties:
+        fullName: { type: string }
+        fatherName: { type: string }
+        motherName: { type: string }
+        aadharNumber: { type: string, description: "Digits (spaces allowed; normalized server-side)" }
+        maritalStatus: { $ref: "#/components/schemas/MaritalStatus" }
+        userName: { type: string }
+        email: { type: string, format: email }
+        password: { type: string, format: password }
+        mobileNo: { type: string }
+        whatsappNo: { type: string }
+        address: { type: string }
+        gender: { $ref: "#/components/schemas/Gender" }
+        dateOfBirth: { type: string, format: date-time }
+        stateId: { type: string }
+        districtId: { type: string }
+        trainingCenterId: { type: string }
+        photoUrl: { type: string, format: uri, description: "Passport-size photo (R2 publicUrl)" }
+        aadharFrontUrl: { type: string, format: uri }
+        aadharBackUrl: { type: string, format: uri }
+        tShirtSize: { $ref: "#/components/schemas/TShirtSize" }
+        playingHand: { $ref: "#/components/schemas/PlayingHand" }
+        acceptTerms:
+          type: boolean
+          enum: [true]
+          description: Must be true — server records `termsAcceptedAt` on the profile
+    RegisterCoachRequest:
+      type: object
+      required:
+        [
+          fullName,
+          fatherName,
+          aadharNumber,
+          address,
+          education,
+          stateId,
+          districtId,
+          trainingCenterId,
+          email,
+          password,
+          phone,
+          appliedFor,
+          experienceInGatka,
+          photoUrl,
+          aadharFrontUrl,
+          aadharBackUrl,
+          gender,
+          acceptTerms,
+        ]
+      properties:
+        fullName: { type: string }
+        fatherName: { type: string }
+        aadharNumber: { type: string, description: "Digits (spaces stripped server-side)" }
+        address: { type: string }
+        education: { type: string, description: "Education / qualifications text" }
+        stateId: { type: string }
+        districtId: { type: string }
+        trainingCenterId: { type: string }
+        email: { type: string, format: email }
+        password: { type: string, format: password }
+        phone: { type: string }
+        appliedFor: { $ref: "#/components/schemas/CoachAppliedFor" }
+        experienceInGatka: { $ref: "#/components/schemas/GatkaExperience" }
+        photoUrl: { type: string, format: uri, description: "Passport-size photo (R2 publicUrl)" }
+        aadharFrontUrl: { type: string, format: uri }
+        aadharBackUrl: { type: string, format: uri }
+        gender: { $ref: "#/components/schemas/Gender" }
+        acceptTerms:
+          type: boolean
+          enum: [true]
+          description: Must be true — server sets `termsAcceptedAt` on the coach profile
+    RegisterRefereeRequest:
+      type: object
+      required:
+        [
+          fullName,
+          fatherName,
+          aadharNumber,
+          address,
+          education,
+          appliedFor,
+          experienceInGatka,
+          email,
+          password,
+          phone,
+          gender,
+          stateId,
+          districtId,
+          photoUrl,
+          aadharFrontUrl,
+          aadharBackUrl,
+          acceptTerms,
+        ]
+      properties:
+        fullName: { type: string }
+        fatherName: { type: string }
+        aadharNumber: { type: string }
+        address: { type: string }
+        education: { type: string }
+        appliedFor: { type: string, description: "What the applicant is applying for (free text)" }
+        experienceInGatka: { $ref: "#/components/schemas/GatkaExperience" }
+        email: { type: string, format: email }
+        password: { type: string, format: password }
+        phone: { type: string }
+        alternatePhone: { type: string, description: "Optional second mobile" }
+        gender: { $ref: "#/components/schemas/Gender" }
+        stateId: { type: string }
+        districtId: { type: string }
+        photoUrl: { type: string, format: uri }
+        aadharFrontUrl: { type: string, format: uri }
+        aadharBackUrl: { type: string, format: uri }
+        acceptTerms:
+          type: boolean
+          enum: [true]
+          description: Must be true — server sets `termsAcceptedAt` on the referee profile
+    RegisterVolunteerRequest:
+      type: object
+      required: [email, password, phone, fullName, gender, stateId]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, format: password }
+        phone: { type: string }
+        fullName: { type: string }
+        gender: { $ref: "#/components/schemas/Gender" }
+        stateId: { type: string }
+    RegisterTrainingCenterRequest:
+      type: object
+      required:
+        [
+          email,
+          password,
+          phone,
+          name,
+          address,
+          stateId,
+          districtId,
+          headName,
+          headAadharNumber,
+          headPassportPhotoUrl,
+          headAadharFrontUrl,
+          headAadharBackUrl,
+          acceptTerms,
+        ]
+      properties:
+        email: { type: string, format: email, description: "Center login email" }
+        password: { type: string, format: password }
+        phone: { type: string }
+        name: { type: string, description: "Training center name" }
+        address: { type: string }
+        stateId: { type: string }
+        districtId: { type: string }
+        headName: { type: string }
+        headAadharNumber: { type: string, description: "Digits (spaces stripped server-side)" }
+        registrarNumber: { type: string, description: "Optional" }
+        registrationCertificateUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: "Optional R2 publicUrl"
+        headPassportPhotoUrl: { type: string, format: uri }
+        headAadharFrontUrl: { type: string, format: uri }
+        headAadharBackUrl: { type: string, format: uri }
+        acceptTerms:
+          type: boolean
+          enum: [true]
+          description: Must be true — server sets `termsAcceptedAt` on the training center
+    State:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        code: { type: string }
+        isEnabled: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    StateCreate:
+      type: object
+      required: [name, code]
+      properties:
+        name: { type: string }
+        code: { type: string, description: "2-8 char uppercase code" }
+        isEnabled: { type: boolean, default: false }
+    StatePatch:
+      type: object
+      properties:
+        name: { type: string }
+        isEnabled: { type: boolean }
+    StateDetailResponse:
+      type: object
+      description: >
+        State with nested `districts` (each includes slim `state`, `trainingCenters` with `district`,
+        `registration` with applicant `user` (including `memberships`) and payment summary), state-body `registration`,
+        `paymentConfig` without secrets plus `hasKeySecret` / `hasWebhookSecret`, `galleryImages`,
+        `pagesContents`, and `districtRegistrationsApplyingFrom` with `district`, `user`, and payment summary.
+      additionalProperties: true
+    DistrictDetailResponse:
+      type: object
+      description: >
+        District with `state` (state registration, public payment config with presence flags, sibling districts),
+        `trainingCenters` (each with slim `district`), and district-body `registration` with applicant `user`
+        and payment summary.
+      additionalProperties: true
+    StatePaymentConfigPut:
+      type: object
+      required: [razorpayKeyId, razorpayKeySecret, webhookSecret]
+      properties:
+        razorpayKeyId: { type: string }
+        razorpayKeySecret: { type: string }
+        webhookSecret: { type: string }
+    StatePaymentConfigResponse:
+      type: object
+      properties:
+        id: { type: string }
+        stateId: { type: string }
+        razorpayKeyId: { type: string }
+        hasKeySecret: { type: boolean }
+        hasWebhookSecret: { type: boolean }
+        updatedAt: { type: string, format: date-time }
+    PublicStateListItem:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        code: { type: string }
+    PublicDistrictListItem:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        stateId: { type: string }
+    PaginatedPublicStateListResponse:
+      type: object
+      required: [items, page, pageSize, total, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/PublicStateListItem" }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+    PaginatedStateListResponse:
+      type: object
+      required: [items, page, pageSize, total, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/State" }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+    PaginatedPublicDistrictListResponse:
+      type: object
+      required: [items, page, pageSize, total, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/PublicDistrictListItem" }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+    PaginatedDistrictListResponse:
+      type: object
+      required: [items, page, pageSize, total, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/District" }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+    District:
+      type: object
+      properties:
+        id: { type: string }
+        stateId: { type: string }
+        name: { type: string }
+        isEnabled: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    DistrictCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        isEnabled: { type: boolean, default: false }
+    DistrictPatch:
+      type: object
+      properties:
+        name: { type: string }
+        isEnabled: { type: boolean }
+    AgeBandType:
+      type: string
+      enum: [SUB_JUNIOR, JUNIOR, SENIOR, VETERAN, OPEN]
+    AgeCategory:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        ageFrom: { type: integer, nullable: true }
+        ageTo: { type: integer, nullable: true }
+        bandType: { $ref: "#/components/schemas/AgeBandType", nullable: true }
+        sortOrder: { type: integer }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    AgeCategoryBody:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        ageFrom: { type: integer, nullable: true }
+        ageTo: { type: integer, nullable: true }
+        bandType: { $ref: "#/components/schemas/AgeBandType", nullable: true }
+        sortOrder: { type: integer }
+        isActive: { type: boolean }
+    AgeCategoryAdminListResponse:
+      type: object
+      required: [items, page, pageSize, total, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AgeCategory" }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+    GalleryImage:
+      type: object
+      properties:
+        id: { type: string }
+        imageUrl: { type: string }
+        stateId: { type: string }
+        caption: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    GalleryImageCreate:
+      type: object
+      required: [imageUrl, stateId]
+      properties:
+        imageUrl: { type: string, format: uri }
+        stateId: { type: string }
+        caption: { type: string, nullable: true }
+    Message:
+      type: object
+      properties:
+        id: { type: string }
+        imageUrl: { type: string, nullable: true }
+        name: { type: string }
+        message: { type: string }
+        designation: { type: string, nullable: true }
+        stateId: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    MessageCreate:
+      type: object
+      required: [name, message, stateId]
+      properties:
+        imageUrl: { type: string, format: uri, nullable: true }
+        name: { type: string }
+        message: { type: string }
+        designation: { type: string, nullable: true }
+        stateId: { type: string }
+    MessagePatch:
+      type: object
+      properties:
+        imageUrl: { type: string, format: uri, nullable: true }
+        name: { type: string }
+        message: { type: string }
+        designation: { type: string, nullable: true }
+    StatusChangeRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { $ref: "#/components/schemas/EntityStatus" }
+        statusReason: { type: string, nullable: true }
+    StateRegistrationCreate:
+      type: object
+      required:
+        [stateId, firstName, lastName, userName, email, password, mobileNo, address]
+      properties:
+        stateId: { type: string }
+        firstName: { type: string }
+        lastName: { type: string }
+        userName: { type: string }
+        email: { type: string, format: email }
+        password: { type: string, format: password, minLength: 8 }
+        mobileNo: { type: string }
+        address: { type: string }
+        passportPhotoUrl: { type: string, format: uri, nullable: true }
+    DistrictRegistrationCreate:
+      type: object
+      required:
+        [
+          stateId,
+          districtId,
+          firstName,
+          lastName,
+          userName,
+          email,
+          password,
+          mobileNo,
+          address,
+        ]
+      properties:
+        stateId: { type: string, description: "Must match the district's state" }
+        districtId: { type: string }
+        firstName: { type: string }
+        lastName: { type: string }
+        userName: { type: string }
+        email: { type: string, format: email }
+        password: { type: string, format: password, minLength: 8 }
+        mobileNo: { type: string }
+        address: { type: string }
+        passportPhotoUrl: { type: string, format: uri, nullable: true }
+    StateRegistration:
+      type: object
+      description: Password is stored only on the linked User account, not on this row
+      properties:
+        id: { type: string }
+        stateId: { type: string }
+        userId: { type: string, nullable: true }
+        firstName: { type: string }
+        lastName: { type: string }
+        userName: { type: string }
+        email: { type: string, format: email }
+        mobileNo: { type: string }
+        address: { type: string }
+        passportPhotoUrl: { type: string, nullable: true }
+        status: { $ref: "#/components/schemas/EntityStatus" }
+        statusReason: { type: string, nullable: true }
+        paymentId: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        state:
+          type: object
+          nullable: true
+          properties:
+            id: { type: string }
+            name: { type: string }
+            code: { type: string }
+            isEnabled: { type: boolean }
+        user:
+          allOf:
+            - $ref: "#/components/schemas/RegistrationApplicantUser"
+          nullable: true
+    RegistrationPaymentSummary:
+      type: object
+      description: Non-sensitive payment row linked to a registration
+      properties:
+        id: { type: string }
+        purpose: { type: string }
+        amountPaise: { type: integer }
+        currency: { type: string }
+        status: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    DistrictRegistrationNestedSummary:
+      description: District-body registration nested under a state’s district (no nested district/state)
+      type: object
+      properties:
+        id: { type: string }
+        districtId: { type: string }
+        stateId: { type: string }
+        userId: { type: string, nullable: true }
+        firstName: { type: string }
+        lastName: { type: string }
+        userName: { type: string }
+        email: { type: string, format: email }
+        mobileNo: { type: string }
+        address: { type: string }
+        passportPhotoUrl: { type: string, nullable: true }
+        status: { $ref: "#/components/schemas/EntityStatus" }
+        statusReason: { type: string, nullable: true }
+        paymentId: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    DistrictWithOptionalDistrictRegistration:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        isEnabled: { type: boolean }
+        registration:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/DistrictRegistrationNestedSummary"
+    StateWithDistrictRegistrations:
+      description: State with ordered districts; each district may include its body registration
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        code: { type: string }
+        isEnabled: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        districts:
+          type: array
+          items: { $ref: "#/components/schemas/DistrictWithOptionalDistrictRegistration" }
+    StateBodyRegistrationSnapshot:
+      description: Parent state’s own body registration (`State.registration`), when present
+      type: object
+      properties:
+        id: { type: string }
+        stateId: { type: string }
+        userId: { type: string, nullable: true }
+        firstName: { type: string }
+        lastName: { type: string }
+        userName: { type: string }
+        email: { type: string, format: email }
+        mobileNo: { type: string }
+        address: { type: string }
+        passportPhotoUrl: { type: string, nullable: true }
+        status: { $ref: "#/components/schemas/EntityStatus" }
+        statusReason: { type: string, nullable: true }
+        paymentId: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        user:
+          allOf:
+            - $ref: "#/components/schemas/RegistrationApplicantUser"
+          nullable: true
+    StateWithStateBodyRegistration:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        code: { type: string }
+        isEnabled: { type: boolean }
+        registration:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/StateBodyRegistrationSnapshot"
+    StateRegistrationDetail:
+      description: >
+        `GET /state-registrations/state/{stateId}` includes optional `payment`, applicant `user`,
+        and `state` with all `districts` (each may include `registration` for the district body).
+      allOf:
+        - $ref: "#/components/schemas/StateRegistration"
+        - type: object
+          properties:
+            payment:
+              nullable: true
+              $ref: "#/components/schemas/RegistrationPaymentSummary"
+            state:
+              nullable: true
+              $ref: "#/components/schemas/StateWithDistrictRegistrations"
+    DistrictRegistrationDetail:
+      description: >
+        `GET /district-registrations/district/{districtId}` includes optional `payment`, applicant `user`,
+        and `state.registration` for the parent state’s body registration when present.
+      allOf:
+        - $ref: "#/components/schemas/DistrictRegistration"
+        - type: object
+          properties:
+            payment:
+              nullable: true
+              $ref: "#/components/schemas/RegistrationPaymentSummary"
+            state:
+              nullable: true
+              $ref: "#/components/schemas/StateWithStateBodyRegistration"
+    StateRegistrationListResponse:
+      type: object
+      required: [items, page, pageSize, total, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/StateRegistration" }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+    DistrictRegistration:
+      type: object
+      description: Password is stored only on the linked User account, not on this row
+      properties:
+        id: { type: string }
+        stateId: { type: string }
+        districtId: { type: string }
+        userId: { type: string, nullable: true }
+        firstName: { type: string }
+        lastName: { type: string }
+        userName: { type: string }
+        email: { type: string, format: email }
+        mobileNo: { type: string }
+        address: { type: string }
+        passportPhotoUrl: { type: string, nullable: true }
+        status: { $ref: "#/components/schemas/EntityStatus" }
+        statusReason: { type: string, nullable: true }
+        paymentId: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        state:
+          type: object
+          nullable: true
+          properties:
+            id: { type: string }
+            name: { type: string }
+            code: { type: string }
+            isEnabled: { type: boolean }
+        district:
+          type: object
+          nullable: true
+          properties:
+            id: { type: string }
+            name: { type: string }
+            stateId: { type: string }
+            isEnabled: { type: boolean }
+        user:
+          allOf:
+            - $ref: "#/components/schemas/RegistrationApplicantUser"
+          nullable: true
+    DistrictRegistrationListResponse:
+      type: object
+      required: [items, page, pageSize, total, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/DistrictRegistration" }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+  /auth/login:
+    post:
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        "200":
+          description: JWT and full user context for the client (no password)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+  /auth/me:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Get current user by token (fresh DB snapshot)
+      responses:
+        "200":
+          description: OK (envelope wraps this payload in `data`)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      user: { $ref: "#/components/schemas/LoginUser" }
+  /auth/register/player:
+    post:
+      summary: Self-register player (pending payment until webhook)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterPlayerRequest"
+      responses:
+        "201":
+          description: Created
+  /auth/register/coach:
+    post:
+      summary: Self-register coach (pending approval)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterCoachRequest"
+      responses:
+        "201":
+          description: Created
+  /auth/register/referee:
+    post:
+      summary: Self-register referee (pending approval)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRefereeRequest"
+      responses:
+        "201":
+          description: Created
+  /auth/register/volunteer:
+    post:
+      summary: Self-register volunteer (pending approval)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterVolunteerRequest"
+      responses:
+        "201":
+          description: Created
+  /auth/register/training-center:
+    post:
+      summary: Register training center + login user (pending approval)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterTrainingCenterRequest"
+      responses:
+        "201":
+          description: Created
+  /auth/otp/request:
+    post:
+      summary: Request password reset OTP (SMS queued if phone on file)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phoneOrEmail:
+                  type: string
+  /auth/otp/confirm:
+    post:
+      summary: Confirm OTP and set new password
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+  /states/public:
+    get:
+      summary: List enabled states (public, paginated)
+      parameters:
+        - $ref: "#/components/parameters/userListPage"
+        - $ref: "#/components/parameters/userListPageSize"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedPublicStateListResponse"
+  /states/public/registration-accepted:
+    get:
+      summary: List enabled states with ACCEPTED state-body registration and payment config (public, paginated)
+      parameters:
+        - $ref: "#/components/parameters/userListPage"
+        - $ref: "#/components/parameters/userListPageSize"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedPublicStateListResponse"
+  /states:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List all states (national admin, paginated)
+      parameters:
+        - $ref: "#/components/parameters/userListPage"
+        - $ref: "#/components/parameters/userListPageSize"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedStateListResponse"
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Create state (national admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StateCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/State" }
+  /states/{id}:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Get state by id (nested relations; national admin or state admin for own state)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StateDetailResponse" }
+        "403":
+          description: Forbidden
+        "404":
+          description: State not found
+    patch:
+      security: [{ bearerAuth: [] }]
+      summary: Update state — enable/disable, rename (national admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StatePatch" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/State" }
+  /states/{id}/payment-config:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Get Razorpay config metadata for state (state admin, own state only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StatePaymentConfigResponse" }
+        "404":
+          description: Not found
+    put:
+      security: [{ bearerAuth: [] }]
+      summary: Upsert per-state Razorpay keys and webhook secret (state admin, own state only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StatePaymentConfigPut" }
+      responses:
+        "200":
+          description: Upserted
+  /districts/public/by-state/{stateId}/registration-accepted:
+    get:
+      summary: List enabled districts whose district-body registration is ACCEPTED (public, paginated)
+      parameters:
+        - in: path
+          name: stateId
+          required: true
+          schema: { type: string }
+        - $ref: "#/components/parameters/userListPage"
+        - $ref: "#/components/parameters/userListPageSize"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedPublicDistrictListResponse"
+  /districts/public/by-state/{stateId}:
+    get:
+      summary: List enabled districts for state (public, paginated)
+      parameters:
+        - in: path
+          name: stateId
+          required: true
+          schema: { type: string }
+        - $ref: "#/components/parameters/userListPage"
+        - $ref: "#/components/parameters/userListPageSize"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedPublicDistrictListResponse"
+  /districts/by-state/{stateId}:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: All districts for state (national/state admin, paginated)
+      parameters:
+        - in: path
+          name: stateId
+          required: true
+          schema: { type: string }
+        - $ref: "#/components/parameters/userListPage"
+        - $ref: "#/components/parameters/userListPageSize"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedDistrictListResponse"
+  /districts/state/{stateId}:
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Create district under state (national/state admin)
+      parameters:
+        - in: path
+          name: stateId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DistrictCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/District" }
+  /districts/{id}:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Get district by id (nested relations; national, state admin in-state, or own district admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DistrictDetailResponse" }
+        "403":
+          description: Forbidden
+        "404":
+          description: District not found
+    patch:
+      security: [{ bearerAuth: [] }]
+      summary: Update district — enable/disable, rename (national/state admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DistrictPatch" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/District" }
+  /training-centers/public/by-district/{districtId}:
+    get:
+      summary: Enabled training centers
+  /settings/global:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Global settings (age calculation date, membership expiry date)
+  /settings/global/age-calculation-date:
+    patch:
+      security: [{ bearerAuth: [] }]
+      summary: Set age calculation date (national + super flag)
+  /settings/global/membership-expiry-date:
+    patch:
+      security: [{ bearerAuth: [] }]
+      summary: Set membership validity end date for paid registrations (national + super flag)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                membershipExpiryDate:
+                  type: string
+                  format: date-time
+                  nullable: true
+      responses:
+        "200":
+          description: Updated global settings
+  /settings/role-payment-fees:
+    get:
+      summary: National registration fee per role (public)
+      description: One row per role except NATIONAL_ADMIN. Amounts are in paise (INR).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/RolePaymentFeeConfig" }
+    patch:
+      security: [{ bearerAuth: [] }]
+      summary: Upsert role fees (national admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RolePaymentFeesPatchBody" }
+      responses:
+        "200":
+          description: Updated list
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/RolePaymentFeeConfig" }
+  /age-categories:
+    get:
+      summary: List active age categories (public)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AgeCategory" }
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Create age category (national admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgeCategoryBody" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgeCategory" }
+  /age-categories/admin:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List all age categories (national admin, paginated)
+      parameters:
+        - $ref: "#/components/parameters/userListPage"
+        - $ref: "#/components/parameters/userListPageSize"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/AgeCategoryAdminListResponse" }
+  /age-categories/{id}:
+    patch:
+      security: [{ bearerAuth: [] }]
+      summary: Update age category (national admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgeCategoryBody" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgeCategory" }
+    delete:
+      security: [{ bearerAuth: [] }]
+      summary: Delete age category (national admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Deleted }
+  /event-groups:
+    get:
+      summary: Active event groups with age category
+  /sessions:
+    get:
+      summary: Active sessions
+  /payments/razorpay/order:
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Create Razorpay order + payment row
+  /payments/verify:
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Verify Razorpay payment signature and mark paid
+      description: >
+        After the Razorpay checkout returns on the client, post the three values.
+        The server verifies the HMAC-SHA256 signature against the state's key secret,
+        marks the payment as PAID, and runs all status transitions (user, registration, membership).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [razorpay_order_id, razorpay_payment_id, razorpay_signature]
+              properties:
+                razorpay_order_id: { type: string }
+                razorpay_payment_id: { type: string }
+                razorpay_signature: { type: string }
+      responses:
+        "200":
+          description: OK (envelope `data` holds this object)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      verified: { type: boolean }
+                      payment: { type: object }
+        "400":
+          description: Invalid signature or missing config
+  /payments/me:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Current user payments
+  /payments/state-config:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Get Razorpay config metadata for own state (state admin)
+      responses:
+        "200":
+          description: OK (envelope `data` holds this object)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/StatePaymentConfigResponse" }
+        "404":
+          description: Not found
+    put:
+      security: [{ bearerAuth: [] }]
+      summary: Upsert own state's Razorpay keys and webhook secret (state admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StatePaymentConfigPut" }
+      responses:
+        "200":
+          description: Upserted (envelope `data` holds this object)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      id: { type: string }
+                      stateId: { type: string }
+                      razorpayKeyId: { type: string }
+                      updatedAt: { type: string, format: date-time }
+  /payments/state-config/{stateId}:
+    parameters:
+      - name: stateId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Get Razorpay config metadata for a state by id (state admin, own state only)
+      responses:
+        "200":
+          description: OK (envelope `data` holds this object)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/StatePaymentConfigResponse" }
+        "403":
+          description: Not state admin or wrong state
+        "404":
+          description: Not found
+    put:
+      security: [{ bearerAuth: [] }]
+      summary: Upsert Razorpay keys for a state by id (state admin, own state only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StatePaymentConfigPut" }
+      responses:
+        "200":
+          description: Upserted (envelope `data` holds this object)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      id: { type: string }
+                      stateId: { type: string }
+                      razorpayKeyId: { type: string }
+                      updatedAt: { type: string, format: date-time }
+        "403":
+          description: Not state admin or wrong state
+  /payments/state-configs:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List state Razorpay payment configs (national admin; paginated; optional stateId filter)
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - in: query
+          name: stateId
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: "#/components/schemas/StatePaymentConfigResponse"
+                        - type: object
+                          properties:
+                            state:
+                              type: object
+                              properties:
+                                id: { type: string }
+                                name: { type: string }
+                                code: { type: string }
+                                isEnabled: { type: boolean }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  total: { type: integer }
+                  totalPages: { type: integer }
+  /payments/state-configs/{stateId}:
+    parameters:
+      - name: stateId
+        in: path
+        required: true
+        schema: { type: string }
+    put:
+      security: [{ bearerAuth: [] }]
+      summary: Upsert a state's Razorpay keys and webhook secret (national admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StatePaymentConfigPut" }
+      responses:
+        "200":
+          description: Upserted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  stateId: { type: string }
+                  razorpayKeyId: { type: string }
+                  updatedAt: { type: string, format: date-time }
+  /players/me/profile:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Player profile
+  /competitions:
+    get:
+      summary: List competitions
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Create competition
+  /competitions/{id}/eligible-players:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Filtered players by gender/age
+  /tournament-registrations:
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Register player for competition event
+  /tournament-registrations/{id}/finalize-payment:
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Start Razorpay payment for final tournament submit
+  /camps:
+    get:
+      summary: List camps
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Create camp
+  /camps/{id}/register:
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Register for camp (payment if fee set)
+  /attendance:
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Mark attendance
+  /results:
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Upsert result + QR payload
+  /results/competition/{competitionId}/export.pdf:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: PDF export
+  /results/competition/{competitionId}/export.xlsx:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Excel export (age/event group columns)
+  /notices/inbox:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Scoped notice inbox
+  /migration/request:
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Player migration request
+  /complaints:
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Raise complaint
+  /verify/qr:
+    get:
+      summary: Verify certificate QR JSON payload (query param payload)
+      parameters:
+        - in: query
+          name: payload
+          schema:
+            type: string
+  /admin/users:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List users with pagination (national admin)
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - in: query
+          name: status
+          schema: { type: string }
+          description: Filter by `EntityStatus`; comma-separated and/or repeat (e.g. `PENDING,ACCEPTED`).
+        - in: query
+          name: userType
+          schema: { type: string }
+          description: Filter by user role; comma-separated and/or repeat (e.g. `PLAYER,COACH`). Maps to `User.role`.
+      responses:
+        "200":
+          description: OK (envelope `data` holds this object)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/AdminUserListResponse" }
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Create admin user (national)
+  /users/players:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List players (hierarchy-scoped, paginated)
+      description: Visibility follows the caller — national (all), state (state), district (district), training center (that center only). Optional `stateId` / `districtId` / `trainingCenterId` narrow further when allowed.
+      parameters:
+        - $ref: "#/components/parameters/userListPage"
+        - $ref: "#/components/parameters/userListPageSize"
+        - $ref: "#/components/parameters/userListStatus"
+        - $ref: "#/components/parameters/userListStateId"
+        - $ref: "#/components/parameters/userListDistrictId"
+        - $ref: "#/components/parameters/userListTrainingCenterId"
+      responses:
+        "200":
+          description: OK (envelope `data` holds this object)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/HierarchyUserListResponse" }
+  /users/coaches:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List coaches (hierarchy-scoped, paginated)
+      parameters:
+        - $ref: "#/components/parameters/userListPage"
+        - $ref: "#/components/parameters/userListPageSize"
+        - $ref: "#/components/parameters/userListStatus"
+        - $ref: "#/components/parameters/userListStateId"
+        - $ref: "#/components/parameters/userListDistrictId"
+        - $ref: "#/components/parameters/userListTrainingCenterId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/HierarchyUserListResponse" }
+  /users/referees:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List referees (hierarchy-scoped, paginated)
+      parameters:
+        - $ref: "#/components/parameters/userListPage"
+        - $ref: "#/components/parameters/userListPageSize"
+        - $ref: "#/components/parameters/userListStatus"
+        - $ref: "#/components/parameters/userListStateId"
+        - $ref: "#/components/parameters/userListDistrictId"
+        - $ref: "#/components/parameters/userListTrainingCenterId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/HierarchyUserListResponse" }
+  /users/volunteers:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List volunteers (hierarchy-scoped, paginated)
+      parameters:
+        - $ref: "#/components/parameters/userListPage"
+        - $ref: "#/components/parameters/userListPageSize"
+        - $ref: "#/components/parameters/userListStatus"
+        - $ref: "#/components/parameters/userListStateId"
+        - $ref: "#/components/parameters/userListDistrictId"
+        - $ref: "#/components/parameters/userListTrainingCenterId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/HierarchyUserListResponse" }
+  /users/training-centers:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List training-center head accounts (hierarchy-scoped, paginated)
+      parameters:
+        - $ref: "#/components/parameters/userListPage"
+        - $ref: "#/components/parameters/userListPageSize"
+        - $ref: "#/components/parameters/userListStatus"
+        - $ref: "#/components/parameters/userListStateId"
+        - $ref: "#/components/parameters/userListDistrictId"
+        - $ref: "#/components/parameters/userListTrainingCenterId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/HierarchyUserListResponse" }
+  /users/district-admins:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List district admins (hierarchy-scoped, paginated)
+      parameters:
+        - $ref: "#/components/parameters/userListPage"
+        - $ref: "#/components/parameters/userListPageSize"
+        - $ref: "#/components/parameters/userListStatus"
+        - $ref: "#/components/parameters/userListStateId"
+        - $ref: "#/components/parameters/userListDistrictId"
+        - $ref: "#/components/parameters/userListTrainingCenterId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/HierarchyUserListResponse" }
+  /users/state-admins:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List state admins (hierarchy-scoped, paginated)
+      parameters:
+        - $ref: "#/components/parameters/userListPage"
+        - $ref: "#/components/parameters/userListPageSize"
+        - $ref: "#/components/parameters/userListStatus"
+        - $ref: "#/components/parameters/userListStateId"
+        - $ref: "#/components/parameters/userListDistrictId"
+        - $ref: "#/components/parameters/userListTrainingCenterId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/HierarchyUserListResponse" }
+  /users/national-admins:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List national admins (national admin only)
+      parameters:
+        - $ref: "#/components/parameters/userListPage"
+        - $ref: "#/components/parameters/userListPageSize"
+        - $ref: "#/components/parameters/userListStatus"
+        - $ref: "#/components/parameters/userListStateId"
+        - $ref: "#/components/parameters/userListDistrictId"
+        - $ref: "#/components/parameters/userListTrainingCenterId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/HierarchyUserListResponse" }
+  /reports/players/expiring:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Membership expiring within N days
+  /reports/players/expired:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Expired memberships
+  /banners/public:
+    get:
+      summary: List active banners (public, ordered by sortOrder)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Banner"
+  /banners/admin:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List all banners (national admin)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Banner"
+        "429":
+          description: Rate limited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RateLimitedError"
+  /banners:
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Create banner (national admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BannerCreate"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Banner"
+        "429":
+          description: Rate limited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RateLimitedError"
+  /banners/{id}:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Get banner by id (national admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Banner"
+        "404":
+          description: Not found
+    patch:
+      security: [{ bearerAuth: [] }]
+      summary: Update banner (national admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BannerPatch"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Banner"
+    delete:
+      security: [{ bearerAuth: [] }]
+      summary: Delete banner (national admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: No content
+  /uploads/r2/presign-put:
+    post:
+      summary: Presign PUT upload to Cloudflare R2 (public)
+      description: |
+        Returns a short-lived `uploadUrl` for direct PUT to R2 and a `publicUrl` to store after upload.
+        Stricter per-IP rate limit than general API; no authentication required.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/R2PresignPutRequest"
+      responses:
+        "200":
+          description: Presigned upload URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/R2PresignPutResponse"
+        "400":
+          description: Unsupported content type or validation error
+        "429":
+          description: Rate limited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RateLimitedError"
+  /uploads/r2/upload:
+    post:
+      summary: Upload image to Cloudflare R2 via backend (public)
+      description: |
+        Send `multipart/form-data` with field `file`. Backend uploads to R2 and returns `{ key, publicUrl }`.
+        Rate limited per IP; no authentication required.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                prefix:
+                  type: string
+      responses:
+        "201":
+          description: Uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key: { type: string }
+                  publicUrl: { type: string, format: uri }
+  /profile-photos/me:
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Upload my profile photo (R2) and save to my profile
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: Uploaded and saved
+  /state-registrations:
+    post:
+      summary: Submit or update state registration (public; creates linked state admin user)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StateRegistrationCreate" }
+      responses:
+        "201":
+          description: New registration and JWT for the linked user (envelope wraps this payload in `data`)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/StateRegistrationAuthResponse" }
+        "200":
+          description: Resubmitted pending registration; JWT refreshed (envelope wraps this payload in `data`)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/StateRegistrationAuthResponse" }
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List state registrations with pagination (national admin)
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+          description: 1-based page index
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - in: query
+          name: status
+          schema:
+            type: string
+          description: |
+            Filter by registration `EntityStatus`. Comma-separated and/or repeat the param
+            (e.g. `PENDING` or `PENDING,ACCEPTED`). Omit for all statuses.
+      responses:
+        "200":
+          description: OK (envelope `data` holds this object)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/StateRegistrationListResponse" }
+  /state-registrations/state/{stateId}:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Get state registration by stateId
+      parameters:
+        - in: path
+          name: stateId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StateRegistrationDetail" }
+  /state-registrations/{id}/status:
+    patch:
+      security: [{ bearerAuth: [] }]
+      summary: Approve/reject state registration (national admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StatusChangeRequest" }
+      responses:
+        "200": { description: Updated }
+  /state-registrations/{id}/decision:
+    patch:
+      security: [{ bearerAuth: [] }]
+      summary: Accept/reject state registration (national admin; accept/reject only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [ACCEPT, REJECT] }
+                reason: { type: string }
+      responses:
+        "200": { description: Updated }
+  /district-registrations:
+    post:
+      summary: Submit or update district registration (public; creates linked district admin user)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DistrictRegistrationCreate" }
+      responses:
+        "201":
+          description: New registration and JWT for the linked user (envelope wraps this payload in `data`)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/DistrictRegistrationAuthResponse" }
+        "200":
+          description: Resubmitted pending registration; JWT refreshed (envelope wraps this payload in `data`)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/DistrictRegistrationAuthResponse" }
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List district registrations with pagination (national all; state admin scoped to their state)
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - in: query
+          name: status
+          schema: { type: string }
+          description: Filter by registration status; comma-separated and/or repeat (e.g. `PENDING,ACCEPTED`).
+      responses:
+        "200":
+          description: OK (envelope `data` holds this object)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/DistrictRegistrationListResponse" }
+  /district-registrations/district/{districtId}:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Get district registration by districtId
+      parameters:
+        - in: path
+          name: districtId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DistrictRegistrationDetail" }
+  /district-registrations/{id}/status:
+    patch:
+      security: [{ bearerAuth: [] }]
+      summary: Approve/reject district registration (national or state admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StatusChangeRequest" }
+      responses:
+        "200": { description: Updated }
+  /status/training-centers/{id}/status:
+    patch:
+      security: [{ bearerAuth: [] }]
+      summary: Change training center status (national/state/district admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StatusChangeRequest" }
+      responses:
+        "200": { description: Updated }
+  /gallery/public/by-state/{stateId}:
+    get:
+      summary: List gallery images for state (public)
+      parameters:
+        - in: path
+          name: stateId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/GalleryImage" }
+  /gallery:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List all gallery images (national/state admin)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/GalleryImage" }
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Add gallery image (national/state admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GalleryImageCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GalleryImage" }
+  /gallery/{id}:
+    delete:
+      security: [{ bearerAuth: [] }]
+      summary: Delete gallery image (national/state admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Deleted }
+  /messages/public/by-state/{stateId}:
+    get:
+      summary: List messages for state (public)
+      parameters:
+        - in: path
+          name: stateId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Message" }
+  /messages:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List all messages (national/state admin)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Message" }
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Create message (national/state admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MessageCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Message" }
+  /messages/{id}:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Get message by id
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Message" }
+    patch:
+      security: [{ bearerAuth: [] }]
+      summary: Update message (national/state admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MessagePatch" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Message" }
+    delete:
+      security: [{ bearerAuth: [] }]
+      summary: Delete message (national/state admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Deleted }
+  /status/users/{id}/status:
+    patch:
+      security: [{ bearerAuth: [] }]
+      summary: Change user status (hierarchy scoped)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StatusChangeRequest" }
+      responses:
+        "200": { description: Updated }
+  /memberships/me:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List current user's memberships
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Membership" }
+  /memberships:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List all memberships (national/state admin; paginated)
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, default: 20 }
+        - in: query
+          name: status
+          schema: { type: string, enum: [ACTIVE, EXPIRED] }
+      responses:
+        "200":
+          description: Paginated list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Membership" }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  total: { type: integer }
+                  totalPages: { type: integer }
+  /memberships/user/{userId}:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List memberships for a specific user (admin)
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Membership" }
+  /memberships/{id}:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Get single membership by id (admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Membership" }
+  /memberships/expire:
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Trigger membership expiry (national admin; marks all past-due memberships + users as EXPIRED)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  expired: { type: integer }
