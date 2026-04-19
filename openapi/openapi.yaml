@@ -1412,7 +1412,7 @@ paths:
                 $ref: "#/components/schemas/PaginatedPublicDistrictListResponse"
   /districts/public/by-state/{stateId}:
     get:
-      summary: List enabled districts for state (public, paginated)
+      summary: List enabled districts for state where district registration is not created yet (public, paginated)
       parameters:
         - in: path
           name: stateId

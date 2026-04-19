@@ -6,14 +6,14 @@ const publicDistrictSelect = { id: true, name: true, stateId: true } as const;
 
 export function findManyPublicByState(stateId: string) {
   return prisma.district.findMany({
-    where: { stateId, isEnabled: true },
+    where: { stateId, isEnabled: true, registration: { is: null } },
     orderBy: { name: "asc" },
     select: publicDistrictSelect,
   });
 }
 
 export function findManyPublicByStatePaginated(stateId: string, params: { skip: number; take: number }) {
-  const where = { stateId, isEnabled: true };
+  const where = { stateId, isEnabled: true, registration: { is: null } };
   return prisma.$transaction([
     prisma.district.findMany({
       where,
