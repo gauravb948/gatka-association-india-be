@@ -361,6 +361,8 @@ components:
         stateId: { type: string, nullable: true }
         districtId: { type: string, nullable: true }
         trainingCenterId: { type: string, nullable: true }
+        stateRegistrationId: { type: string, nullable: true }
+        districtRegistrationId: { type: string, nullable: true }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
         state:
