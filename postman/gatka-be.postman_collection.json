@@ -409,6 +409,16 @@
             ],
             "url": "{{baseUrl}}/users/national-admins?page=1&pageSize=20"
           }
+        },
+        {
+          "name": "GET — user detail by id",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/users/{{userId}}"
+          }
         }
       ]
     },
@@ -580,7 +590,7 @@
           }
         },
         {
-          "name": "PATCH training center status",
+          "name": "PATCH training center status (ACCEPTED/REJECTED/BLOCKED)",
           "request": {
             "method": "PATCH",
             "header": [
@@ -589,7 +599,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"status\": \"ACCEPTED\",\n  \"statusReason\": \"Approved\"\n}"
+              "raw": "{\n  \"status\": \"BLOCKED\",\n  \"statusReason\": \"Policy violation\"\n}"
             },
             "url": "{{baseUrl}}/status/training-centers/{{trainingCenterId}}/status"
           }

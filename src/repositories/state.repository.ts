@@ -6,14 +6,14 @@ const publicStateSelect = { id: true, name: true, code: true } as const;
 
 export function findManyPublic() {
   return prisma.state.findMany({
-    where: { isEnabled: true },
+    where: { isEnabled: true, registration: { is: null } },
     orderBy: { name: "asc" },
     select: publicStateSelect,
   });
 }
 
 export function findManyPublicPaginated(params: { skip: number; take: number }) {
-  const where = { isEnabled: true };
+  const where = { isEnabled: true, registration: { is: null } };
   return prisma.$transaction([
     prisma.state.findMany({
       where,

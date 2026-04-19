@@ -42,6 +42,15 @@ async function withAdminRegistrationIds<T extends { id: string; role: Role }>(us
   return user;
 }
 
+async function buildAuthSessionForUserId(userId: string) {
+  const full = await userRepository.findByIdForLoginResponse(userId);
+  if (!full) throw new AppError(500, "User not found");
+  return {
+    accessToken: signAccessToken({ sub: full.id, role: full.role }),
+    user: await withAdminRegistrationIds(full),
+  };
+}
+
 export async function login(req: Request, res: Response, next: NextFunction) {
   try {
     const { email, password } = loginSchema.parse(req.body);
@@ -130,11 +139,8 @@ export async function registerPlayer(req: Request, res: Response, next: NextFunc
       },
     };
     const user = await userRepository.createPlayerWithProfile(userData);
-    const token = signAccessToken({ sub: user.id, role: user.role });
-    res.status(201).json({
-      accessToken: token,
-      user: { id: user.id, email: user.email, role: user.role },
-    });
+    const payload = await buildAuthSessionForUserId(user.id);
+    res.status(201).json(payload);
   } catch (e) {
     next(e);
   }
@@ -182,7 +188,8 @@ export async function registerCoach(req: Request, res: Response, next: NextFunct
       },
     };
     const user = await userRepository.createPlayerWithProfile(userData);
-    res.status(201).json({ ok: true, userId: user.id });
+    const payload = await buildAuthSessionForUserId(user.id);
+    res.status(201).json(payload);
   } catch (e) {
     next(e);
   }
@@ -232,7 +239,8 @@ export async function registerReferee(req: Request, res: Response, next: NextFun
       },
     };
     const user = await userRepository.createPlayerWithProfile(userData);
-    res.status(201).json({ ok: true, userId: user.id });
+    const payload = await buildAuthSessionForUserId(user.id);
+    res.status(201).json(payload);
   } catch (e) {
     next(e);
   }
@@ -265,7 +273,8 @@ export async function registerVolunteer(req: Request, res: Response, next: NextF
       },
     };
     const user = await userRepository.createPlayerWithProfile(userData);
-    res.status(201).json({ ok: true, userId: user.id });
+    const payload = await buildAuthSessionForUserId(user.id);
+    res.status(201).json(payload);
   } catch (e) {
     next(e);
   }
@@ -319,7 +328,11 @@ export async function registerTrainingCenter(
       trainingCenter: { connect: { id: tc.id } },
     };
     const user = await userRepository.createPlayerWithProfile(userData);
-    res.status(201).json({ ok: true, trainingCenterId: tc.id, userId: user.id });
+    const payload = await buildAuthSessionForUserId(user.id);
+    res.status(201).json({
+      ...payload,
+      trainingCenterId: tc.id,
+    });
   } catch (e) {
     next(e);
   }

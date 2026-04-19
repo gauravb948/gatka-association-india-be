@@ -14,3 +14,4 @@ usersRouter.get("/training-centers", requireAuth, list("TRAINING_CENTER"));
 usersRouter.get("/district-admins", requireAuth, list("DISTRICT_ADMIN"));
 usersRouter.get("/state-admins", requireAuth, list("STATE_ADMIN"));
 usersRouter.get("/national-admins", requireAuth, list("NATIONAL_ADMIN"));
+usersRouter.get("/:id", requireAuth, usersListController.getUserById);

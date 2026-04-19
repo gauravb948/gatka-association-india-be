@@ -1,7 +1,10 @@
 import type { NextFunction, Request, Response } from "express";
 import { EntityStatus, Role } from "@prisma/client";
 import { AppError } from "../lib/errors.js";
-import { statusChangeBodySchema } from "../validators/status.validators.js";
+import {
+  statusChangeBodySchema,
+  trainingCenterStatusChangeBodySchema,
+} from "../validators/status.validators.js";
 import { prisma } from "../lib/prisma.js";
 
 const roleRank: Record<Role, number> = {
@@ -28,7 +31,7 @@ export async function setTrainingCenterStatus(
 ) {
   try {
     const actor = req.dbUser!;
-    const body = statusChangeBodySchema.parse(req.body);
+    const body = trainingCenterStatusChangeBodySchema.parse(req.body);
     const existing = await prisma.trainingCenter.findUnique({
       where: { id: req.params.id },
       select: { id: true, districtId: true, district: { select: { stateId: true } } },
@@ -41,12 +44,22 @@ export async function setTrainingCenterStatus(
       (actor.role === "DISTRICT_ADMIN" && actor.districtId === existing.districtId);
     if (!allowed) throw new AppError(403, "Forbidden", "FORBIDDEN_ROLE");
 
+    const reason = body.status === "ACCEPTED" ? null : body.statusReason!;
     const row = await prisma.trainingCenter.update({
       where: { id: req.params.id },
       data: {
         status: body.status as EntityStatus,
-        statusReason: body.statusReason ?? null,
+        statusReason: reason,
         isEnabled: body.status === "ACCEPTED",
+      },
+    });
+    await prisma.user.updateMany({
+      where: { trainingCenterId: req.params.id, role: Role.TRAINING_CENTER },
+      data: {
+        status: body.status as EntityStatus,
+        statusReason: reason,
+        isActive: body.status === "ACCEPTED",
+        disabledReason: body.status === "ACCEPTED" ? null : reason,
       },
     });
     res.json(row);

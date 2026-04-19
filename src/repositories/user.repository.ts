@@ -164,6 +164,20 @@ export function findByIdForLoginResponse(id: string) {
   });
 }
 
+export function findByIdRoleOnly(id: string) {
+  return prisma.user.findUnique({
+    where: { id },
+    select: { id: true, role: true },
+  });
+}
+
+export function findByIdWithinScope(id: string, scopeWhere: Prisma.UserWhereInput) {
+  return prisma.user.findFirst({
+    where: { AND: [{ id }, scopeWhere] },
+    select: { id: true },
+  });
+}
+
 export function findStateIdOnly(id: string) {
   return prisma.user.findUnique({
     where: { id },
@@ -250,7 +264,69 @@ const adminUserListSelect = {
   updatedAt: true,
   state: { select: { id: true, name: true, code: true } },
   district: { select: { id: true, name: true } },
-  trainingCenter: { select: { id: true, name: true } },
+  trainingCenter: {
+    select: {
+      id: true,
+      name: true,
+      address: true,
+      registrarNumber: true,
+      headName: true,
+      headAadharNumber: true,
+      registrationCertificateUrl: true,
+      headPassportPhotoUrl: true,
+      headAadharFrontUrl: true,
+      headAadharBackUrl: true,
+      isEnabled: true,
+      status: true,
+      statusReason: true,
+      termsAcceptedAt: true,
+      district: {
+        select: {
+          id: true,
+          name: true,
+          state: { select: { id: true, name: true, code: true, isEnabled: true } },
+        },
+      },
+      createdAt: true,
+      updatedAt: true,
+    },
+  },
+  ...loginProfileSelect,
+  stateRegistrationApplicant: {
+    select: {
+      id: true,
+      stateId: true,
+      firstName: true,
+      lastName: true,
+      userName: true,
+      email: true,
+      mobileNo: true,
+      address: true,
+      passportPhotoUrl: true,
+      status: true,
+      statusReason: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  },
+  districtRegistrationApplicant: {
+    select: {
+      id: true,
+      stateId: true,
+      districtId: true,
+      firstName: true,
+      lastName: true,
+      userName: true,
+      email: true,
+      mobileNo: true,
+      address: true,
+      passportPhotoUrl: true,
+      status: true,
+      statusReason: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  },
 } as const;
 
 export function findManyPaginatedForAdminList(params: {

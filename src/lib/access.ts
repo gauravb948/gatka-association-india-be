@@ -35,22 +35,12 @@ export function assertHierarchyEnabled(user: UserForHierarchyCheck) {
     throw new AppError(403, "Account is rejected", "USER_REJECTED");
   }
 
-  const adminAwaitingRegistration =
-    (user.role === "STATE_ADMIN" || user.role === "DISTRICT_ADMIN") &&
+  const userAdminAwaitingRegistration =
     (user.status === EntityStatus.PENDING || user.status === EntityStatus.SUBMITTED);
-
-  if (!adminAwaitingRegistration) {
-    if (user.status === EntityStatus.PENDING) {
-      throw new AppError(403, "Account is pending", "USER_PENDING");
-    }
-    if (user.status === EntityStatus.SUBMITTED) {
-      throw new AppError(403, "Account is submitted", "USER_SUBMITTED");
-    }
-  }
 
   if (user.role === "NATIONAL_ADMIN") return;
 
-  if (adminAwaitingRegistration) {
+  if (userAdminAwaitingRegistration) {
     return;
   }
 

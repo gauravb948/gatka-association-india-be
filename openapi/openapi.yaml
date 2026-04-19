@@ -422,6 +422,10 @@ components:
           properties:
             id: { type: string }
             name: { type: string }
+        userTypeProfile:
+          description: Role-specific profile/registration payload for this row; null when unavailable.
+          nullable: true
+          additionalProperties: true
     AdminUserListResponse:
       type: object
       required: [items, page, pageSize, total, totalPages]
@@ -876,6 +880,17 @@ components:
       properties:
         status: { $ref: "#/components/schemas/EntityStatus" }
         statusReason: { type: string, nullable: true }
+    TrainingCenterStatusChangeRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ACCEPTED, REJECTED, BLOCKED]
+        statusReason:
+          type: string
+          nullable: true
+          description: Required when status is REJECTED or BLOCKED
     StateRegistrationCreate:
       type: object
       required:
@@ -1253,7 +1268,7 @@ paths:
               type: object
   /states/public:
     get:
-      summary: List enabled states (public, paginated)
+      summary: List enabled states where state-body registration is not created yet (public, paginated)
       parameters:
         - $ref: "#/components/parameters/userListPage"
         - $ref: "#/components/parameters/userListPageSize"
@@ -2103,6 +2118,32 @@ paths:
                   status: { type: boolean }
                   message: { type: string }
                   data: { $ref: "#/components/schemas/HierarchyUserListResponse" }
+  /users/{id}:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Get a user by id (self or hierarchy-scoped access)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: "#/components/schemas/LoginUser" }
+                  userTypeProfile:
+                    description: Role-specific profile/registration payload; null when not applicable.
+                    nullable: true
+                    additionalProperties: true
+        "403":
+          description: Forbidden
+        "404":
+          description: User not found
   /reports/players/expiring:
     get:
       security: [{ bearerAuth: [] }]
@@ -2489,12 +2530,12 @@ paths:
   /status/training-centers/{id}/status:
     patch:
       security: [{ bearerAuth: [] }]
-      summary: Change training center status (national/state/district admin)
+      summary: Accept/reject/block training center (national/state/district admin)
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/StatusChangeRequest" }
+            schema: { $ref: "#/components/schemas/TrainingCenterStatusChangeRequest" }
       responses:
         "200": { description: Updated }
   /gallery/public/by-state/{stateId}:

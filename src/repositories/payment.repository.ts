@@ -17,6 +17,32 @@ export function findManyByUser(userId: string, take: number) {
     where: { userId },
     orderBy: { createdAt: "desc" },
     take,
+    include: {
+      user: {
+        select: { id: true, role: true, email: true, username: true },
+      },
+      state: {
+        select: { id: true, name: true, code: true },
+      },
+      session: {
+        select: { id: true, name: true, startDate: true, endDate: true },
+      },
+      tournamentRegs: {
+        select: { id: true, competitionId: true, playerUserId: true, registeredById: true },
+      },
+      campRegs: {
+        select: { id: true, campId: true, userId: true },
+      },
+      stateRegistrations: {
+        select: { id: true, stateId: true, userId: true },
+      },
+      districtRegistrations: {
+        select: { id: true, districtId: true, stateId: true, userId: true },
+      },
+      memberships: {
+        select: { id: true, userId: true, type: true, status: true },
+      },
+    },
   });
 }
 
