@@ -101,6 +101,26 @@ async function main() {
     ageByName[a.name] = row.id;
   }
 
+  const openRow = await prisma.ageCategory.upsert({
+    where: { id: "seed-age-open" },
+    create: {
+      id: "seed-age-open",
+      name: "Open",
+      ageFrom: null,
+      ageTo: null,
+      bandType: "OPEN",
+      sortOrder: 6,
+    },
+    update: {
+      name: "Open",
+      ageFrom: null,
+      ageTo: null,
+      bandType: "OPEN",
+      sortOrder: 6,
+    },
+  });
+  ageByName["Open"] = openRow.id;
+
   const groups: Array<{
     segment: string;
     gender: "MALE" | "FEMALE";

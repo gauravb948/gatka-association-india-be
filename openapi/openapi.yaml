@@ -10,6 +10,13 @@ info:
     **Uploads:** Cloudflare R2 — `POST /uploads/r2/upload` (multipart) and `POST /uploads/r2/presign-put` (JSON) are **public** (no JWT); protected by **rate limits**. Store returned `publicUrl` on entities (e.g. banners, registration photos).
 
     **Rate limiting:** per-IP limits on `/api` (and stricter limits on auth and upload presign). Exceeded limits return **429** with JSON `{ error, code: RATE_LIMITED, kind, retryAfterSec }`. Use `TRUST_PROXY=1` behind a reverse proxy.
+
+    **Age categories:** `GET /age-categories` is **unauthenticated** (no JWT).
+
+    **Attendance:** `POST /attendance` requires COACH, TRAINING_CENTER, or district/state/national admin.
+    `GET /attendance/user/{userId}` is for the same user when `role` is PLAYER, or any user for other roles.
+    `GET /attendance/competition/{competitionId}/summary` lists TOURNAMENT rows for that competition (district/state/national admin only).
+    `GET /attendance/report` returns present vs absent **players** for a training center + day, a competition (optional event + day), or a camp (optional day) — same roles as marking attendance.
 servers:
   - url: http://localhost:4000/api
     description: Local
@@ -165,7 +172,8 @@ components:
       enum: [PENDING, SUBMITTED, ACCEPTED, REJECTED, BLOCKED]
     Gender:
       type: string
-      enum: [MALE, FEMALE, BOYS, GIRLS]
+      description: OPEN is for competitions only (all player genders eligible); person profiles use MALE/FEMALE/BOYS/GIRLS.
+      enum: [MALE, FEMALE, BOYS, GIRLS, OPEN]
     MaritalStatus:
       type: string
       enum: [SINGLE, MARRIED, DIVORCED, WIDOWED, SEPARATED, OTHER]
@@ -252,6 +260,7 @@ components:
       properties:
         id: { type: string }
         name: { type: string }
+        registrationNumber: { type: string, nullable: true }
         isEnabled: { type: boolean }
         status: { $ref: "#/components/schemas/EntityStatus" }
         statusReason: { type: string, nullable: true }
@@ -295,10 +304,39 @@ components:
         trainingCenterId: { type: string }
         dateOfJoining: { type: string, format: date-time }
         termsAcceptedAt: { type: string, format: date-time, nullable: true }
+    EligiblePlayerSummary:
+      type: object
+      description: Active players eligible for this competition; includes profile image and nested geo names
+      properties:
+        userId: { type: string }
+        fullName: { type: string }
+        gender: { $ref: "#/components/schemas/Gender" }
+        registrationNumber: { type: string }
+        stateId: { type: string }
+        districtId: { type: string }
+        trainingCenterId: { type: string }
+        photoUrl: { type: string, nullable: true, description: Player profile image URL }
+        state:
+          type: object
+          properties:
+            id: { type: string }
+            name: { type: string }
+            code: { type: string }
+        district:
+          type: object
+          properties:
+            id: { type: string }
+            name: { type: string }
+        trainingCenter:
+          type: object
+          properties:
+            id: { type: string }
+            name: { type: string }
     LoginCoachProfile:
       type: object
       nullable: true
       properties:
+        registrationNumber: { type: string, nullable: true }
         fullName: { type: string }
         fatherName: { type: string, nullable: true }
         aadharNumber: { type: string, nullable: true }
@@ -318,6 +356,7 @@ components:
       type: object
       nullable: true
       properties:
+        registrationNumber: { type: string, nullable: true }
         fullName: { type: string }
         fatherName: { type: string, nullable: true }
         aadharNumber: { type: string, nullable: true }
@@ -339,6 +378,7 @@ components:
       type: object
       nullable: true
       properties:
+        registrationNumber: { type: string, nullable: true }
         fullName: { type: string }
         photoUrl: { type: string, nullable: true }
         gender: { $ref: "#/components/schemas/Gender" }
@@ -721,6 +761,22 @@ components:
         hasKeySecret: { type: boolean }
         hasWebhookSecret: { type: boolean }
         updatedAt: { type: string, format: date-time }
+    NationalPaymentConfigResponse:
+      type: object
+      description: Singleton Razorpay config for national flows (e.g. state-body registration). Secrets never returned.
+      properties:
+        id: { type: string, example: "singleton" }
+        razorpayKeyId: { type: string }
+        hasKeySecret: { type: boolean }
+        hasWebhookSecret: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    NationalPaymentConfigPutResponse:
+      type: object
+      properties:
+        id: { type: string }
+        razorpayKeyId: { type: string }
+        updatedAt: { type: string, format: date-time }
     PublicStateListItem:
       type: object
       properties:
@@ -833,6 +889,577 @@ components:
         pageSize: { type: integer, minimum: 1, maximum: 100 }
         total: { type: integer, minimum: 0 }
         totalPages: { type: integer, minimum: 0 }
+    Event:
+      type: object
+      properties:
+        id: { type: string }
+        eventGroupId: { type: string }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        minPlayers: { type: integer }
+        maxPlayers: { type: integer }
+        optionalPlayers: { type: integer }
+        totalPlayers: { type: integer }
+        sortOrder: { type: integer }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    CompetitionStateLink:
+      type: object
+      properties:
+        competitionId: { type: string }
+        stateId: { type: string }
+    CompetitionDistrictLink:
+      type: object
+      properties:
+        competitionId: { type: string }
+        districtId: { type: string }
+    CompetitionAgeCategoryLink:
+      type: object
+      properties:
+        competitionId: { type: string }
+        ageCategoryId: { type: string }
+        ageCategory:
+          allOf:
+            - { $ref: "#/components/schemas/AgeCategory" }
+    CompetitionCreator:
+      type: object
+      description: Minimal user summary when competition includes createdBy
+      properties:
+        id: { type: string }
+        email: { type: string }
+        role: { type: string }
+        stateId: { type: string, nullable: true }
+        districtId: { type: string, nullable: true }
+    Competition:
+      type: object
+      description: Season year is the UTC calendar year of `createdAt` (no Session link).
+      properties:
+        id: { type: string }
+        level: { type: string, enum: [DISTRICT, STATE, NATIONAL] }
+        name: { type: string }
+        venue: { type: string }
+        genders:
+          type: array
+          items: { $ref: "#/components/schemas/Gender" }
+        ageCategories:
+          type: array
+          items: { $ref: "#/components/schemas/CompetitionAgeCategoryLink" }
+        ageTillDate: { type: string, format: date-time, nullable: true }
+        startDate: { type: string, format: date-time, nullable: true }
+        endDate: { type: string, format: date-time, nullable: true }
+        registrationOpensAt: { type: string, format: date-time, nullable: true }
+        registrationClosesAt: { type: string, format: date-time, nullable: true }
+        finalSubmitRequiresPayment: { type: boolean }
+        isClosed: { type: boolean }
+        createdById: { type: string, nullable: true }
+        createdBy:
+          nullable: true
+          allOf:
+            - { $ref: "#/components/schemas/CompetitionCreator" }
+        states:
+          type: array
+          items: { $ref: "#/components/schemas/CompetitionStateLink" }
+        districts:
+          type: array
+          items: { $ref: "#/components/schemas/CompetitionDistrictLink" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    CompetitionAggregateResultsBody:
+      type: object
+      required: [firstPlace, secondPlace, thirdPlace]
+      properties:
+        firstPlace:
+          type: string
+          description: Id of the single winning unit (training center, district, or state — matches competition `level`).
+        secondPlace:
+          type: array
+          items: { type: string }
+          description: Unit ids tied for second (may be empty).
+        thirdPlace:
+          type: array
+          items: { type: string }
+          description: Unit ids tied for third (may be empty).
+      description: >
+        Replaces all aggregate standings for the competition. Each id may appear only once across the three lists.
+        District-level competitions rank training centers; state-level rank districts; national rank states.
+    CompetitionAggregateStandingRow:
+      type: object
+      properties:
+        id: { type: string }
+        rankBand: { type: integer, enum: [1, 2, 3] }
+        unitType: { type: string, enum: [TRAINING_CENTER, DISTRICT, STATE] }
+        unitId: { type: string }
+        tieOrder: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        createdBy:
+          nullable: true
+          type: object
+          properties:
+            id: { type: string }
+            email: { type: string }
+            role: { type: string }
+        unit:
+          description: Resolved training center, district, or state record
+          nullable: true
+          type: object
+    CompetitionAggregateResultsResponse:
+      type: object
+      required: [competitionId, level, unitType, firstPlace, secondPlace, thirdPlace]
+      properties:
+        competitionId: { type: string }
+        level: { type: string, enum: [DISTRICT, STATE, NATIONAL] }
+        unitType: { type: string, enum: [TRAINING_CENTER, DISTRICT, STATE] }
+        firstPlace:
+          type: array
+          items: { $ref: "#/components/schemas/CompetitionAggregateStandingRow" }
+        secondPlace:
+          type: array
+          items: { $ref: "#/components/schemas/CompetitionAggregateStandingRow" }
+        thirdPlace:
+          type: array
+          items: { $ref: "#/components/schemas/CompetitionAggregateStandingRow" }
+    Session:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        startDate: { type: string, format: date-time }
+        endDate: { type: string, format: date-time }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    EventGroup:
+      type: object
+      properties:
+        id: { type: string }
+        segment: { type: string }
+        gender: { $ref: "#/components/schemas/Gender" }
+        ageCategoryId: { type: string }
+        ageCategory: { $ref: "#/components/schemas/AgeCategory" }
+        sortOrder: { type: integer }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    EventWithEventGroup:
+      allOf:
+        - { $ref: "#/components/schemas/Event" }
+        - type: object
+          properties:
+            eventGroup: { $ref: "#/components/schemas/EventGroup" }
+    CompetitionStateLinkDetail:
+      type: object
+      properties:
+        competitionId: { type: string }
+        stateId: { type: string }
+        state: { $ref: "#/components/schemas/State" }
+    DistrictWithState:
+      allOf:
+        - { $ref: "#/components/schemas/District" }
+        - type: object
+          properties:
+            state: { $ref: "#/components/schemas/State" }
+    CompetitionDistrictLinkDetail:
+      type: object
+      properties:
+        competitionId: { type: string }
+        districtId: { type: string }
+        district: { $ref: "#/components/schemas/DistrictWithState" }
+    CompetitionDetail:
+      description: >
+        Competition with state/district rows including full State/District,
+        all active catalog events (Event → EventGroup → AgeCategory; same list for every competition),
+        age category links, and creator.
+        Season year is inferred from `createdAt` (UTC).
+      type: object
+      properties:
+        id: { type: string }
+        level: { type: string, enum: [DISTRICT, STATE, NATIONAL] }
+        name: { type: string }
+        venue: { type: string }
+        genders:
+          type: array
+          items: { $ref: "#/components/schemas/Gender" }
+        ageCategories:
+          type: array
+          items: { $ref: "#/components/schemas/CompetitionAgeCategoryLink" }
+        ageTillDate: { type: string, format: date-time, nullable: true }
+        startDate: { type: string, format: date-time, nullable: true }
+        endDate: { type: string, format: date-time, nullable: true }
+        registrationOpensAt: { type: string, format: date-time, nullable: true }
+        registrationClosesAt: { type: string, format: date-time, nullable: true }
+        finalSubmitRequiresPayment: { type: boolean }
+        isClosed: { type: boolean }
+        createdById: { type: string, nullable: true }
+        createdBy:
+          nullable: true
+          allOf:
+            - { $ref: "#/components/schemas/CompetitionCreator" }
+        states:
+          type: array
+          items: { $ref: "#/components/schemas/CompetitionStateLinkDetail" }
+        districts:
+          type: array
+          items: { $ref: "#/components/schemas/CompetitionDistrictLinkDetail" }
+        events:
+          type: array
+          items: { $ref: "#/components/schemas/EventWithEventGroup" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    CompetitionMeListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Competition" }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1 }
+        total: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+    CampLevel:
+      type: string
+      enum: [NATIONAL, STATE, DISTRICT]
+    CampSignupRole:
+      type: string
+      description: Roles allowed to register (admins excluded)
+      enum: [PLAYER, COACH, REFEREE, VOLUNTEER, TRAINING_CENTER]
+    CampStateLink:
+      type: object
+      properties:
+        campId: { type: string }
+        stateId: { type: string }
+    CampDistrictLink:
+      type: object
+      properties:
+        campId: { type: string }
+        districtId: { type: string }
+    Camp:
+      type: object
+      properties:
+        id: { type: string }
+        sessionId: { type: string, nullable: true }
+        level: { $ref: "#/components/schemas/CampLevel" }
+        name: { type: string }
+        venue: { type: string }
+        startDate: { type: string, format: date-time }
+        endDate: { type: string, format: date-time }
+        registrationOpensAt: { type: string, format: date-time, nullable: true }
+        registrationClosesAt: { type: string, format: date-time, nullable: true }
+        allowedSignupRoles:
+          type: array
+          items: { $ref: "#/components/schemas/Role" }
+        audience:
+          type: string
+          nullable: true
+          enum: [PLAYERS, VOLUNTEERS, COACHES, REFEREES, ALL]
+        isClosed: { type: boolean }
+        createdById: { type: string, nullable: true }
+        createdBy:
+          nullable: true
+          allOf:
+            - { $ref: "#/components/schemas/CompetitionCreator" }
+        states:
+          type: array
+          items: { $ref: "#/components/schemas/CampStateLink" }
+        districts:
+          type: array
+          items: { $ref: "#/components/schemas/CampDistrictLink" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    CampListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Camp" }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1 }
+        total: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+    CampCreateBody:
+      type: object
+      required:
+        - name
+        - venue
+        - stateIds
+        - districtIds
+        - startDate
+        - endDate
+        - registrationOpensAt
+        - registrationClosesAt
+        - allowedSignupRoles
+      properties:
+        name: { type: string }
+        venue: { type: string }
+        stateIds:
+          type: array
+          minItems: 1
+          items: { type: string }
+        districtIds:
+          type: array
+          minItems: 1
+          items: { type: string }
+        startDate: { type: string, description: ISO date or date-time }
+        endDate: { type: string }
+        registrationOpensAt: { type: string }
+        registrationClosesAt: { type: string }
+        allowedSignupRoles:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/CampSignupRole" }
+      description: >
+        Camp level (national/state/district) is inferred from the signed-in admin.
+        Geography rules match competitions. Signup is restricted to `allowedSignupRoles`
+        and to users whose state/district falls in the camp scope (districts list takes precedence).
+        No `description` field — extra properties are rejected.
+      additionalProperties: false
+    CampPatchBody:
+      type: object
+      description: >
+        At least one property required. If updating geography, send both stateIds and districtIds (each non-empty).
+        Cannot edit when isClosed is true. Camp level is not mutable.
+        No `description` field — extra properties are rejected.
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name: { type: string }
+        venue: { type: string }
+        stateIds:
+          type: array
+          minItems: 1
+          items: { type: string }
+        districtIds:
+          type: array
+          minItems: 1
+          items: { type: string }
+        startDate: { type: string }
+        endDate: { type: string }
+        registrationOpensAt: { type: string }
+        registrationClosesAt: { type: string }
+        allowedSignupRoles:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/CampSignupRole" }
+    AttendanceType:
+      type: string
+      enum: [TOURNAMENT, CAMP, TC_DAILY]
+    AttendanceMarkRequest:
+      type: object
+      required: [userId, date, type]
+      properties:
+        userId: { type: string, description: User whose attendance is recorded }
+        date:
+          type: string
+          pattern: "^\\d{4}-\\d{2}-\\d{2}$"
+          description: Calendar date (YYYY-MM-DD); server normalizes to UTC date.
+        present: { type: boolean, default: true }
+        type: { $ref: "#/components/schemas/AttendanceType" }
+        competitionId:
+          type: string
+          description: Optional; use with TOURNAMENT.
+        campId:
+          type: string
+          description: Optional; use with CAMP.
+        trainingCenterId:
+          type: string
+          description: Optional; use with TC_DAILY.
+        notes: { type: string, nullable: true }
+    Attendance:
+      type: object
+      properties:
+        id: { type: string }
+        type: { type: string }
+        date: { type: string, format: date }
+        userId: { type: string }
+        markedById: { type: string }
+        present: { type: boolean }
+        competitionId: { type: string, nullable: true }
+        campId: { type: string, nullable: true }
+        trainingCenterId: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+    AttendanceUserSnippet:
+      type: object
+      properties:
+        id: { type: string }
+        email: { type: string, format: email }
+    AttendanceTournamentListItem:
+      allOf:
+        - $ref: "#/components/schemas/Attendance"
+        - type: object
+          properties:
+            user:
+              $ref: "#/components/schemas/AttendanceUserSnippet"
+    AttendanceBulkMarkRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items: { $ref: "#/components/schemas/AttendanceMarkRequest" }
+    AttendanceBulkMarkResultItem:
+      type: object
+      required: [created, attendance]
+      properties:
+        created: { type: boolean }
+        attendance: { $ref: "#/components/schemas/Attendance" }
+    AttendanceBulkMarkResponse:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items: { $ref: "#/components/schemas/AttendanceBulkMarkResultItem" }
+    AttendanceReportRow:
+      type: object
+      properties:
+        user:
+          type: object
+          description: Player `User` with `playerProfile` (fullName, registrationNumber, trainingCenter, …)
+        attendance:
+          nullable: true
+          allOf:
+            - { $ref: "#/components/schemas/Attendance" }
+        isPresent: { type: boolean }
+    AttendanceReportRowCompetition:
+      allOf:
+        - { $ref: "#/components/schemas/AttendanceReportRow" }
+        - type: object
+          properties:
+            participations:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string }
+                  eventId: { type: string, nullable: true }
+                  eventName: { type: string, nullable: true }
+    AttendanceReportTrainingCenter:
+      type: object
+      required: [kind, trainingCenterId, date, present, absent]
+      properties:
+        kind: { type: string, enum: [trainingCenter] }
+        trainingCenterId: { type: string }
+        date: { type: string, format: date }
+        present:
+          type: array
+          items: { $ref: "#/components/schemas/AttendanceReportRow" }
+        absent:
+          type: array
+          items: { $ref: "#/components/schemas/AttendanceReportRow" }
+    AttendanceReportCompetition:
+      type: object
+      required: [kind, competitionId, eventId, date, present, absent]
+      properties:
+        kind: { type: string, enum: [competition] }
+        competitionId: { type: string }
+        eventId: { type: string, nullable: true }
+        date: { type: string, format: date, nullable: true }
+        present:
+          type: array
+          items: { $ref: "#/components/schemas/AttendanceReportRowCompetition" }
+        absent:
+          type: array
+          items: { $ref: "#/components/schemas/AttendanceReportRowCompetition" }
+    AttendanceReportCamp:
+      type: object
+      required: [kind, campId, date, present, absent]
+      properties:
+        kind: { type: string, enum: [camp] }
+        campId: { type: string }
+        date: { type: string, format: date, nullable: true }
+        present:
+          type: array
+          items: { $ref: "#/components/schemas/AttendanceReportRow" }
+        absent:
+          type: array
+          items: { $ref: "#/components/schemas/AttendanceReportRow" }
+    CompetitionCreateBody:
+      type: object
+      required:
+        - name
+        - venue
+        - genders
+        - stateIds
+        - districtIds
+        - startDate
+        - endDate
+        - registrationOpensAt
+        - registrationClosesAt
+        - ageTillDate
+        - ageCategoryIds
+      properties:
+        name: { type: string }
+        venue: { type: string }
+        genders:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/Gender" }
+        ageCategoryIds:
+          type: array
+          minItems: 1
+          items: { type: string }
+        stateIds:
+          type: array
+          minItems: 1
+          items: { type: string }
+        districtIds:
+          type: array
+          minItems: 1
+          items: { type: string }
+        startDate:
+          type: string
+          description: ISO date or date-time (competition start)
+        endDate:
+          type: string
+          description: ISO date or date-time (competition end)
+        registrationOpensAt:
+          type: string
+          description: ISO date or date-time
+        registrationClosesAt:
+          type: string
+          description: ISO date or date-time
+        ageTillDate:
+          type: string
+          description: >
+            Age-as-of date for tournament signup: when the competition lists age categories,
+            the player must match at least one on this date; otherwise the selected event's
+            age category (from its event group) applies.
+    CompetitionPatchBody:
+      type: object
+      description: >
+        At least one property required. If updating geography, send both stateIds and districtIds (each non-empty).
+        Cannot edit when isClosed is true. Same field semantics as create where present: `genders` and
+        `ageCategoryIds` are full replacements when sent (non-empty arrays). Legacy competitions with no
+        `createdBy` get the current user set as creator on the first successful patch.
+      minProperties: 1
+      properties:
+        name: { type: string }
+        venue: { type: string }
+        genders:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/Gender" }
+        stateIds:
+          type: array
+          minItems: 1
+          items: { type: string }
+        districtIds:
+          type: array
+          minItems: 1
+          items: { type: string }
+        startDate: { type: string }
+        endDate: { type: string }
+        registrationOpensAt: { type: string }
+        registrationClosesAt: { type: string }
+        ageTillDate: { type: string }
+        ageCategoryIds:
+          type: array
+          minItems: 1
+          items: { type: string }
     GalleryImage:
       type: object
       properties:
@@ -1410,6 +2037,33 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PaginatedPublicDistrictListResponse"
+  /districts/public/by-states/registration-accepted:
+    post:
+      summary: List districts with ACCEPTED district-body registration for multiple states (public)
+      description: >
+        Returns enabled districts in any of the given states whose linked `DistrictRegistration`
+        status is ACCEPTED. Same filter as GET `/districts/public/by-state/{stateId}/registration-accepted`,
+        but not paginated. Duplicate state ids in the body are ignored.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stateIds]
+              properties:
+                stateIds:
+                  type: array
+                  minItems: 1
+                  items: { type: string }
+      responses:
+        "200":
+          description: OK — array of id, name, stateId (sorted by stateId, then name)
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PublicDistrictListItem" }
   /districts/public/by-state/{stateId}:
     get:
       summary: List enabled districts for state where district registration is not created yet (public, paginated)
@@ -1505,7 +2159,29 @@ paths:
               schema: { $ref: "#/components/schemas/District" }
   /training-centers/public/by-district/{districtId}:
     get:
-      summary: Enabled training centers
+      security: []
+      summary: Training centers in a district (public)
+      description: >
+        Returns only training centers with `status` **ACCEPTED** and `isEnabled` **true** in the given district.
+        Minimal fields for signup pickers (`id`, `name`, `districtId`).
+      parameters:
+        - name: districtId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string }
+                    name: { type: string }
+                    districtId: { type: string }
   /settings/global:
     get:
       security: [{ bearerAuth: [] }]
@@ -1562,7 +2238,8 @@ paths:
                 items: { $ref: "#/components/schemas/RolePaymentFeeConfig" }
   /age-categories:
     get:
-      summary: List active age categories (public)
+      security: []
+      summary: List active age categories (public, no authentication)
       responses:
         "200":
           description: OK
@@ -1636,6 +2313,28 @@ paths:
   /event-groups:
     get:
       summary: Active event groups with age category
+  /event-groups/{id}/events:
+    get:
+      summary: List all events for an event group
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Event group id
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK — ordered by sortOrder
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Event" }
+        "404":
+          description: Event group not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
   /sessions:
     get:
       summary: Active sessions
@@ -1683,6 +2382,32 @@ paths:
     get:
       security: [{ bearerAuth: [] }]
       summary: Current user payments
+  /payments/national-config:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Get national Razorpay config metadata (national admin; secrets omitted)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NationalPaymentConfigResponse" }
+        "404":
+          description: Row not created yet (run seed/migration or PUT once)
+    put:
+      security: [{ bearerAuth: [] }]
+      summary: Upsert national Razorpay keys and webhook secret (national admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StatePaymentConfigPut" }
+      responses:
+        "200":
+          description: Upserted (response omits secrets)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NationalPaymentConfigPutResponse" }
   /payments/state-config:
     get:
       security: [{ bearerAuth: [] }]
@@ -1849,13 +2574,357 @@ paths:
   /competitions:
     get:
       summary: List competitions
+      parameters:
+        - name: name
+          in: query
+          required: false
+          description: Case-insensitive substring match on competition name
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Competition" }
     post:
       security: [{ bearerAuth: [] }]
-      summary: Create competition
+      summary: Create competition (form fields only; level from admin role; season year from createdAt)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CompetitionCreateBody" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Competition" }
+        "409":
+          description: Competition name already exists
+  /competitions/me:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List competitions for the current user (paginated)
+      description: >
+        National admins see competitions they created, those created by state/district admins,
+        and legacy rows with no recorded creator.
+        State admins see non-national competitions where their state appears in the competition's
+        selected states, or where at least one selected district lies in their state (so a national
+        admin limiting a competition to states A and B only surfaces it to state admins A and B).
+        District admins see non-national competitions that list their district, or with no districts
+        selected but their state in the selected states (state-wide scope).         Legacy competitions
+        with no state/district rows remain visible to state and district admins.
+        Training centers see district-level competitions that include their district in the
+        competition's selected districts.
+        Other authenticated users see distinct competitions where they have at least one tournament
+        registration as the player. Items include `createdBy` when available.
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: name
+          in: query
+          required: false
+          description: Case-insensitive substring match on competition name
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CompetitionMeListResponse" }
+        "401":
+          description: Unauthorized
+  /competitions/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      summary: Get competition by id (full detail)
+      description: >
+        Public. Returns geographic scope with nested states/districts, age category links,
+        creator summary, and competition events with each event's group and age category.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CompetitionDetail" }
+        "404":
+          description: Competition not found
+    patch:
+      security: [{ bearerAuth: [] }]
+      summary: Update competition (scoped admins; not when closed)
+      description: >
+        Partial update. Response includes `createdBy` and `createdById` like create. Supports multiple
+        `genders` and `ageCategoryIds` (replace junction when `ageCategoryIds` is sent).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CompetitionPatchBody" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Competition" }
+        "400":
+          description: Closed competition
+        "403":
+          description: Outside admin scope
+        "409":
+          description: Name taken
+  /competitions/{id}/close:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Close competition (no new tournament registrations; idempotent)
+      responses:
+        "200":
+          description: OK — returns competition with isClosed true
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Competition" }
+        "403":
+          description: Outside admin scope
+  /competitions/{id}/event-groups:
+    get:
+      summary: Event groups in this competition’s age scope
+      description: >
+        Public. Returns active `EventGroup` rows (with `ageCategory`) whose age band overlaps at least one
+        of this competition’s linked age categories, using inclusive `ageFrom`/`ageTo` (null = unbounded).
+        If the competition has no linked age categories, all active event groups are returned.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/EventGroup" }
+        "404":
+          description: Competition not found
+  /competitions/{id}/aggregate-results:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Get organization-level aggregate results (1st/2nd/3rd)
+      description: >
+        Same manage scope as patching the competition. Returns ranked units: training centers (district-level
+        competition), districts (state-level), or states (national). `firstPlace` is at most one row; second and
+        third may list ties.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CompetitionAggregateResultsResponse" }
+        "403":
+          description: Outside admin scope
+        "404":
+          description: Competition not found
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Set or replace aggregate competition results
+      description: >
+        Replaces all rows for this competition. Exactly one `firstPlace` id; `secondPlace` and `thirdPlace` are
+        arrays (may be empty) allowing multiple units at 2nd and 3rd. All ids must sit within the competition’s
+        geography. District-level → training center ids; state-level → district ids; national → state ids.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CompetitionAggregateResultsBody" }
+      responses:
+        "201":
+          description: Created — current standings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CompetitionAggregateResultsResponse" }
+        "400":
+          description: Validation or geography mismatch
+        "403":
+          description: Outside admin scope
+        "404":
+          description: Competition not found
   /competitions/{id}/eligible-players:
     get:
       security: [{ bearerAuth: [] }]
-      summary: Filtered players by gender/age
+      summary: Players matching hierarchy, competition gender/geo, and event-group rules
+      description: >
+        Requires lower-level completion in the competition calendar year when applicable (district before state,
+        state before national), with participation and tournament attendance marked present. Without `eventId`,
+        includes players eligible for at least one linked competition event (age/gender per event group). With
+        `eventId`, narrows to that catalog event's age band and event-group gender.
+        Training-center users: for `DISTRICT`-level competitions only, results are limited to active players in the
+        training center's district (any accepted player in that district); for higher-level competitions the list is empty.
+        When `eventId` is set, players who already have a participation record for that catalog event in this
+        competition are omitted. For catalog Fari Soti / Single Soti events, players who have the opposite
+        Soti type in this competition are also omitted (mutual exclusion).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: eventId
+          in: query
+          required: false
+          schema: { type: string }
+          description: Catalog `Event.id` (all active events apply to every competition)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/EligiblePlayerSummary" }
+        "400":
+          description: Competition closed
+        "403":
+          description: Training center context missing
+        "404":
+          description: Competition not found
+  /competitions/{id}/participations/bulk:
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Bulk record participation for multiple catalog events
+      description: >
+        Each item targets one catalog `Event` (`eventId`) with `playerUserIds` (one for individual
+        events, team size between event min/max for team events). Enforces hierarchy by competition `createdAt` year,
+        max two events per player in this competition (e.g. team and/or Single Soti, or team and/or Fari Soti; Fari and
+        Single Soti are mutually exclusive), at most one Individual Single Soti per event group, and team size bounds. All
+        items validated before any insert.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  minItems: 1
+                  maxItems: 30
+                  items:
+                    type: object
+                    required: [eventId, playerUserIds]
+                    properties:
+                      eventId: { type: string }
+                      playerUserIds:
+                        type: array
+                        minItems: 1
+                        maxItems: 32
+                        items: { type: string }
+      responses:
+        "201":
+          description: All created
+        "400":
+          description: Competition closed or validation failed
+  /competitions/{id}/participations:
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Record participation for one catalog event (team or individual)
+      description: >
+        Creates `ParticipationRecord` rows for catalog `eventId` and each `playerUserId`. Same business rules as bulk.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [eventId, playerUserIds]
+              properties:
+                eventId: { type: string }
+                playerUserIds:
+                  type: array
+                  minItems: 1
+                  maxItems: 32
+                  items: { type: string }
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: >
+            Closed competition, eligibility, gender, geo, age, caps, team size, or Fari/Single Soti mutual exclusion
+            (`FARI_SOTI_BLOCKS_SINGLE_SOTI`, `SINGLE_SOTI_BLOCKS_FARI_SOTI`).
+        "403":
+          description: Role/level mismatch or player outside registrar scope
+        "409":
+          description: Player already in this event or duplicate single-soti in group
+  /competitions/{id}/players-not-participated:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Eligible players who can still register for at least one event (scoped)
+      description: >
+        Players with ACTIVE status, not blacklisted/TC-disabled, within competition geography (enabled states/districts),
+        matching competition-level gender and at least one linked event's event-group age/gender, passing hierarchy
+        rules for this competition year, and **not** saturated (still able to register some allowed event given caps).
+        Scoped to the caller's hierarchy. Omits players who already filled all allowed slots.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: "#/components/parameters/userListPage"
+        - $ref: "#/components/parameters/userListPageSize"
+      responses:
+        "200":
+          description: OK (envelope with paginated items)
+        "400":
+          description: Competition closed
+  /competitions/{id}/participants:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List participants (participation records) for a competition
+      description: >
+        Paginated `ParticipationRecord` rows with `participated` true, including nested player profile summary.
+        Scoped to the caller's hierarchy the same way as player lists (national sees all, others see their geography).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: "#/components/parameters/userListPage"
+        - $ref: "#/components/parameters/userListPageSize"
+      responses:
+        "200":
+          description: OK (envelope with paginated items)
   /tournament-registrations:
     post:
       security: [{ bearerAuth: [] }]
@@ -1866,18 +2935,250 @@ paths:
       summary: Start Razorpay payment for final tournament submit
   /camps:
     get:
-      summary: List camps
+      summary: List camps (paginated)
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: name
+          in: query
+          required: false
+          description: Case-insensitive substring match on camp name
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CampListResponse" }
     post:
       security: [{ bearerAuth: [] }]
-      summary: Create camp
+      summary: Create camp (level from admin role; multi state/district scope)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CampCreateBody" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Camp" }
+  /camps/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    patch:
+      security: [{ bearerAuth: [] }]
+      summary: Update camp (scoped admins; not when closed)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CampPatchBody" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Camp" }
+        "400":
+          description: Closed camp
+        "403":
+          description: Outside admin scope
+  /camps/{id}/close:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Close camp (no new registrations; idempotent)
+      responses:
+        "200":
+          description: OK — returns camp with isClosed true
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Camp" }
+        "403":
+          description: Outside admin scope
   /camps/{id}/register:
     post:
       security: [{ bearerAuth: [] }]
-      summary: Register for camp (payment if fee set)
+      summary: Register for camp
+      description: >
+        Allowed only if current time is within registration window, your `User.role` is in
+        `allowedSignupRoles`, and (when the camp lists states/districts) your profile geography matches scope.
+        Registration is recorded immediately (no camp fee).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "201":
+          description: Created — camp registration row
   /attendance:
     post:
       security: [{ bearerAuth: [] }]
       summary: Mark attendance
+      description: >
+        Allowed roles: COACH, TRAINING_CENTER, DISTRICT_ADMIN, STATE_ADMIN, NATIONAL_ADMIN.
+        Body `type` selects context: use `competitionId` for TOURNAMENT, `campId` for CAMP, `trainingCenterId` for TC_DAILY as needed.
+        There is at most one row per subject user per calendar `date`. A repeat call for the same `userId` and `date` updates
+        that row (latest payload wins) and returns 200; first write returns 201.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AttendanceMarkRequest" }
+      responses:
+        "201":
+          description: Created a new attendance row for this user and date
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Attendance" }
+        "200":
+          description: Updated existing attendance for this user and date
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Attendance" }
+        "400":
+          description: Validation error
+        "401":
+          description: Missing or invalid JWT
+        "403":
+          description: Role cannot mark attendance
+  /attendance/bulk:
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Bulk mark attendance
+      description: >
+        Same roles and per-item rules as `POST /attendance`. Request body is 1–500 items; each item has the same shape as
+        a single mark. All rows are written in **one transaction** (all commit or all roll back). Response `results` are in
+        the same order as `items`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AttendanceBulkMarkRequest" }
+      responses:
+        "200":
+          description: OK — per-item `created` flag and final `attendance` row
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AttendanceBulkMarkResponse" }
+        "400":
+          description: Validation error (e.g. empty or too many items)
+        "401":
+          description: Missing or invalid JWT
+        "403":
+          description: Role cannot mark attendance
+  /attendance/report:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Player attendance report (training center, competition, or camp)
+      description: >
+        Same roles as marking attendance. Exactly one of:
+        (1) `trainingCenterId` and `date` — all **players** in that TC: **present** if that day’s row is `TC_DAILY`, same
+        `trainingCenterId`, and `present` (see `isPresent`); **absent** otherwise (same-day row may still be returned for
+        other contexts e.g. tournament);
+        (2) `competitionId`, optional `eventId` (only players who participated in that event), optional `date` — **present**
+        if TOURNAMENT attendance for this competition is marked `present` (for that day if `date` is set, or any day if
+        omitted); **absent** = participated but not present per those rules, with `participations` for context;
+        (3) `campId`, optional `date` — **players** registered for the camp: **present** for `CAMP`+`present` (that day
+        or any day with `date` omitted); **absent** = registered but not in the present set.
+      parameters:
+        - in: query
+          name: trainingCenterId
+          schema: { type: string }
+          description: Use with `date` (mutually exclusive with `competitionId` / `campId`).
+        - in: query
+          name: date
+          schema: { type: string, format: date }
+          description: Calendar date (YYYY-MM-DD). Required for `trainingCenterId`; optional for competition/camp to scope to that day in UTC.
+        - in: query
+          name: competitionId
+          schema: { type: string }
+        - in: query
+          name: eventId
+          schema: { type: string }
+          description: Catalog event id; requires `competitionId`; limits to players with participation in that event.
+        - in: query
+          name: campId
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK — body includes `kind` discriminator
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - { $ref: "#/components/schemas/AttendanceReportTrainingCenter" }
+                  - { $ref: "#/components/schemas/AttendanceReportCompetition" }
+                  - { $ref: "#/components/schemas/AttendanceReportCamp" }
+        "400":
+          description: Invalid or ambiguous query
+        "401":
+          description: Missing or invalid JWT
+        "403":
+          description: Role cannot view report
+  /attendance/user/{userId}:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List attendance for a user
+      description: >
+        Returns up to 200 rows newest-first. If the caller is a PLAYER, `userId` must be the current user.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Attendance" }
+        "401":
+          description: Missing or invalid JWT
+        "403":
+          description: Player may not list another user
+  /attendance/competition/{competitionId}/summary:
+    parameters:
+      - name: competitionId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Tournament attendance rows for a competition
+      description: >
+        Returns `type` TOURNAMENT attendance for the competition, including subject `user` (id, email).
+        Allowed roles: DISTRICT_ADMIN, STATE_ADMIN, NATIONAL_ADMIN.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AttendanceTournamentListItem" }
+        "401":
+          description: Missing or invalid JWT
+        "403":
+          description: Forbidden for this role
   /results:
     post:
       security: [{ bearerAuth: [] }]
@@ -1943,6 +3244,41 @@ paths:
     post:
       security: [{ bearerAuth: [] }]
       summary: Create admin user (national)
+  /users/players/by-state/{stateId}:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List players in a state (hierarchy-scoped, paginated)
+      description: >
+        Same rules and response shape as `GET /users/players` with `stateId` set to the path parameter.
+        Training centers may only use their own state's id. Returns 404 if the state id does not exist.
+      parameters:
+        - in: path
+          name: stateId
+          required: true
+          schema: { type: string }
+        - $ref: "#/components/parameters/userListPage"
+        - $ref: "#/components/parameters/userListPageSize"
+        - $ref: "#/components/parameters/userListStatus"
+        - $ref: "#/components/parameters/userListDistrictId"
+        - $ref: "#/components/parameters/userListTrainingCenterId"
+      responses:
+        "200":
+          description: OK (envelope `data` holds this object; includes `stateId` echo)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data:
+                    allOf:
+                      - { $ref: "#/components/schemas/HierarchyUserListResponse" }
+                      - type: object
+                        properties:
+                          stateId: { type: string }
+        "404":
+          description: State not found
   /users/players:
     get:
       security: [{ bearerAuth: [] }]

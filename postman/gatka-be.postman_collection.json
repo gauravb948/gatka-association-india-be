@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Gatka Association India BE",
-    "description": "API collection (baseUrl includes `/api`). Rate limits: 429 with `code: RATE_LIMITED`. Auth routes use stricter limits; R2 upload/presign are public with upload rate limits.",
+    "description": "API collection (baseUrl includes `/api`). Rate limits: 429 with `code: RATE_LIMITED`. Auth routes use stricter limits; R2 upload/presign are public with upload rate limits. After **Auth → Me**, `userId` is set on the collection for user-scoped calls (e.g. attendance). Set `competitionId` / `campId` where needed for attendance and competitions.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -68,6 +68,22 @@
     {
       "key": "razorpay_signature",
       "value": ""
+    },
+    {
+      "key": "userId",
+      "value": "<userId>"
+    },
+    {
+      "key": "competitionId",
+      "value": "<competitionId>"
+    },
+    {
+      "key": "campId",
+      "value": "<campId>"
+    },
+    {
+      "key": "membershipId",
+      "value": "<membershipId>"
     }
   ],
   "item": [
@@ -117,6 +133,19 @@
         ,
         {
           "name": "Me — current user by token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const u = j.user || (j.data && j.data.user);",
+                  "if (u && u.id) pm.collectionVariables.set('userId', u.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
@@ -1188,6 +1217,141 @@
               "raw": "{\n  \"isEnabled\": true\n}"
             },
             "url": "{{baseUrl}}/districts/{{districtId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Attendance",
+      "description": "Mark attendance: roles COACH, TRAINING_CENTER, DISTRICT_ADMIN, STATE_ADMIN, NATIONAL_ADMIN. `date` is ISO calendar date `YYYY-MM-DD`. Types: TOURNAMENT (optional `competitionId`), CAMP (optional `campId`), TC_DAILY (optional `trainingCenterId` for a player at a TC). Competition summary: DISTRICT_ADMIN, STATE_ADMIN, NATIONAL_ADMIN only.",
+      "item": [
+        {
+          "name": "GET — report (training center + date)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/attendance/report?trainingCenterId={{trainingCenterId}}&date=2026-04-24"
+          }
+        },
+        {
+          "name": "GET — report (competition, optional event + date)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/attendance/report?competitionId={{competitionId}}&date=2026-04-24"
+          }
+        },
+        {
+          "name": "GET — report (camp, optional date)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/attendance/report?campId={{campId}}&date=2026-04-24"
+          }
+        },
+        {
+          "name": "POST — bulk mark attendance",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"userId\": \"{{userId}}\",\n      \"date\": \"2026-04-24\",\n      \"type\": \"TOURNAMENT\",\n      \"present\": true,\n      \"competitionId\": \"{{competitionId}}\"\n    }\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/attendance/bulk"
+          }
+        },
+        {
+          "name": "POST — mark attendance (tournament)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"date\": \"2026-04-24\",\n  \"type\": \"TOURNAMENT\",\n  \"present\": true,\n  \"competitionId\": \"{{competitionId}}\",\n  \"notes\": \"optional\"\n}"
+            },
+            "url": "{{baseUrl}}/attendance"
+          }
+        },
+        {
+          "name": "POST — mark attendance (camp)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"date\": \"2026-04-24\",\n  \"type\": \"CAMP\",\n  \"present\": true,\n  \"campId\": \"{{campId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/attendance"
+          }
+        },
+        {
+          "name": "POST — mark attendance (training center daily)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"date\": \"2026-04-24\",\n  \"type\": \"TC_DAILY\",\n  \"present\": true,\n  \"trainingCenterId\": \"{{trainingCenterId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/attendance"
+          }
+        },
+        {
+          "name": "GET — list attendance for user",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/attendance/user/{{userId}}"
+          }
+        },
+        {
+          "name": "GET — tournament attendance summary (competition)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/attendance/competition/{{competitionId}}/summary"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Competitions — aggregate results",
+      "description": "Organization-level 1st/2nd/3rd by competition level: DISTRICT → training centers, STATE → districts, NATIONAL → states. One winner in firstPlace; secondPlace and thirdPlace are arrays (ties).",
+      "item": [
+        {
+          "name": "GET — aggregate results",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/competitions/{{competitionId}}/aggregate-results"
+          }
+        },
+        {
+          "name": "POST — set aggregate results (replace)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstPlace\": \"<unitId>\",\n  \"secondPlace\": [],\n  \"thirdPlace\": []\n}"
+            },
+            "url": "{{baseUrl}}/competitions/{{competitionId}}/aggregate-results"
           }
         }
       ]

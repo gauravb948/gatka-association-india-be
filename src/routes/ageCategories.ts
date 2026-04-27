@@ -4,6 +4,7 @@ import * as ageCategoriesController from "../controllers/ageCategories.controlle
 
 export const ageCategoriesRouter = Router();
 
+/** Public: no JWT (reference data for forms). */
 ageCategoriesRouter.get("/", ageCategoriesController.listActive);
 ageCategoriesRouter.get(
   "/admin",

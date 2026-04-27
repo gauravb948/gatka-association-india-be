@@ -6,6 +6,11 @@ export const usersRouter = Router();
 
 const list = usersListController.listUsersByRole;
 
+usersRouter.get(
+  "/players/by-state/:stateId",
+  requireAuth,
+  usersListController.listPlayersByState
+);
 usersRouter.get("/players", requireAuth, list("PLAYER"));
 usersRouter.get("/coaches", requireAuth, list("COACH"));
 usersRouter.get("/referees", requireAuth, list("REFEREE"));

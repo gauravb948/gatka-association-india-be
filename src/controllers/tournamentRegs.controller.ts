@@ -8,10 +8,12 @@ import { AppError } from "../lib/errors.js";
 import {
   assertParticipationPrerequisite,
   assertPlayerActiveForTournament,
-  assertPlayerFitsCompetitionAge,
+  assertPlayerFitsTournamentEventAge,
+  assertPlayerInCompetitionGeography,
   playerGenderMatchesCompetition,
 } from "../lib/eligibility.js";
 import { getRazorpayForState } from "../lib/razorpayClient.js";
+import { prisma } from "../lib/prisma.js";
 import {
   tournamentFinalizePaymentSchema,
   tournamentRegistrationBodySchema,
@@ -31,29 +33,44 @@ export async function create(req: Request, res: Response, next: NextFunction) {
       throw new AppError(403, "Cannot register players for tournament");
     }
 
-    const comp = await competitionRepository.findByIdWithEvents(body.competitionId);
+    const comp = await competitionRepository.findByIdForPlayerEligibility(body.competitionId);
     if (!comp) throw new AppError(404, "Competition not found");
+    if (comp.isClosed) {
+      throw new AppError(400, "Competition is closed", "COMPETITION_CLOSED");
+    }
+
+    const eventOk = await prisma.event.findFirst({
+      where: { id: body.eventId, isActive: true },
+      select: { id: true },
+    });
+    if (!eventOk) {
+      throw new AppError(400, "Event not in catalog or inactive", "UNKNOWN_EVENT");
+    }
 
     await assertPlayerActiveForTournament(body.playerUserId);
-    await assertParticipationPrerequisite(
-      body.playerUserId,
-      comp.sessionId,
-      comp.level
-    );
-    await assertPlayerFitsCompetitionAge(body.playerUserId, comp.id);
+    await assertParticipationPrerequisite(body.playerUserId, comp.createdAt, comp.level);
+    await assertPlayerFitsTournamentEventAge(body.playerUserId, comp, body.eventId);
 
     const profile = await playerRepository.findProfileByUserId(body.playerUserId);
     if (!profile) throw new AppError(404, "Player not found");
-    if (!playerGenderMatchesCompetition(profile.gender, comp.gender)) {
+    if (!playerGenderMatchesCompetition(profile.gender, comp.genders)) {
       throw new AppError(400, "Gender not eligible");
     }
 
+    assertPlayerInCompetitionGeography(comp, {
+      stateId: profile.stateId,
+      districtId: profile.districtId,
+    });
+
     if (registrar.role === "TRAINING_CENTER") {
-      if (profile.trainingCenterId !== registrar.trainingCenterId) {
-        throw new AppError(403, "Player not at your TC");
-      }
       if (comp.level !== "DISTRICT") {
         throw new AppError(403, "TC registers for district level only");
+      }
+      if (!registrar.trainingCenter) {
+        throw new AppError(403, "Training center context missing", "FORBIDDEN_SCOPE");
+      }
+      if (profile.districtId !== registrar.trainingCenter.district.id) {
+        throw new AppError(403, "Player not in your district", "FORBIDDEN_SCOPE");
       }
     }
     if (registrar.role === "DISTRICT_ADMIN") {
@@ -72,9 +89,6 @@ export async function create(req: Request, res: Response, next: NextFunction) {
         throw new AppError(403, "State registers for national level");
       }
     }
-
-    const hasEvent = comp.events.some((ce) => ce.eventId === body.eventId);
-    if (!hasEvent) throw new AppError(400, "Event not in competition");
 
     const row = await tournamentRegistrationRepository.upsertRegistration({
       competitionId: body.competitionId,
@@ -107,7 +121,6 @@ export async function finalizePayment(req: Request, res: Response, next: NextFun
       state: { connect: { id: stateId } },
       purpose: "TOURNAMENT_REGISTRATION",
       amountPaise: body.amountPaise,
-      session: { connect: { id: reg.competition.sessionId } },
       status: "PENDING",
       metadata: { tournamentRegistrationId: reg.id },
     });

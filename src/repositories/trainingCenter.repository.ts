@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { EntityStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 
+/** Public picker: enabled rows with registration `ACCEPTED` only (no pending/rejected TCs). */
 export function findManyPublicByDistrict(districtId: string) {
   return prisma.trainingCenter.findMany({
     where: { districtId, isEnabled: true, status: EntityStatus.ACCEPTED },

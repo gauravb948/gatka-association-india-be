@@ -22,3 +22,15 @@ export function fitsAgeCategory(
   if (ageTo != null && age > ageTo) return false;
   return true;
 }
+
+/** Inclusive age bands: null bounds mean unbounded in that direction. */
+export function ageBandsOverlap(
+  a: { ageFrom: number | null; ageTo: number | null },
+  b: { ageFrom: number | null; ageTo: number | null }
+): boolean {
+  const aLo = a.ageFrom ?? Number.NEGATIVE_INFINITY;
+  const aHi = a.ageTo ?? Number.POSITIVE_INFINITY;
+  const bLo = b.ageFrom ?? Number.NEGATIVE_INFINITY;
+  const bHi = b.ageTo ?? Number.POSITIVE_INFINITY;
+  return Math.max(aLo, bLo) <= Math.min(aHi, bHi);
+}

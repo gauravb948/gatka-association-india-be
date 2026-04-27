@@ -23,6 +23,8 @@ enum Gender {
   FEMALE
   BOYS
   GIRLS
+  /// Competition-only: any player gender may register (see eligibility).
+  OPEN
 }
 
 enum MaritalStatus {
@@ -183,8 +185,7 @@ model State {
   users              User[]
   playerProfiles     PlayerProfile[]
   paymentConfig      StatePaymentConfig?
-  competitions       Competition[]
-  camps              Camp[]
+  campStates         CampState[]
   notices            Notice[]
   migrationFrom      MigrationRequest[] @relation("MigrationFromState")
   migrationTo        MigrationRequest[] @relation("MigrationToState")
@@ -196,6 +197,7 @@ model State {
   galleryImages      GalleryImage[]
   messages           Message[]
   pagesContents      PagesContent[]
+  competitionStates  CompetitionState[]
 }
 
 model District {
@@ -209,9 +211,9 @@ model District {
 
   trainingCenters TrainingCenter[]
   users           User[]
-  playerProfiles  PlayerProfile[]
-  competitions    Competition[]
-  camps           Camp[]
+  playerProfiles       PlayerProfile[]
+  competitionDistricts CompetitionDistrict[]
+  campDistricts   CampDistrict[]
   notices         Notice[]
   registration    DistrictRegistration?
   refereeProfiles RefereeProfile[]
@@ -225,6 +227,7 @@ model TrainingCenter {
   districtId String
   district   District @relation(fields: [districtId], references: [id], onDelete: Cascade)
   name       String
+  registrationNumber String? @unique
   address    String?
   registrarNumber String?
   headName   String?
@@ -285,10 +288,13 @@ model User {
   migrationRequests      MigrationRequest[]
   complaints             Complaint[]
   competitionResults     CompetitionResult[]
+  competitionAggregateStandingsCreated CompetitionAggregateStanding[] @relation("AggregateStandingCreatedBy")
   smsOutbox              SmsOutbox[]
   memberships                  Membership[]
   stateRegistrationApplicant   StateRegistration?   @relation("StateRegistrationApplicant")
   districtRegistrationApplicant DistrictRegistration? @relation("DistrictRegistrationApplicant")
+  competitionsCreated            Competition[]           @relation("CompetitionCreatedBy")
+  campsCreated                   Camp[]                  @relation("CampCreatedBy")
 
   @@index([role])
   @@index([stateId])
@@ -343,6 +349,7 @@ model CoachProfile {
   user                 User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   trainingCenterId     String
   trainingCenter       TrainingCenter @relation(fields: [trainingCenterId], references: [id])
+  registrationNumber   String?        @unique
   fullName             String
   fatherName           String?
   aadharNumber         String?
@@ -369,6 +376,7 @@ model RefereeProfile {
   state                State             @relation(fields: [stateId], references: [id])
   districtId           String?
   district             District?         @relation(fields: [districtId], references: [id], onDelete: SetNull)
+  registrationNumber   String?           @unique
   fullName             String
   fatherName           String?
   aadharNumber         String?
@@ -397,6 +405,7 @@ model VolunteerProfile {
   user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   stateId              String
   state                State    @relation(fields: [stateId], references: [id])
+  registrationNumber   String?  @unique
   fullName             String
   photoUrl             String?
   gender               Gender
@@ -416,10 +425,9 @@ model Session {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  competitions       Competition[]
-  participations     ParticipationRecord[]
-  payments           Payment[]
-  camps              Camp[]
+  participations ParticipationRecord[]
+  payments       Payment[]
+  camps          Camp[]
 }
 
 model AgeCategory {
@@ -433,8 +441,8 @@ model AgeCategory {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
-  eventGroups   EventGroup[]
-  competitions  Competition[]
+  eventGroups             EventGroup[]
+  competitionAgeCategories CompetitionAgeCategory[]
 }
 
 model EventGroup {
@@ -455,17 +463,21 @@ model EventGroup {
 }
 
 model Event {
-  id           String     @id @default(cuid())
-  eventGroupId String
-  eventGroup   EventGroup @relation(fields: [eventGroupId], references: [id], onDelete: Cascade)
-  name         String
-  description  String?
-  sortOrder    Int        @default(0)
-  isActive     Boolean    @default(true)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id              String     @id @default(cuid())
+  eventGroupId    String
+  eventGroup      EventGroup @relation(fields: [eventGroupId], references: [id], onDelete: Cascade)
+  name            String
+  description     String?
+  minPlayers      Int        @default(0)
+  maxPlayers      Int        @default(0)
+  optionalPlayers Int        @default(0)
+  totalPlayers    Int        @default(0)
+  sortOrder       Int        @default(0)
+  isActive        Boolean    @default(true)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
-  competitionEvents CompetitionEvent[]
+  participations      ParticipationRecord[]
   tournamentRegs      TournamentRegistration[]
   results             CompetitionResult[]
 
@@ -532,45 +544,88 @@ model Membership {
 
 model Competition {
   id                       String           @id @default(cuid())
-  sessionId                String
-  session                  Session          @relation(fields: [sessionId], references: [id])
+  /// Season year is inferred from `createdAt` (UTC calendar year).
   level                    CompetitionLevel
-  stateId                  String?
-  state                    State?           @relation(fields: [stateId], references: [id])
-  districtId               String?
-  district                 District?        @relation(fields: [districtId], references: [id])
   name                     String
-  gender                   Gender
-  ageCategoryId            String?
-  ageCategory              AgeCategory?     @relation(fields: [ageCategoryId], references: [id])
+  venue                    String
+  /// Open to players matching any of these genders (MALE/BOYS and FEMALE/GIRLS as compatible pairs; OPEN = all).
+  genders                  Gender[]
+  /// Age for signup: player must match at least one linked age category on `ageTillDate`; if none linked, event group category applies.
+  ageTillDate              DateTime?
   startDate                DateTime?
   endDate                  DateTime?
   registrationOpensAt      DateTime?
   registrationClosesAt     DateTime?
   finalSubmitRequiresPayment Boolean        @default(true)
+  isClosed                 Boolean          @default(false)
+  createdById              String?
+  createdBy                User?            @relation("CompetitionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt                DateTime         @default(now())
   updatedAt                DateTime         @updatedAt
 
-  events           CompetitionEvent[]
+  states           CompetitionState[]
+  districts        CompetitionDistrict[]
+  ageCategories    CompetitionAgeCategory[]
   tournamentRegs   TournamentRegistration[]
   participations   ParticipationRecord[]
   attendance       Attendance[]
   results          CompetitionResult[]
+  aggregateStandings CompetitionAggregateStanding[]
 
-  @@index([sessionId])
   @@index([level])
+  @@index([createdById])
 }
 
-model CompetitionEvent {
-  id            String      @id @default(cuid())
-  competitionId String
-  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
-  eventId       String
-  event         Event       @relation(fields: [eventId], references: [id])
-  maxPlayers    Int?
-  minPlayers    Int?
+/// Organization-level standings (TC / district / state) for a competition: rank 1 has exactly one unit; ranks 2 and 3 allow ties.
+model CompetitionAggregateStanding {
+  id             String   @id @default(cuid())
+  competitionId  String
+  competition    Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  /// 1 = first place (exactly one row per competition), 2 = second, 3 = third (multiple rows allowed for 2 and 3).
+  rankBand       Int
+  /// TRAINING_CENTER for district-level competitions, DISTRICT for state-level, STATE for national.
+  unitType       String
+  unitId         String
+  /// Ordering within the same rank band (e.g. tie-break order).
+  tieOrder       Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  createdById    String?
+  createdBy      User?    @relation("AggregateStandingCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
-  @@unique([competitionId, eventId])
+  @@unique([competitionId, unitType, unitId])
+  @@index([competitionId, rankBand])
+}
+
+/// Geographic scope: when rows exist, players must fall within the scope (districts take precedence over states).
+model CompetitionState {
+  competitionId String
+  stateId       String
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  state         State       @relation(fields: [stateId], references: [id], onDelete: Cascade)
+
+  @@id([competitionId, stateId])
+  @@index([stateId])
+}
+
+model CompetitionDistrict {
+  competitionId String
+  districtId    String
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  district      District    @relation(fields: [districtId], references: [id], onDelete: Cascade)
+
+  @@id([competitionId, districtId])
+  @@index([districtId])
+}
+
+model CompetitionAgeCategory {
+  competitionId  String
+  ageCategoryId  String
+  competition    Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  ageCategory    AgeCategory @relation(fields: [ageCategoryId], references: [id], onDelete: Cascade)
+
+  @@id([competitionId, ageCategoryId])
+  @@index([ageCategoryId])
 }
 
 model TournamentRegistration {
@@ -596,41 +651,76 @@ model TournamentRegistration {
 
 model ParticipationRecord {
   id            String           @id @default(cuid())
-  sessionId     String
-  session       Session          @relation(fields: [sessionId], references: [id])
+  sessionId     String?
+  session       Session?         @relation(fields: [sessionId], references: [id])
   playerUserId  String
   playerUser    User             @relation(fields: [playerUserId], references: [id])
   level         CompetitionLevel
   competitionId String
   competition   Competition      @relation(fields: [competitionId], references: [id])
+  /// Catalog `Event.id` (all active events are in scope for every competition; no per-competition event list).
+  eventId       String?
+  event         Event?         @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  /// Same UUID for all members of one team signup; null for individual events.
+  teamId        String?
   participated  Boolean          @default(true)
   createdAt     DateTime         @default(now())
 
+  @@unique([competitionId, playerUserId, eventId])
   @@index([sessionId, playerUserId, level])
+  @@index([eventId])
 }
 
 model Camp {
-  id          String       @id @default(cuid())
-  sessionId   String?
-  session     Session?     @relation(fields: [sessionId], references: [id])
-  level       CampLevel
-  stateId     String?
-  state       State?       @relation(fields: [stateId], references: [id])
-  districtId  String?
-  district    District?    @relation(fields: [districtId], references: [id])
-  name        String
-  description String?
-  startDate   DateTime
-  endDate     DateTime
-  audience    CampAudience
-  feeAmountPaise Int?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id                       String         @id @default(cuid())
+  sessionId                String?
+  session                  Session?       @relation(fields: [sessionId], references: [id])
+  /// Inferred from the admin who created the camp (national / state / district).
+  level                    CampLevel
+  name                     String
+  venue                    String
+  startDate                DateTime
+  endDate                  DateTime
+  registrationOpensAt      DateTime?
+  registrationClosesAt     DateTime?
+  /// Legacy single-audience field; prefer `allowedSignupRoles` on new rows.
+  audience                 CampAudience?
+  /// Roles that may register for this camp (e.g. PLAYER, COACH).
+  allowedSignupRoles       Role[]
+  isClosed                 Boolean        @default(false)
+  createdById              String?
+  createdBy                User?          @relation("CampCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt                DateTime       @default(now())
+  updatedAt                DateTime       @updatedAt
 
-  registrations CampRegistration[]
-  attendance    Attendance[]
+  states         CampState[]
+  districts      CampDistrict[]
+  registrations  CampRegistration[]
+  attendance     Attendance[]
 
   @@index([level])
+  @@index([createdById])
+}
+
+/// Geographic scope: districts take precedence (player must be in one); else state list.
+model CampState {
+  campId  String
+  stateId String
+  camp    Camp   @relation(fields: [campId], references: [id], onDelete: Cascade)
+  state   State  @relation(fields: [stateId], references: [id], onDelete: Cascade)
+
+  @@id([campId, stateId])
+  @@index([stateId])
+}
+
+model CampDistrict {
+  campId     String
+  districtId String
+  camp       Camp     @relation(fields: [campId], references: [id], onDelete: Cascade)
+  district   District @relation(fields: [districtId], references: [id], onDelete: Cascade)
+
+  @@id([campId, districtId])
+  @@index([districtId])
 }
 
 model CampRegistration {
@@ -665,7 +755,7 @@ model Attendance {
   notes        String?
   createdAt    DateTime     @default(now())
 
-  @@index([userId, date])
+  @@unique([userId, date])
   @@index([competitionId])
   @@index([campId])
 }

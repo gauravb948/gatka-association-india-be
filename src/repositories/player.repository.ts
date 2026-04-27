@@ -45,7 +45,12 @@ export function findManyEligibleActive() {
       isBlacklisted: false,
       tcDisabled: false,
     },
-    include: { user: true },
+    include: {
+      user: true,
+      state: { select: { id: true, name: true, code: true } },
+      district: { select: { id: true, name: true } },
+      trainingCenter: { select: { id: true, name: true } },
+    },
   });
 }
 

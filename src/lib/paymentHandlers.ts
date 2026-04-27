@@ -49,6 +49,60 @@ const REGISTRATION_TO_ROLE: Partial<Record<PaymentPurpose, Role>> = {
   [PaymentPurpose.DISTRICT_REGISTRATION]: "DISTRICT_ADMIN",
 };
 
+function nextRegNo(prefix: string, lastValue?: string | null) {
+  let next = 1;
+  if (lastValue) {
+    const part = lastValue.replace(prefix, "");
+    const n = parseInt(part, 10);
+    if (!Number.isNaN(n)) next = n + 1;
+  }
+  return `${prefix}${String(next).padStart(6, "0")}`;
+}
+
+async function allocateCoachRegistrationNumber(stateCode: string): Promise<string> {
+  const year = new Date().getUTCFullYear();
+  const prefix = `${stateCode.toUpperCase()}-CO-${year}-`;
+  const last = await prisma.coachProfile.findFirst({
+    where: { registrationNumber: { startsWith: prefix } },
+    orderBy: { registrationNumber: "desc" },
+    select: { registrationNumber: true },
+  });
+  return nextRegNo(prefix, last?.registrationNumber);
+}
+
+async function allocateRefereeRegistrationNumber(stateCode: string): Promise<string> {
+  const year = new Date().getUTCFullYear();
+  const prefix = `${stateCode.toUpperCase()}-RF-${year}-`;
+  const last = await prisma.refereeProfile.findFirst({
+    where: { registrationNumber: { startsWith: prefix } },
+    orderBy: { registrationNumber: "desc" },
+    select: { registrationNumber: true },
+  });
+  return nextRegNo(prefix, last?.registrationNumber);
+}
+
+async function allocateVolunteerRegistrationNumber(stateCode: string): Promise<string> {
+  const year = new Date().getUTCFullYear();
+  const prefix = `${stateCode.toUpperCase()}-VO-${year}-`;
+  const last = await prisma.volunteerProfile.findFirst({
+    where: { registrationNumber: { startsWith: prefix } },
+    orderBy: { registrationNumber: "desc" },
+    select: { registrationNumber: true },
+  });
+  return nextRegNo(prefix, last?.registrationNumber);
+}
+
+async function allocateTrainingCenterRegistrationNumber(stateCode: string): Promise<string> {
+  const year = new Date().getUTCFullYear();
+  const prefix = `${stateCode.toUpperCase()}-TC-${year}-`;
+  const last = await prisma.trainingCenter.findFirst({
+    where: { registrationNumber: { startsWith: prefix } },
+    orderBy: { registrationNumber: "desc" },
+    select: { registrationNumber: true },
+  });
+  return nextRegNo(prefix, last?.registrationNumber);
+}
+
 export async function applySuccessfulPayment(
   paymentId: string,
   razorpayPaymentId?: string
@@ -118,19 +172,43 @@ export async function applySuccessfulPayment(
 
   // ── Coach ──
   if (pay.purpose === PaymentPurpose.COACH_REGISTRATION || pay.purpose === PaymentPurpose.COACH_RENEWAL) {
-    await prisma.coachProfile.updateMany({
+    const profile = await prisma.coachProfile.findUnique({
       where: { userId: pay.userId },
-      data: { membershipValidUntil: validUntil },
+      include: { trainingCenter: { include: { district: { include: { state: true } } } } },
     });
+    const data: { membershipValidUntil: Date; registrationNumber?: string } = {
+      membershipValidUntil: validUntil,
+    };
+    if (
+      pay.purpose === PaymentPurpose.COACH_REGISTRATION &&
+      profile &&
+      !profile.registrationNumber
+    ) {
+      data.registrationNumber = await allocateCoachRegistrationNumber(
+        profile.trainingCenter.district.state.code
+      );
+    }
+    await prisma.coachProfile.updateMany({ where: { userId: pay.userId }, data });
     return;
   }
 
   // ── Referee ──
   if (pay.purpose === PaymentPurpose.REFEREE_REGISTRATION || pay.purpose === PaymentPurpose.REFEREE_RENEWAL) {
-    await prisma.refereeProfile.updateMany({
+    const profile = await prisma.refereeProfile.findUnique({
       where: { userId: pay.userId },
-      data: { membershipValidUntil: validUntil },
+      include: { state: true },
     });
+    const data: { membershipValidUntil: Date; registrationNumber?: string } = {
+      membershipValidUntil: validUntil,
+    };
+    if (
+      pay.purpose === PaymentPurpose.REFEREE_REGISTRATION &&
+      profile &&
+      !profile.registrationNumber
+    ) {
+      data.registrationNumber = await allocateRefereeRegistrationNumber(profile.state.code);
+    }
+    await prisma.refereeProfile.updateMany({ where: { userId: pay.userId }, data });
     return;
   }
 
@@ -139,10 +217,21 @@ export async function applySuccessfulPayment(
     pay.purpose === PaymentPurpose.VOLUNTEER_REGISTRATION ||
     pay.purpose === PaymentPurpose.VOLUNTEER_RENEWAL
   ) {
-    await prisma.volunteerProfile.updateMany({
+    const profile = await prisma.volunteerProfile.findUnique({
       where: { userId: pay.userId },
-      data: { membershipValidUntil: validUntil },
+      include: { state: true },
     });
+    const data: { membershipValidUntil: Date; registrationNumber?: string } = {
+      membershipValidUntil: validUntil,
+    };
+    if (
+      pay.purpose === PaymentPurpose.VOLUNTEER_REGISTRATION &&
+      profile &&
+      !profile.registrationNumber
+    ) {
+      data.registrationNumber = await allocateVolunteerRegistrationNumber(profile.state.code);
+    }
+    await prisma.volunteerProfile.updateMany({ where: { userId: pay.userId }, data });
     return;
   }
 
@@ -156,7 +245,7 @@ export async function applySuccessfulPayment(
       select: { trainingCenterId: true },
     });
     if (u?.trainingCenterId) {
-      const tc = await trainingCenterRepository.findById(u.trainingCenterId);
+      const tc = await trainingCenterRepository.findByIdWithDistrictAndState(u.trainingCenterId);
       if (pay.purpose === PaymentPurpose.TRAINING_CENTER_RENEWAL) {
         if (tc) {
           await trainingCenterRepository.updateTrainingCenter(u.trainingCenterId, {
@@ -165,9 +254,13 @@ export async function applySuccessfulPayment(
           });
         }
       } else if (tc && tc.status === EntityStatus.PENDING) {
+        const registrationNumber =
+          tc.registrationNumber ??
+          (await allocateTrainingCenterRegistrationNumber(tc.district.state.code));
         await trainingCenterRepository.updateTrainingCenter(u.trainingCenterId, {
           status: EntityStatus.SUBMITTED,
           statusReason: "Payment completed; submitted for approval",
+          registrationNumber,
         });
       }
     }

@@ -1,9 +1,9 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 
-export function findManyActiveByGroup(eventGroupId: string) {
+export function findManyByGroup(eventGroupId: string) {
   return prisma.event.findMany({
-    where: { eventGroupId, isActive: true },
+    where: { eventGroupId },
     orderBy: { sortOrder: "asc" },
   });
 }

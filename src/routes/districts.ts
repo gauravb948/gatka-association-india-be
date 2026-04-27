@@ -8,6 +8,10 @@ districtsRouter.get(
   "/public/by-state/:stateId/registration-accepted",
   districtsController.listPublicByStateRegistrationAccepted
 );
+districtsRouter.post(
+  "/public/by-states/registration-accepted",
+  districtsController.listPublicByStatesRegistrationAccepted
+);
 districtsRouter.get("/public/by-state/:stateId", districtsController.listPublicByState);
 districtsRouter.get(
   "/by-state/:stateId",

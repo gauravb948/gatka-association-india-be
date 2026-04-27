@@ -15,3 +15,8 @@ export const patchDistrictSchema = z.object({
   name: z.string().optional(),
   isEnabled: z.boolean().optional(),
 });
+
+/** Body for `POST /districts/public/by-states/registration-accepted`. */
+export const districtByStateIdsBodySchema = z.object({
+  stateIds: z.array(z.string().min(1)).min(1),
+});

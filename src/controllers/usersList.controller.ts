@@ -45,6 +45,71 @@ function listItemUserTypeProfile(item: any, targetRole: Role) {
   }
 }
 
+/** `GET /users/players/by-state/:stateId` — same visibility rules as `GET /users/players?stateId=…`. */
+export async function listPlayersByState(req: Request, res: Response, next: NextFunction) {
+  try {
+    const actor = req.dbUser!;
+    const stateId = req.params.stateId?.trim();
+    if (!stateId) {
+      throw new AppError(400, "stateId is required", "INVALID_STATE");
+    }
+
+    const stateRow = await prisma.state.findUnique({ where: { id: stateId }, select: { id: true } });
+    if (!stateRow) {
+      throw new AppError(404, "State not found", "STATE_NOT_FOUND");
+    }
+
+    const q = userHierarchyListQuerySchema.parse(req.query);
+
+    if (actor.role === "TRAINING_CENTER") {
+      const tcStateId = actor.trainingCenter?.district.state.id;
+      if (!tcStateId || tcStateId !== stateId) {
+        throw new AppError(403, "stateId is outside your scope", "FORBIDDEN_FILTER");
+      }
+    }
+
+    const geo = hierarchyGeoWhere(actor, "PLAYER");
+    const optional =
+      actor.role === "TRAINING_CENTER"
+        ? []
+        : await validatedOptionalGeoClauses(actor, { ...q, stateId });
+    const where = buildListWhere("PLAYER", geo, optional, q.status);
+    const skip = (q.page - 1) * q.pageSize;
+    const [items, total] = await userRepository.findManyPaginatedWithWhere({
+      where,
+      skip,
+      take: q.pageSize,
+    });
+    const enrichedItems = items.map((item) => {
+      const {
+        playerProfile,
+        coachProfile,
+        refereeProfile,
+        volunteerProfile,
+        stateRegistrationApplicant,
+        districtRegistrationApplicant,
+        ...rest
+      } = item as any;
+      return {
+        ...rest,
+        userTypeProfile: listItemUserTypeProfile(item, "PLAYER"),
+      };
+    });
+    const totalPages = total === 0 ? 0 : Math.ceil(total / q.pageSize);
+    res.json({
+      items: enrichedItems,
+      page: q.page,
+      pageSize: q.pageSize,
+      total,
+      totalPages,
+      role: "PLAYER" as const,
+      stateId,
+    });
+  } catch (e) {
+    next(e);
+  }
+}
+
 export function listUsersByRole(targetRole: Role) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {

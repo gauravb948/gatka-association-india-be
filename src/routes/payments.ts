@@ -3,12 +3,26 @@ import { requireAuth, requireRoles } from "../middleware/auth.js";
 import * as paymentsController from "../controllers/payments.controller.js";
 import * as statePaymentConfigController from "../controllers/statePaymentConfig.controller.js";
 import * as statePaymentConfigsAdminController from "../controllers/statePaymentConfigsAdmin.controller.js";
+import * as nationalPaymentConfigController from "../controllers/nationalPaymentConfig.controller.js";
 
 export const paymentsRouter = Router();
 
 paymentsRouter.post("/razorpay/order", requireAuth, paymentsController.createRazorpayOrder);
 paymentsRouter.post("/verify", requireAuth, paymentsController.verify);
 paymentsRouter.get("/me", requireAuth, paymentsController.listMine);
+
+paymentsRouter.get(
+  "/national-config",
+  requireAuth,
+  requireRoles("NATIONAL_ADMIN"),
+  nationalPaymentConfigController.get
+);
+paymentsRouter.put(
+  "/national-config",
+  requireAuth,
+  requireRoles("NATIONAL_ADMIN"),
+  nationalPaymentConfigController.put
+);
 
 // State admin can manage only their own state's payment config.
 paymentsRouter.get(

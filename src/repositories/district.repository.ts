@@ -67,6 +67,31 @@ export function findManyByState(stateId: string) {
   });
 }
 
+/** All districts in any of the given states (enabled + public shape). */
+export function findManyPublicByStateIds(stateIds: string[]) {
+  return prisma.district.findMany({
+    where: { stateId: { in: stateIds }, isEnabled: true, registration: { is: null } },
+    orderBy: [{ stateId: "asc" }, { name: "asc" }],
+    select: publicDistrictSelect,
+  });
+}
+
+/** Enabled districts in any of the given states whose district-body registration is ACCEPTED. */
+export function findManyWithAcceptedRegistrationByStateIds(stateIds: string[]) {
+  if (stateIds.length === 0) {
+    return Promise.resolve([] as { id: string; name: string; stateId: string }[]);
+  }
+  return prisma.district.findMany({
+    where: {
+      stateId: { in: stateIds },
+      isEnabled: true,
+      registration: { is: { status: EntityStatus.ACCEPTED } },
+    },
+    orderBy: [{ stateId: "asc" }, { name: "asc" }],
+    select: publicDistrictSelect,
+  });
+}
+
 export function findManyByStatePaginated(stateId: string, params: { skip: number; take: number }) {
   const where = { stateId };
   return prisma.$transaction([

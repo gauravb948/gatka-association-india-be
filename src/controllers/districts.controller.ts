@@ -5,6 +5,7 @@ import * as statePaymentRepository from "../repositories/statePayment.repository
 import { AppError } from "../lib/errors.js";
 import {
   createDistrictSchema,
+  districtByStateIdsBodySchema,
   districtListQuerySchema,
   patchDistrictSchema,
 } from "../validators/district.validators.js";
@@ -40,6 +41,22 @@ export async function listPublicByStateRegistrationAccepted(
       );
     const totalPages = total === 0 ? 0 : Math.ceil(total / q.pageSize);
     res.json({ items, page: q.page, pageSize: q.pageSize, total, totalPages });
+  } catch (e) {
+    next(e);
+  }
+}
+
+/** Public: all enabled districts with ACCEPTED district registration across one or more states (deduped `stateIds`). */
+export async function listPublicByStatesRegistrationAccepted(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const body = districtByStateIdsBodySchema.parse(req.body);
+    const stateIds = [...new Set(body.stateIds)];
+    const items = await districtRepository.findManyWithAcceptedRegistrationByStateIds(stateIds);
+    res.json(items);
   } catch (e) {
     next(e);
   }

@@ -2,11 +2,13 @@ import { z } from "zod";
 import {
   CoachAppliedFor,
   GatkaExperience,
-  Gender,
   MaritalStatus,
   PlayingHand,
   TShirtSize,
 } from "@prisma/client";
+
+/** Physical persons only; OPEN is reserved for competition `genders`. */
+const personGenderSchema = z.enum(["MALE", "FEMALE", "BOYS", "GIRLS"]);
 
 export const loginSchema = z.object({
   email: z.string().email(),
@@ -29,7 +31,7 @@ export const registerPlayerSchema = z.object({
   mobileNo: z.string().min(7).max(20),
   whatsappNo: z.string().min(7).max(20),
   address: z.string().min(3).max(1000),
-  gender: z.nativeEnum(Gender),
+  gender: personGenderSchema,
   dateOfBirth: z.string().datetime(),
   stateId: z.string().min(1),
   districtId: z.string().min(1),
@@ -62,7 +64,7 @@ export const registerCoachSchema = z.object({
   photoUrl: z.string().url(),
   aadharFrontUrl: z.string().url(),
   aadharBackUrl: z.string().url(),
-  gender: z.nativeEnum(Gender),
+  gender: personGenderSchema,
   trainingCenterId: z.string().min(1),
   acceptTerms: z.literal(true),
 });
@@ -86,7 +88,7 @@ export const registerRefereeSchema = z.object({
     (v) => (v === "" || v === null || v === undefined ? undefined : v),
     z.string().min(7).max(20).optional()
   ),
-  gender: z.nativeEnum(Gender),
+  gender: personGenderSchema,
   stateId: z.string().min(1),
   districtId: z.string().min(1),
   photoUrl: z.string().url(),
@@ -100,7 +102,7 @@ export const registerVolunteerSchema = z.object({
   password: z.string().min(8),
   phone: z.string().optional(),
   fullName: z.string().min(1),
-  gender: z.nativeEnum(Gender),
+  gender: personGenderSchema,
   stateId: z.string(),
 });
 

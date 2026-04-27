@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Camp" ADD COLUMN "isClosed" BOOLEAN NOT NULL DEFAULT false;

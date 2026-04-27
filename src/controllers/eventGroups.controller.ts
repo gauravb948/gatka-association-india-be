@@ -59,7 +59,9 @@ export async function patch(req: Request, res: Response, next: NextFunction) {
 
 export async function listEventsByGroup(req: Request, res: Response, next: NextFunction) {
   try {
-    const rows = await eventRepository.findManyActiveByGroup(req.params.id);
+    const group = await eventGroupRepository.findById(req.params.id);
+    if (!group) throw new AppError(404, "Event group not found");
+    const rows = await eventRepository.findManyByGroup(req.params.id);
     res.json(rows);
   } catch (e) {
     next(e);

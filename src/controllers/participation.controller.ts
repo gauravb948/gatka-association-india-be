@@ -13,7 +13,9 @@ export async function create(req: Request, res: Response, next: NextFunction) {
       throw new AppError(400, "Level mismatch with competition");
     }
     const row = await participationRepository.createParticipation({
-      session: { connect: { id: body.sessionId } },
+      ...(body.sessionId
+        ? { session: { connect: { id: body.sessionId } } }
+        : {}),
       playerUser: { connect: { id: body.playerUserId } },
       competition: { connect: { id: body.competitionId } },
       level: body.level,

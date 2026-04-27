@@ -61,6 +61,7 @@ const loginProfileSelect = {
   },
   coachProfile: {
     select: {
+      registrationNumber: true,
       fullName: true,
       fatherName: true,
       aadharNumber: true,
@@ -80,6 +81,7 @@ const loginProfileSelect = {
   },
   refereeProfile: {
     select: {
+      registrationNumber: true,
       fullName: true,
       fatherName: true,
       aadharNumber: true,
@@ -101,6 +103,7 @@ const loginProfileSelect = {
   },
   volunteerProfile: {
     select: {
+      registrationNumber: true,
       fullName: true,
       photoUrl: true,
       gender: true,
@@ -146,6 +149,7 @@ export function findByIdForLoginResponse(id: string) {
         select: {
           id: true,
           name: true,
+          registrationNumber: true,
           isEnabled: true,
           status: true,
           statusReason: true,
@@ -268,6 +272,7 @@ const adminUserListSelect = {
     select: {
       id: true,
       name: true,
+      registrationNumber: true,
       address: true,
       registrarNumber: true,
       headName: true,
