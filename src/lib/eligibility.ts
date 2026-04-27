@@ -174,6 +174,8 @@ export async function assertPlayerFitsTournamentEventAge(
   const dob = profile.dateOfBirth;
   const asOf = comp.ageTillDate;
 
+  console.log("dob", dob);
+
   if (comp.ageCategories.length > 0) {
     const ok = comp.ageCategories.some((link) =>
       fitsAgeCategory(dob, asOf, link.ageCategory.ageFrom, link.ageCategory.ageTo)
