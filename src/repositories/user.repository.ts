@@ -6,10 +6,6 @@ export function findByEmail(email: string) {
   return prisma.user.findUnique({ where: { email } });
 }
 
-export function findByUsername(username: string) {
-  return prisma.user.findUnique({ where: { username } });
-}
-
 export function findFirstByEmailOrPhone(phoneOrEmail: string) {
   return prisma.user.findFirst({
     where: { OR: [{ email: phoneOrEmail }, { phone: phoneOrEmail }] },
@@ -120,7 +116,6 @@ export function findByIdForLoginResponse(id: string) {
     where: { id },
     select: {
       id: true,
-      username: true,
       email: true,
       phone: true,
       role: true,
@@ -197,6 +192,7 @@ export function updatePassword(userId: string, passwordHash: string) {
   return prisma.user.update({
     where: { id: userId },
     data: { passwordHash },
+    select: { id: true },
   });
 }
 
@@ -252,7 +248,6 @@ export async function completePasswordResetWithOtp(
 
 const adminUserListSelect = {
   id: true,
-  username: true,
   email: true,
   phone: true,
   role: true,
@@ -303,7 +298,6 @@ const adminUserListSelect = {
       stateId: true,
       firstName: true,
       lastName: true,
-      userName: true,
       email: true,
       mobileNo: true,
       address: true,
@@ -321,7 +315,6 @@ const adminUserListSelect = {
       districtId: true,
       firstName: true,
       lastName: true,
-      userName: true,
       email: true,
       mobileNo: true,
       address: true,
@@ -372,4 +365,133 @@ export function findManyPaginatedWithWhere(params: {
     }),
     prisma.user.count({ where: params.where }),
   ]);
+}
+
+/** User + profiles for assembling a public ID card (accepted + active callers only—see controller rules per role). */
+export function findPublicIdCardContextByUserId(userId: string) {
+  return prisma.user.findFirst({
+    where: {
+      id: userId,
+      isActive: true,
+      status: EntityStatus.ACCEPTED,
+    },
+    select: {
+      id: true,
+      role: true,
+      email: true,
+      playerProfile: {
+        select: {
+          fullName: true,
+          photoUrl: true,
+          dateOfBirth: true,
+          gender: true,
+          registrationNumber: true,
+          registrationStatus: true,
+          isBlacklisted: true,
+          tcDisabled: true,
+          trainingCenter: {
+            select: {
+              id: true,
+              name: true,
+              isEnabled: true,
+              status: true,
+              district: {
+                select: {
+                  id: true,
+                  name: true,
+                  isEnabled: true,
+                  state: { select: { id: true, name: true, isEnabled: true } },
+                },
+              },
+            },
+          },
+          district: { select: { id: true, name: true, isEnabled: true } },
+          state: { select: { id: true, name: true, isEnabled: true } },
+        },
+      },
+      coachProfile: {
+        select: {
+          fullName: true,
+          photoUrl: true,
+          gender: true,
+          registrationNumber: true,
+          isBlacklisted: true,
+          trainingCenter: {
+            select: {
+              id: true,
+              name: true,
+              isEnabled: true,
+              status: true,
+              district: {
+                select: {
+                  id: true,
+                  name: true,
+                  isEnabled: true,
+                  state: { select: { id: true, name: true, isEnabled: true } },
+                },
+              },
+            },
+          },
+        },
+      },
+      refereeProfile: {
+        select: {
+          fullName: true,
+          photoUrl: true,
+          gender: true,
+          registrationNumber: true,
+          isBlacklisted: true,
+          state: { select: { id: true, name: true, isEnabled: true } },
+          district: { select: { id: true, name: true, isEnabled: true } },
+        },
+      },
+      volunteerProfile: {
+        select: {
+          fullName: true,
+          photoUrl: true,
+          gender: true,
+          registrationNumber: true,
+          isBlacklisted: true,
+          state: { select: { id: true, name: true, isEnabled: true } },
+        },
+      },
+      stateRegistrationApplicant: {
+        select: {
+          firstName: true,
+          lastName: true,
+          passportPhotoUrl: true,
+          status: true,
+          state: { select: { id: true, name: true, isEnabled: true } },
+        },
+      },
+      districtRegistrationApplicant: {
+        select: {
+          firstName: true,
+          lastName: true,
+          passportPhotoUrl: true,
+          status: true,
+          district: { select: { id: true, name: true, isEnabled: true } },
+          state: { select: { id: true, name: true, isEnabled: true } },
+        },
+      },
+      trainingCenter: {
+        select: {
+          id: true,
+          name: true,
+          headName: true,
+          headPassportPhotoUrl: true,
+          isEnabled: true,
+          status: true,
+          district: {
+            select: {
+              id: true,
+              name: true,
+              isEnabled: true,
+              state: { select: { id: true, name: true, isEnabled: true } },
+            },
+          },
+        },
+      },
+    },
+  });
 }

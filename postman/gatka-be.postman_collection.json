@@ -153,13 +153,28 @@
           }
         },
         {
+          "name": "Patch my profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"national@gatka.local\",\n  \"phone\": \"9999999999\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/me/profile"
+          }
+        },
+        {
           "name": "Register — Player",
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fullName\": \"Test Player\",\n  \"fatherName\": \"Father Name\",\n  \"motherName\": \"Mother Name\",\n  \"aadharNumber\": \"123456789012\",\n  \"maritalStatus\": \"SINGLE\",\n  \"userName\": \"testplayer01\",\n  \"email\": \"testplayer01@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"mobileNo\": \"9999999999\",\n  \"whatsappNo\": \"9999999999\",\n  \"address\": \"Full postal address line 1 and 2\",\n  \"gender\": \"MALE\",\n  \"dateOfBirth\": \"2005-01-01T00:00:00.000Z\",\n  \"stateId\": \"{{stateId}}\",\n  \"districtId\": \"{{districtId}}\",\n  \"trainingCenterId\": \"{{trainingCenterId}}\",\n  \"photoUrl\": \"https://example.com/uploads/player-photo.png\",\n  \"aadharFrontUrl\": \"https://example.com/uploads/aadhar-front.png\",\n  \"aadharBackUrl\": \"https://example.com/uploads/aadhar-back.png\",\n  \"tShirtSize\": \"M\",\n  \"playingHand\": \"RIGHT\",\n  \"acceptTerms\": true\n}"
+              "raw": "{\n  \"fullName\": \"Test Player\",\n  \"fatherName\": \"Father Name\",\n  \"motherName\": \"Mother Name\",\n  \"aadharNumber\": \"123456789012\",\n  \"maritalStatus\": \"SINGLE\",\n  \"email\": \"testplayer01@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"mobileNo\": \"9999999999\",\n  \"whatsappNo\": \"9999999999\",\n  \"address\": \"Full postal address line 1 and 2\",\n  \"gender\": \"MALE\",\n  \"dateOfBirth\": \"2005-01-01T00:00:00.000Z\",\n  \"stateId\": \"{{stateId}}\",\n  \"districtId\": \"{{districtId}}\",\n  \"trainingCenterId\": \"{{trainingCenterId}}\",\n  \"photoUrl\": \"https://example.com/uploads/player-photo.png\",\n  \"aadharFrontUrl\": \"https://example.com/uploads/aadhar-front.png\",\n  \"aadharBackUrl\": \"https://example.com/uploads/aadhar-back.png\",\n  \"tShirtSize\": \"M\",\n  \"playingHand\": \"RIGHT\",\n  \"acceptTerms\": true\n}"
             },
             "url": "{{baseUrl}}/auth/register/player"
           }
@@ -448,6 +463,21 @@
             ],
             "url": "{{baseUrl}}/users/{{userId}}"
           }
+        },
+        {
+          "name": "PATCH — set password for user (hierarchy)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newPassword\": \"ChangeMe123!\"\n}"
+            },
+            "url": "{{baseUrl}}/users/{{userId}}/password"
+          }
         }
       ]
     },
@@ -661,7 +691,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"stateId\": \"{{stateId}}\",\n  \"firstName\": \"State\",\n  \"lastName\": \"Admin\",\n  \"userName\": \"stateadmin_pb\",\n  \"email\": \"stateadmin_pb@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"mobileNo\": \"9999999999\",\n  \"address\": \"State office address\",\n  \"passportPhotoUrl\": null\n}"
+              "raw": "{\n  \"stateId\": \"{{stateId}}\",\n  \"firstName\": \"State\",\n  \"lastName\": \"Admin\",\n  \"email\": \"stateadmin_pb@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"mobileNo\": \"9999999999\",\n  \"address\": \"State office address\",\n  \"passportPhotoUrl\": null\n}"
             },
             "url": "{{baseUrl}}/state-registrations"
           }
@@ -744,7 +774,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"stateId\": \"{{stateId}}\",\n  \"districtId\": \"{{districtId}}\",\n  \"firstName\": \"District\",\n  \"lastName\": \"Admin\",\n  \"userName\": \"districtadmin01\",\n  \"email\": \"districtadmin01@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"mobileNo\": \"9999999998\",\n  \"address\": \"District office address\",\n  \"passportPhotoUrl\": null\n}"
+              "raw": "{\n  \"stateId\": \"{{stateId}}\",\n  \"districtId\": \"{{districtId}}\",\n  \"firstName\": \"District\",\n  \"lastName\": \"Admin\",\n  \"email\": \"districtadmin01@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"mobileNo\": \"9999999998\",\n  \"address\": \"District office address\",\n  \"passportPhotoUrl\": null\n}"
             },
             "url": "{{baseUrl}}/district-registrations"
           }
@@ -1175,6 +1205,64 @@
               { "key": "Authorization", "value": "Bearer {{accessToken}}" }
             ],
             "url": "{{baseUrl}}/districts/{{districtId}}"
+          }
+        },
+        {
+          "name": "POST — create district (stateId in body)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const d = j.data !== undefined ? j.data : j;",
+                  "if (d && d.id) pm.collectionVariables.set('districtId', d.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stateId\": \"{{stateId}}\",\n  \"name\": \"Example District\",\n  \"isEnabled\": true\n}"
+            },
+            "url": "{{baseUrl}}/districts"
+          }
+        },
+        {
+          "name": "PATCH — update district (id in body)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{districtId}}\",\n  \"isEnabled\": true\n}"
+            },
+            "url": "{{baseUrl}}/districts"
+          }
+        },
+        {
+          "name": "POST — bulk add districts under state",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"districts\": [\n    { \"name\": \"District Alpha\", \"isEnabled\": false },\n    { \"name\": \"District Beta\", \"isEnabled\": true }\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/districts/state/{{stateId}}/bulk"
           }
         },
         {

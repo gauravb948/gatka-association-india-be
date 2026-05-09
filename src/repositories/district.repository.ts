@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import type { District, Prisma } from "@prisma/client";
 import { EntityStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 
@@ -67,6 +67,31 @@ export function findManyByState(stateId: string) {
   });
 }
 
+/** Admin list for state: newest district-body registration activity first (`DistrictRegistration.updatedAt`), then name. */
+export async function findManyByStatePaginated(
+  stateId: string,
+  params: { skip: number; take: number }
+) {
+  const where = { stateId };
+  const [idRows, total] = await prisma.$transaction([
+    prisma.$queryRaw<{ id: string }[]>`
+      SELECT d.id FROM "District" d
+      LEFT JOIN "DistrictRegistration" dr ON dr."districtId" = d.id
+      WHERE d."stateId" = ${stateId}
+      ORDER BY dr."updatedAt" DESC NULLS LAST, d.name ASC
+      LIMIT ${params.take}
+      OFFSET ${params.skip}
+    `,
+    prisma.district.count({ where }),
+  ]);
+  const ids = idRows.map((r) => r.id);
+  if (ids.length === 0) return [[], total] as const;
+  const rows = await prisma.district.findMany({ where: { id: { in: ids } } });
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const items = ids.map((id) => byId.get(id)).filter(Boolean) as District[];
+  return [items, total] as const;
+}
+
 /** All districts in any of the given states (enabled + public shape). */
 export function findManyPublicByStateIds(stateIds: string[]) {
   return prisma.district.findMany({
@@ -92,19 +117,6 @@ export function findManyWithAcceptedRegistrationByStateIds(stateIds: string[]) {
   });
 }
 
-export function findManyByStatePaginated(stateId: string, params: { skip: number; take: number }) {
-  const where = { stateId };
-  return prisma.$transaction([
-    prisma.district.findMany({
-      where,
-      orderBy: { name: "asc" },
-      skip: params.skip,
-      take: params.take,
-    }),
-    prisma.district.count({ where }),
-  ]);
-}
-
 export function findById(id: string) {
   return prisma.district.findUnique({ where: { id } });
 }
@@ -119,7 +131,6 @@ export function findByIdWithState(id: string) {
 const applicantUserSelect = {
   id: true,
   email: true,
-  username: true,
   phone: true,
   role: true,
   status: true,

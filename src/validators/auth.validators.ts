@@ -25,7 +25,6 @@ export const registerPlayerSchema = z.object({
     .max(20)
     .transform((s) => s.replace(/\s/g, "")),
   maritalStatus: z.nativeEnum(MaritalStatus),
-  userName: z.string().min(3).max(40),
   email: z.string().email(),
   password: z.string().min(8),
   mobileNo: z.string().min(7).max(20),

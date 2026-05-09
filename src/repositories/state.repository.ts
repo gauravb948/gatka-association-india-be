@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import type { State, Prisma } from "@prisma/client";
 import { EntityStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 
@@ -64,15 +64,24 @@ export function findManyAll() {
   return prisma.state.findMany({ orderBy: { name: "asc" } });
 }
 
-export function findManyAllPaginated(params: { skip: number; take: number }) {
-  return prisma.$transaction([
-    prisma.state.findMany({
-      orderBy: { name: "asc" },
-      skip: params.skip,
-      take: params.take,
-    }),
+/** Admin list: newest state-body registration activity first (`StateRegistration.updatedAt`), then alphabetically by name. */
+export async function findManyAllPaginated(params: { skip: number; take: number }) {
+  const [idRows, total] = await prisma.$transaction([
+    prisma.$queryRaw<{ id: string }[]>`
+      SELECT s.id FROM "State" s
+      LEFT JOIN "StateRegistration" sr ON sr."stateId" = s.id
+      ORDER BY sr."updatedAt" DESC NULLS LAST, s.name ASC
+      LIMIT ${params.take}
+      OFFSET ${params.skip}
+    `,
     prisma.state.count(),
   ]);
+  const ids = idRows.map((r) => r.id);
+  if (ids.length === 0) return [[], total] as const;
+  const rows = await prisma.state.findMany({ where: { id: { in: ids } } });
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const items = ids.map((id) => byId.get(id)).filter(Boolean) as State[];
+  return [items, total] as const;
 }
 
 export function findById(id: string) {
@@ -104,7 +113,6 @@ const membershipSummarySelect = {
 const applicantUserSelect = {
   id: true,
   email: true,
-  username: true,
   phone: true,
   role: true,
   status: true,

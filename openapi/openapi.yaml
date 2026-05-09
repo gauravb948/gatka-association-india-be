@@ -389,7 +389,6 @@ components:
       type: object
       properties:
         id: { type: string }
-        username: { type: string, nullable: true }
         email: { type: string, format: email }
         phone: { type: string, nullable: true }
         role: { $ref: "#/components/schemas/Role" }
@@ -421,6 +420,48 @@ components:
         coachProfile: { $ref: "#/components/schemas/LoginCoachProfile" }
         refereeProfile: { $ref: "#/components/schemas/LoginRefereeProfile" }
         volunteerProfile: { $ref: "#/components/schemas/LoginVolunteerProfile" }
+    PublicUserIdCard:
+      description: >
+        Minimal public ID-card payload (no Bearer). Fields vary by `role`: e.g. players include
+        DOB and geo; national admins only `userId`, `role`, and a display `name`.
+      type: object
+      required: [userId, role, name]
+      properties:
+        userId: { type: string }
+        role: { $ref: "#/components/schemas/Role" }
+        name: { type: string }
+        dateOfBirth: { type: string, format: date-time, nullable: true }
+        gender:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/Gender"
+        registrationNumber: { type: string, nullable: true, description: Membership number when assigned on profile }
+        photoUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: >
+            Profile / passport photo public URL when available: player-coach-referee-volunteer use
+            profile `photoUrl`; training center uses center `headPassportPhotoUrl`; state/district
+            admins use registration `passportPhotoUrl`; national admins typically null.
+        trainingCenter:
+          nullable: true
+          type: object
+          properties:
+            id: { type: string }
+            name: { type: string }
+        district:
+          nullable: true
+          type: object
+          properties:
+            id: { type: string }
+            name: { type: string }
+        state:
+          nullable: true
+          type: object
+          properties:
+            id: { type: string }
+            name: { type: string }
     LoginResponse:
       type: object
       properties:
@@ -431,7 +472,6 @@ components:
       description: User directory row (no password)
       properties:
         id: { type: string }
-        username: { type: string, nullable: true }
         email: { type: string, format: email }
         phone: { type: string, nullable: true }
         role: { $ref: "#/components/schemas/Role" }
@@ -488,13 +528,112 @@ components:
           properties:
             role:
               $ref: "#/components/schemas/Role"
+    HierarchyPasswordResetRequest:
+      type: object
+      required: [newPassword]
+      properties:
+        newPassword: { type: string, format: password, minLength: 8 }
+    HierarchyPasswordResetResponse:
+      type: object
+      required: [ok, userId]
+      properties:
+        ok: { type: boolean, const: true }
+        userId: { type: string }
+    PatchMyProfileRequest:
+      type: object
+      description: >
+        Update the signed-in account. Send at least one of `email`, `phone`, or exactly one
+        non-empty role-specific subsection (`playerProfile`, `coachProfile`, etc.) per request.
+        NATIONAL_ADMIN may only change `email` / `phone`.
+      additionalProperties: false
+      properties:
+        email: { type: string, format: email }
+        phone: { type: string, nullable: true, minLength: 7, maxLength: 25 }
+        playerProfile:
+          type: object
+          additionalProperties: false
+          properties:
+            fullName: { type: string, minLength: 1, maxLength: 200 }
+            fatherName: { type: string, nullable: true, minLength: 1, maxLength: 160 }
+            motherName: { type: string, nullable: true, minLength: 1, maxLength: 160 }
+            whatsappNo: { type: string, minLength: 7, maxLength: 25 }
+            address: { type: string, minLength: 3, maxLength: 1000 }
+            maritalStatus: { $ref: "#/components/schemas/MaritalStatus" }
+            tShirtSize: { $ref: "#/components/schemas/TShirtSize" }
+            playingHand: { $ref: "#/components/schemas/PlayingHand" }
+            photoUrl: { type: string, format: uri }
+            aadharFrontUrl: { type: string, format: uri }
+            aadharBackUrl: { type: string, format: uri }
+        coachProfile:
+          type: object
+          additionalProperties: false
+          properties:
+            fullName: { type: string, minLength: 1, maxLength: 200 }
+            fatherName: { type: string, nullable: true, minLength: 1, maxLength: 160 }
+            address: { type: string, minLength: 3, maxLength: 1000 }
+            education: { type: string, minLength: 1, maxLength: 2000 }
+            appliedFor: { $ref: "#/components/schemas/CoachAppliedFor" }
+            experienceInGatka: { $ref: "#/components/schemas/GatkaExperience" }
+            photoUrl: { type: string, format: uri }
+            aadharFrontUrl: { type: string, format: uri }
+            aadharBackUrl: { type: string, format: uri }
+        refereeProfile:
+          type: object
+          additionalProperties: false
+          properties:
+            fullName: { type: string, minLength: 1, maxLength: 200 }
+            fatherName: { type: string, nullable: true, minLength: 1, maxLength: 160 }
+            alternatePhone: { type: string, minLength: 7, maxLength: 25 }
+            address: { type: string, minLength: 3, maxLength: 1000 }
+            appliedFor: { type: string, minLength: 1, maxLength: 160 }
+            education: { type: string, minLength: 1, maxLength: 2000 }
+            experienceInGatka: { $ref: "#/components/schemas/GatkaExperience" }
+            photoUrl: { type: string, format: uri }
+            aadharFrontUrl: { type: string, format: uri }
+            aadharBackUrl: { type: string, format: uri }
+        volunteerProfile:
+          type: object
+          additionalProperties: false
+          properties:
+            fullName: { type: string, minLength: 1, maxLength: 200 }
+            photoUrl: { type: string, format: uri }
+        trainingCenterOrg:
+          type: object
+          additionalProperties: false
+          properties:
+            name: { type: string, minLength: 1, maxLength: 160 }
+            address: { type: string, minLength: 3, maxLength: 1000 }
+            headName: { type: string, minLength: 1, maxLength: 160 }
+            registrarNumber: { type: string, nullable: true, minLength: 2, maxLength: 60 }
+            headAadharNumber: { type: string, minLength: 8, maxLength: 20 }
+            registrationCertificateUrl: { type: string, format: uri, nullable: true }
+            headPassportPhotoUrl: { type: string, format: uri }
+            headAadharFrontUrl: { type: string, format: uri }
+            headAadharBackUrl: { type: string, format: uri }
+        stateRegistration:
+          type: object
+          additionalProperties: false
+          properties:
+            firstName: { type: string, minLength: 1, maxLength: 80 }
+            lastName: { type: string, minLength: 1, maxLength: 80 }
+            mobileNo: { type: string, minLength: 10, maxLength: 15 }
+            address: { type: string, minLength: 1 }
+            passportPhotoUrl: { type: string, format: uri, nullable: true }
+        districtRegistration:
+          type: object
+          additionalProperties: false
+          properties:
+            firstName: { type: string, minLength: 1, maxLength: 80 }
+            lastName: { type: string, minLength: 1, maxLength: 80 }
+            mobileNo: { type: string, minLength: 10, maxLength: 15 }
+            address: { type: string, minLength: 1 }
+            passportPhotoUrl: { type: string, format: uri, nullable: true }
     RegistrationApplicantUser:
       type: object
       description: Linked applicant account (subset of fields; no password)
       properties:
         id: { type: string }
         email: { type: string, format: email }
-        username: { type: string, nullable: true }
         phone: { type: string, nullable: true }
         role: { $ref: "#/components/schemas/Role" }
         status: { $ref: "#/components/schemas/EntityStatus" }
@@ -525,7 +664,6 @@ components:
           motherName,
           aadharNumber,
           maritalStatus,
-          userName,
           email,
           password,
           mobileNo,
@@ -549,7 +687,6 @@ components:
         motherName: { type: string }
         aadharNumber: { type: string, description: "Digits (spaces allowed; normalized server-side)" }
         maritalStatus: { $ref: "#/components/schemas/MaritalStatus" }
-        userName: { type: string }
         email: { type: string, format: email }
         password: { type: string, format: password }
         mobileNo: { type: string }
@@ -846,12 +983,48 @@ components:
       type: object
       required: [name]
       properties:
-        name: { type: string }
+        name: { type: string, maxLength: 200, description: "Trimmed server-side" }
         isEnabled: { type: boolean, default: false }
+    DistrictCreateWithState:
+      type: object
+      required: [stateId, name]
+      properties:
+        stateId: { type: string }
+        name: { type: string, maxLength: 200, description: "Trimmed server-side" }
+        isEnabled: { type: boolean }
+    BulkDistrictsCreateRequest:
+      type: object
+      required: [districts]
+      properties:
+        districts:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            type: object
+            required: [name]
+            properties:
+              name: { type: string }
+              isEnabled: { type: boolean }
+    DistrictBulkCreateResponse:
+      type: object
+      required: [districts]
+      properties:
+        districts:
+          type: array
+          items: { $ref: "#/components/schemas/District" }
     DistrictPatch:
       type: object
       properties:
-        name: { type: string }
+        name: { type: string, maxLength: 200, description: "Trimmed server-side when present" }
+        isEnabled: { type: boolean }
+    DistrictPatchWithId:
+      type: object
+      required: [id]
+      description: Provide at least one of `name` or `isEnabled` along with `id`.
+      properties:
+        id: { type: string }
+        name: { type: string, maxLength: 200, description: "Trimmed server-side when present" }
         isEnabled: { type: boolean }
     AgeBandType:
       type: string
@@ -1523,12 +1696,11 @@ components:
     StateRegistrationCreate:
       type: object
       required:
-        [stateId, firstName, lastName, userName, email, password, mobileNo, address]
+        [stateId, firstName, lastName, email, password, mobileNo, address]
       properties:
         stateId: { type: string }
         firstName: { type: string }
         lastName: { type: string }
-        userName: { type: string }
         email: { type: string, format: email }
         password: { type: string, format: password, minLength: 8 }
         mobileNo: { type: string }
@@ -1542,7 +1714,6 @@ components:
           districtId,
           firstName,
           lastName,
-          userName,
           email,
           password,
           mobileNo,
@@ -1553,7 +1724,6 @@ components:
         districtId: { type: string }
         firstName: { type: string }
         lastName: { type: string }
-        userName: { type: string }
         email: { type: string, format: email }
         password: { type: string, format: password, minLength: 8 }
         mobileNo: { type: string }
@@ -1568,7 +1738,6 @@ components:
         userId: { type: string, nullable: true }
         firstName: { type: string }
         lastName: { type: string }
-        userName: { type: string }
         email: { type: string, format: email }
         mobileNo: { type: string }
         address: { type: string }
@@ -1611,7 +1780,6 @@ components:
         userId: { type: string, nullable: true }
         firstName: { type: string }
         lastName: { type: string }
-        userName: { type: string }
         email: { type: string, format: email }
         mobileNo: { type: string }
         address: { type: string }
@@ -1653,7 +1821,6 @@ components:
         userId: { type: string, nullable: true }
         firstName: { type: string }
         lastName: { type: string }
-        userName: { type: string }
         email: { type: string, format: email }
         mobileNo: { type: string }
         address: { type: string }
@@ -1727,7 +1894,6 @@ components:
         userId: { type: string, nullable: true }
         firstName: { type: string }
         lastName: { type: string }
-        userName: { type: string }
         email: { type: string, format: email }
         mobileNo: { type: string }
         address: { type: string }
@@ -1816,6 +1982,40 @@ paths:
                     type: object
                     properties:
                       user: { $ref: "#/components/schemas/LoginUser" }
+  /auth/me/profile:
+    patch:
+      security: [{ bearerAuth: [] }]
+      summary: Update current user profile (self-service)
+      description: >
+        Patches `User.email` / `User.phone` and/or one role-specific profile block.
+        Only the subsection matching your role is accepted. For STATE_ADMIN / DISTRICT_ADMIN,
+        updating `mobileNo` also updates the linked user `phone`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchMyProfileRequest"
+      responses:
+        "200":
+          description: OK (envelope wraps this payload in `data`)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      user: { $ref: "#/components/schemas/LoginUser" }
+        "400":
+          description: Invalid body or wrong profile section for role
+        "404":
+          description: State or district registration row missing for admin user
+        "409":
+          description: Email already in use
   /auth/register/player:
     post:
       summary: Self-register player (pending payment until webhook)
@@ -1925,6 +2125,7 @@ paths:
     get:
       security: [{ bearerAuth: [] }]
       summary: List all states (national admin, paginated)
+      description: Ordered by newest state-body registration submission/activity (`StateRegistration.updatedAt` desc); states without a registration row appear after, then alphabetical by state name within each tier.
       parameters:
         - $ref: "#/components/parameters/userListPage"
         - $ref: "#/components/parameters/userListPageSize"
@@ -2081,10 +2282,52 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PaginatedPublicDistrictListResponse"
+  /districts:
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Create a single district (national/state admin)
+      description: Same rules as POST `/districts/state/{stateId}`; provide `stateId` in the JSON body.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DistrictCreateWithState" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/District" }
+        "403":
+          description: State admin targeting another state
+        "409":
+          description: District name already exists in this state
+    patch:
+      security: [{ bearerAuth: [] }]
+      summary: Update a district (national/state admin)
+      description: Same rules as PATCH `/districts/{id}`; supply the district `id` in the JSON body. At least one of `name`, `isEnabled` is required.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DistrictPatchWithId" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/District" }
+        "403":
+          description: State admin targeting a district outside their state
+        "404":
+          description: District not found
+        "409":
+          description: Renamed to a name that already exists in this state
   /districts/by-state/{stateId}:
     get:
       security: [{ bearerAuth: [] }]
       summary: All districts for state (national/state admin, paginated)
+      description: Ordered by newest district-body registration submission/activity (`DistrictRegistration.updatedAt` desc); districts without a registration appear after, then alphabetical by district name within each tier.
       parameters:
         - in: path
           name: stateId
@@ -2099,6 +2342,33 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PaginatedDistrictListResponse"
+  /districts/state/{stateId}/bulk:
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Bulk create districts under state (national/state admin)
+      description: >
+        Creates many districts in one database transaction. Fails with 409 if any name
+        collides with an existing district in the same state (the whole batch rolls back).
+      parameters:
+        - in: path
+          name: stateId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BulkDistrictsCreateRequest" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DistrictBulkCreateResponse" }
+        "400":
+          description: Invalid body or duplicate names in the request payload
+        "409":
+          description: A district name already exists for this state
   /districts/state/{stateId}:
     post:
       security: [{ bearerAuth: [] }]
@@ -2119,6 +2389,8 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/District" }
+        "409":
+          description: District name already exists in this state
   /districts/{id}:
     get:
       security: [{ bearerAuth: [] }]
@@ -2157,6 +2429,12 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/District" }
+        "403":
+          description: Forbidden
+        "404":
+          description: District not found
+        "409":
+          description: Renamed to a name that already exists in this state
   /training-centers/public/by-district/{districtId}:
     get:
       security: []
@@ -3456,6 +3734,71 @@ paths:
                   status: { type: boolean }
                   message: { type: string }
                   data: { $ref: "#/components/schemas/HierarchyUserListResponse" }
+  /users/id-card/public:
+    get:
+      summary: Public ID-card fields by user id (no auth)
+      description: >
+        Accepted, active users only. Players must be membership-active at their training center;
+        coaches/referees/volunteers must not be blacklisted; state/district admins require an
+        ACCEPTED registration; training-center users need an enabled accepted center.
+      parameters:
+        - in: query
+          name: userId
+          required: true
+          schema: { type: string }
+          description: User `id` (same as API user id)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/PublicUserIdCard" }
+        "400":
+          description: Missing or invalid userId
+        "404":
+          description: Unknown user or not eligible for public ID display
+  /users/{userId}/password:
+    patch:
+      security: [{ bearerAuth: [] }]
+      summary: Set password for another user (hierarchy admins)
+      description: >
+        Allowed for `NATIONAL_ADMIN`, `STATE_ADMIN`, `DISTRICT_ADMIN`, and `TRAINING_CENTER`.
+        Target must be a strictly lower role under the same geographic rules as user directory
+        (national admin may reset everyone except other national admins;
+        state admin may reset district admins and below in that state; TC may reset players/coaches at that TC).
+        You cannot reset your own password here — use OTP or other self-service flows.
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/HierarchyPasswordResetRequest" }
+      responses:
+        "200":
+          description: Password updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/HierarchyPasswordResetResponse" }
+        "400":
+          description: Missing userId or invalid password / attempted self-reset
+        "403":
+          description: Forbidden role, target role, or user outside geographic scope
+        "404":
+          description: Target user not found
   /users/{id}:
     get:
       security: [{ bearerAuth: [] }]

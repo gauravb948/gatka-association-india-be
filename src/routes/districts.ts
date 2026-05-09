@@ -20,6 +20,24 @@ districtsRouter.get(
   districtsController.listByState
 );
 districtsRouter.post(
+  "/",
+  requireAuth,
+  requireRoles("STATE_ADMIN", "NATIONAL_ADMIN"),
+  districtsController.createOne
+);
+districtsRouter.patch(
+  "/",
+  requireAuth,
+  requireRoles("STATE_ADMIN", "NATIONAL_ADMIN"),
+  districtsController.patchOne
+);
+districtsRouter.post(
+  "/state/:stateId/bulk",
+  requireAuth,
+  requireRoles("STATE_ADMIN", "NATIONAL_ADMIN"),
+  districtsController.bulkCreateForState
+);
+districtsRouter.post(
   "/state/:stateId",
   requireAuth,
   requireRoles("STATE_ADMIN", "NATIONAL_ADMIN"),

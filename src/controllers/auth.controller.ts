@@ -8,6 +8,7 @@ import { verifyPassword, hashPassword } from "../lib/password.js";
 import { signAccessToken } from "../lib/jwt.js";
 import { AppError } from "../lib/errors.js";
 import { assertHierarchyEnabled, type UserForHierarchyCheck } from "../lib/access.js";
+import { withAdminRegistrationIds } from "../lib/withAdminRegistrationIds.js";
 import { queueSms } from "../lib/smsQueue.js";
 import { prisma } from "../lib/prisma.js";
 import * as stateRepository from "../repositories/state.repository.js";
@@ -23,24 +24,6 @@ import {
   registerTrainingCenterSchema,
   registerVolunteerSchema,
 } from "../validators/auth.validators.js";
-
-async function withAdminRegistrationIds<T extends { id: string; role: Role }>(user: T) {
-  if (user.role === Role.STATE_ADMIN) {
-    const reg = await prisma.stateRegistration.findUnique({
-      where: { userId: user.id },
-      select: { id: true },
-    });
-    return { ...user, stateRegistrationId: reg?.id ?? null };
-  }
-  if (user.role === Role.DISTRICT_ADMIN) {
-    const reg = await prisma.districtRegistration.findUnique({
-      where: { userId: user.id },
-      select: { id: true },
-    });
-    return { ...user, districtRegistrationId: reg?.id ?? null };
-  }
-  return user;
-}
 
 async function buildAuthSessionForUserId(userId: string) {
   const full = await userRepository.findByIdForLoginResponse(userId);
@@ -99,13 +82,10 @@ export async function registerPlayer(req: Request, res: Response, next: NextFunc
     }
     const exists = await userRepository.findByEmail(body.email);
     if (exists) throw new AppError(409, "Email already registered");
-    const unameExists = await userRepository.findByUsername(body.userName);
-    if (unameExists) throw new AppError(409, "Username already registered");
 
     const passwordHash = await hashPassword(body.password);
     const userData: Prisma.UserCreateInput = {
       email: body.email,
-      username: body.userName,
       phone: body.mobileNo,
       passwordHash,
       role: Role.PLAYER,

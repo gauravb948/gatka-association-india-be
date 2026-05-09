@@ -5,7 +5,6 @@ export const stateRegistrationCreateSchema = z.object({
   stateId: z.string().min(1),
   firstName: z.string().min(1).max(80),
   lastName: z.string().min(1).max(80),
-  userName: z.string().min(2).max(50),
   email: z.string().email(),
   password: z.string().min(8).max(128),
   mobileNo: z.string().min(10).max(15),

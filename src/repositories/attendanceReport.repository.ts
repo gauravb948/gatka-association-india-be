@@ -6,7 +6,6 @@ import * as participationRepository from "./participation.repository.js";
 const userReportSelect = {
   id: true,
   email: true,
-  username: true,
   role: true,
   status: true,
   playerProfile: {

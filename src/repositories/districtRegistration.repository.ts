@@ -13,7 +13,6 @@ const stateSelect = { id: true, name: true, code: true, isEnabled: true } as con
 const applicantUserSelect = {
   id: true,
   email: true,
-  username: true,
   phone: true,
   role: true,
   status: true,
@@ -41,7 +40,6 @@ const stateWithStateRegistrationSelect = {
       userId: true,
       firstName: true,
       lastName: true,
-      userName: true,
       email: true,
       mobileNo: true,
       address: true,

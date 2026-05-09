@@ -31,6 +31,9 @@ function messageForKnownRoute(req: Request): string | null {
   if (method === "PATCH" && /\/settings\/role-payment-fees\/?$/.test(path)) {
     return "Role payment fees updated successfully";
   }
+  if (method === "PATCH" && /\/auth\/me\/profile\/?$/.test(path)) {
+    return "Profile updated successfully";
+  }
 
   if (method !== "POST") return null;
 

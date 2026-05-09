@@ -17,19 +17,12 @@ import {
 
 async function assertApplicantCredentialsAvailable(
   email: string,
-  userName: string,
-  ctx?: { previousEmail?: string; previousUserName?: string; previousUserId?: string | null }
+  ctx?: { previousEmail?: string; previousUserId?: string | null }
 ) {
   if (email !== ctx?.previousEmail) {
     const u = await userRepository.findByEmail(email);
     if (u && u.id !== ctx?.previousUserId) {
       throw new AppError(409, "Email already in use", "EMAIL_IN_USE");
-    }
-  }
-  if (userName !== ctx?.previousUserName) {
-    const u2 = await userRepository.findByUsername(userName);
-    if (u2 && u2.id !== ctx?.previousUserId) {
-      throw new AppError(409, "Username already in use", "USERNAME_IN_USE");
     }
   }
 }
@@ -63,7 +56,6 @@ export async function create(req: Request, res: Response, next: NextFunction) {
     > = {
       firstName: body.firstName,
       lastName: body.lastName,
-      userName: body.userName,
       email: body.email,
       mobileNo: body.mobileNo,
       address: body.address,
@@ -74,7 +66,6 @@ export async function create(req: Request, res: Response, next: NextFunction) {
 
     const userCreateBase: Prisma.UserCreateInput = {
       email: body.email,
-      username: body.userName,
       phone: body.mobileNo,
       passwordHash,
       role: Role.DISTRICT_ADMIN,
@@ -88,9 +79,8 @@ export async function create(req: Request, res: Response, next: NextFunction) {
     let userIdOut: string;
 
     if (existing) {
-      await assertApplicantCredentialsAvailable(body.email, body.userName, {
+      await assertApplicantCredentialsAvailable(body.email, {
         previousEmail: existing.email,
-        previousUserName: existing.userName,
         previousUserId: existing.userId,
       });
 
@@ -101,7 +91,6 @@ export async function create(req: Request, res: Response, next: NextFunction) {
             where: { id: uid },
             data: {
               email: body.email,
-              username: body.userName,
               phone: body.mobileNo,
               passwordHash,
               state: { connect: { id: body.stateId } },
@@ -129,7 +118,7 @@ export async function create(req: Request, res: Response, next: NextFunction) {
       return res.json(payload);
     }
 
-    await assertApplicantCredentialsAvailable(body.email, body.userName);
+    await assertApplicantCredentialsAvailable(body.email);
 
     userIdOut = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({ data: userCreateBase });

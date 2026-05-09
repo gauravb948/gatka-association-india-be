@@ -52,7 +52,7 @@ export async function listAll(req: Request, res: Response, next: NextFunction) {
         skip,
         take: pageSize,
         include: {
-          user: { select: { id: true, email: true, username: true, role: true, stateId: true, districtId: true } },
+          user: { select: { id: true, email: true, role: true, stateId: true, districtId: true } },
           payment: { select: { id: true, purpose: true, amountPaise: true, status: true } },
         },
       }),
@@ -82,7 +82,7 @@ export async function getById(req: Request, res: Response, next: NextFunction) {
     const row = await prisma.membership.findUnique({
       where: { id: req.params.id },
       include: {
-        user: { select: { id: true, email: true, username: true, role: true } },
+        user: { select: { id: true, email: true, role: true } },
         payment: { select: { id: true, purpose: true, amountPaise: true, status: true } },
       },
     });

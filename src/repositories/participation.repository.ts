@@ -105,7 +105,6 @@ const participationListInclude = {
     select: {
       id: true,
       email: true,
-      username: true,
       phone: true,
       playerProfile: {
         select: {

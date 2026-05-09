@@ -19,7 +19,7 @@ export function findManyByUser(userId: string, take: number) {
     take,
     include: {
       user: {
-        select: { id: true, role: true, email: true, username: true },
+        select: { id: true, role: true, email: true },
       },
       state: {
         select: { id: true, name: true, code: true },

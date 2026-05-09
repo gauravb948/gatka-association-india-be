@@ -253,7 +253,6 @@ model TrainingCenter {
 
 model User {
   id               String          @id @default(cuid())
-  username         String?         @unique
   email            String          @unique
   phone            String?
   passwordHash     String
@@ -902,7 +901,6 @@ model StateRegistration {
   user               User?        @relation("StateRegistrationApplicant", fields: [userId], references: [id], onDelete: SetNull)
   firstName          String
   lastName           String
-  userName           String
   email              String
   mobileNo           String
   address            String
@@ -916,7 +914,6 @@ model StateRegistration {
 
   @@index([status])
   @@index([email])
-  @@index([userName])
 }
 
 model DistrictRegistration {
@@ -929,7 +926,6 @@ model DistrictRegistration {
   user             User?        @relation("DistrictRegistrationApplicant", fields: [userId], references: [id], onDelete: SetNull)
   firstName        String
   lastName         String
-  userName         String
   email            String
   mobileNo         String
   address          String
@@ -944,7 +940,6 @@ model DistrictRegistration {
   @@index([status])
   @@index([stateId])
   @@index([email])
-  @@index([userName])
 }
 
 model GalleryImage {
