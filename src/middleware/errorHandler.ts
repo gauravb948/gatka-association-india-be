@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { AppError } from "../lib/errors.js";
+import { buildZodValidationResponseBody } from "../lib/zodValidationResponse.js";
 import { ZodError } from "zod";
 
 export function errorHandler(
@@ -17,12 +18,7 @@ export function errorHandler(
     });
   }
   if (err instanceof ZodError) {
-    return res.status(400).json({
-      status: false,
-      data: null,
-      message: "Validation failed",
-      details: err.flatten(),
-    });
+    return res.status(400).json(buildZodValidationResponseBody(err));
   }
   console.error(err);
   return res.status(500).json({ status: false, data: null, message: "Internal server error" });
