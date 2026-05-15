@@ -667,7 +667,6 @@ components:
           email,
           password,
           mobileNo,
-          whatsappNo,
           address,
           gender,
           dateOfBirth,
@@ -690,7 +689,10 @@ components:
         email: { type: string, format: email }
         password: { type: string, format: password }
         mobileNo: { type: string }
-        whatsappNo: { type: string }
+        whatsappNo:
+          type: string
+          nullable: true
+          description: Optional. Omitted or null clears the slot; min 7 characters when sent.
         address: { type: string }
         gender: { $ref: "#/components/schemas/Gender" }
         dateOfBirth: { type: string, format: date-time }

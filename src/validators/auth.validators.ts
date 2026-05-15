@@ -28,7 +28,10 @@ export const registerPlayerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
   mobileNo: z.string().min(7).max(20),
-  whatsappNo: z.string().min(7).max(20),
+  whatsappNo: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? undefined : v),
+    z.string().min(7).max(20).optional()
+  ),
   address: z.string().min(3).max(1000),
   gender: personGenderSchema,
   dateOfBirth: z.string().datetime(),

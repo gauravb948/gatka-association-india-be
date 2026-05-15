@@ -104,7 +104,7 @@ export async function registerPlayer(req: Request, res: Response, next: NextFunc
           motherName: body.motherName.trim(),
           aadharNumber: body.aadharNumber,
           maritalStatus: body.maritalStatus,
-          whatsappNo: body.whatsappNo.trim(),
+          whatsappNo: body.whatsappNo?.trim() || null,
           tShirtSize: body.tShirtSize,
           playingHand: body.playingHand,
           address: body.address,
