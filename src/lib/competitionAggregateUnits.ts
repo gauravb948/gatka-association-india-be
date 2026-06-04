@@ -27,9 +27,7 @@ export async function assertAggregateUnitsInCompetitionScope(
   unitIds: string[]
 ): Promise<void> {
   const unique = [...new Set(unitIds)];
-  if (unique.length !== unitIds.length) {
-    throw new AppError(400, "Duplicate unit ids", "DUPLICATE_UNITS");
-  }
+  if (unique.length === 0) return;
   if (unitType === AGGREGATE_UNIT_TYPE.TRAINING_CENTER) {
     const tcs = await prisma.trainingCenter.findMany({
       where: { id: { in: unique } },

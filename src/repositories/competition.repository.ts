@@ -2,6 +2,73 @@ import type { Prisma, Role } from "@prisma/client";
 import { ageBandsOverlap } from "../lib/age.js";
 import { prisma } from "../lib/prisma.js";
 
+function withNameContains(
+  where: Prisma.CompetitionWhereInput,
+  nameContains?: string
+): Prisma.CompetitionWhereInput {
+  if (!nameContains) return where;
+  const nameFilter = {
+    name: { contains: nameContains, mode: "insensitive" as const },
+  };
+  if (Object.keys(where).length === 0) return nameFilter;
+  return { AND: [where, nameFilter] };
+}
+
+/** Competitions whose results the caller may list (hierarchy-scoped). Returns null when not allowed. */
+export function competitionResultsVisibilityWhere(user: {
+  role: Role;
+  stateId: string | null;
+  districtId: string | null;
+}): Prisma.CompetitionWhereInput | null {
+  if (user.role === "NATIONAL_ADMIN") return {};
+
+  if (user.role === "STATE_ADMIN") {
+    if (!user.stateId) return null;
+    return {
+      level: { in: ["NATIONAL", "STATE"] },
+      OR: [
+        { states: { some: { stateId: user.stateId } } },
+        { districts: { some: { district: { stateId: user.stateId } } } },
+        { AND: [{ states: { none: {} } }, { districts: { none: {} } }] },
+      ],
+    };
+  }
+
+  if (user.role === "DISTRICT_ADMIN") {
+    if (!user.districtId) return null;
+    const or: Prisma.CompetitionWhereInput[] = [
+      { districts: { some: { districtId: user.districtId } } },
+    ];
+    if (user.stateId) {
+      or.push({
+        AND: [{ districts: { none: {} } }, { states: { some: { stateId: user.stateId } } }],
+      });
+    }
+    or.push({ AND: [{ states: { none: {} } }, { districts: { none: {} } }] });
+    return {
+      level: { in: ["STATE", "DISTRICT"] },
+      OR: or,
+    };
+  }
+
+  return null;
+}
+
+export function buildResultsListCompetitionFilter(
+  user: { role: Role; stateId: string | null; districtId: string | null },
+  opts?: { competitionId?: string; search?: string }
+): Prisma.CompetitionWhereInput | null {
+  const visibility = competitionResultsVisibilityWhere(user);
+  if (visibility === null) return null;
+
+  const parts: Prisma.CompetitionWhereInput[] = [visibility];
+  if (opts?.competitionId) {
+    parts.push({ id: opts.competitionId });
+  }
+  const base = parts.length === 1 ? parts[0]! : { AND: parts };
+  return withNameContains(base, opts?.search);
+}
+
 const defaultCompetitionInclude = {
   states: true,
   districts: true,
@@ -105,18 +172,6 @@ function adminCompetitionCreatorWhere(user: {
   return {};
 }
 
-function withNameContains(
-  where: Prisma.CompetitionWhereInput,
-  nameContains?: string
-): Prisma.CompetitionWhereInput {
-  if (!nameContains) return where;
-  const nameFilter = {
-    name: { contains: nameContains, mode: "insensitive" as const },
-  };
-  if (Object.keys(where).length === 0) return nameFilter;
-  return { AND: [where, nameFilter] };
-}
-
 export function findMany(filters?: { nameContains?: string }) {
   const where = withNameContains({}, filters?.nameContains);
   return prisma.competition.findMany({
@@ -132,7 +187,8 @@ export function findMany(filters?: { nameContains?: string }) {
  * selected districts fall in this state (e.g. national admin chose states A+B → only A/B state admins).
  * District — selected district matches, or state-only scope (no districts) with this admin's state.
  * Training center — `DISTRICT`-level competitions that list this TC's district (`districtId` from user or linked TC).
- * Others — tournament registrations as player.
+ * Player — distinct competitions where they have at least one `participated` participation record.
+ * Other roles — distinct competitions where they have at least one tournament registration as the player.
  */
 export async function findManyForAuthenticatedUserPaginated(
   user: {
@@ -141,12 +197,13 @@ export async function findManyForAuthenticatedUserPaginated(
     stateId: string | null;
     districtId: string | null;
   },
-  pagination: { skip: number; take: number; nameContains?: string }
+  pagination: { skip: number; take: number; nameContains?: string; openOnly?: boolean }
 ) {
-  const { skip, take, nameContains } = pagination;
+  const { skip, take, nameContains, openOnly } = pagination;
 
   if (user.role === "NATIONAL_ADMIN") {
-    const where = withNameContains(adminCompetitionCreatorWhere(user), nameContains);
+    const base = withNameContains(adminCompetitionCreatorWhere(user), nameContains);
+    const where = openOnly ? { AND: [base, { isClosed: false }] } : base;
     const [total, items] = await Promise.all([
       prisma.competition.count({ where }),
       prisma.competition.findMany({
@@ -173,7 +230,8 @@ export async function findManyForAuthenticatedUserPaginated(
         },
       ],
     };
-    const where = withNameContains(geo, nameContains);
+    const base = withNameContains(geo, nameContains);
+    const where = openOnly ? { AND: [base, { isClosed: false }] } : base;
     const [total, items] = await Promise.all([
       prisma.competition.count({ where }),
       prisma.competition.findMany({
@@ -207,7 +265,8 @@ export async function findManyForAuthenticatedUserPaginated(
       level: { in: ["STATE", "DISTRICT"] },
       OR: or,
     };
-    const where = withNameContains(geo, nameContains);
+    const base = withNameContains(geo, nameContains);
+    const where = openOnly ? { AND: [base, { isClosed: false }] } : base;
     const [total, items] = await Promise.all([
       prisma.competition.count({ where }),
       prisma.competition.findMany({
@@ -226,7 +285,30 @@ export async function findManyForAuthenticatedUserPaginated(
       level: "DISTRICT",
       districts: { some: { districtId: user.districtId } },
     };
-    const where = withNameContains(geo, nameContains);
+    const base = withNameContains(geo, nameContains);
+    const where = openOnly ? { AND: [base, { isClosed: false }] } : base;
+    const [total, items] = await Promise.all([
+      prisma.competition.count({ where }),
+      prisma.competition.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take,
+        include: meListInclude,
+      }),
+    ]);
+    return { items, total };
+  }
+
+  if (user.role === "PLAYER") {
+    const grouped = await prisma.participationRecord.groupBy({
+      by: ["competitionId"],
+      where: { playerUserId: user.id, participated: true },
+    });
+    const idList = grouped.map((g) => g.competitionId);
+    if (idList.length === 0) return { items: [], total: 0 };
+    const base = withNameContains({ id: { in: idList } }, nameContains);
+    const where = openOnly ? { AND: [base, { isClosed: false }] } : base;
     const [total, items] = await Promise.all([
       prisma.competition.count({ where }),
       prisma.competition.findMany({
@@ -246,7 +328,8 @@ export async function findManyForAuthenticatedUserPaginated(
   });
   const idList = grouped.map((g) => g.competitionId);
   if (idList.length === 0) return { items: [], total: 0 };
-  const where = withNameContains({ id: { in: idList } }, nameContains);
+  const base = withNameContains({ id: { in: idList } }, nameContains);
+  const where = openOnly ? { AND: [base, { isClosed: false }] } : base;
   const [total, items] = await Promise.all([
     prisma.competition.count({ where }),
     prisma.competition.findMany({
@@ -258,6 +341,21 @@ export async function findManyForAuthenticatedUserPaginated(
     }),
   ]);
   return { items, total };
+}
+
+/** Same visibility as `findManyForAuthenticatedUserPaginated`; returns total count only (for dashboard). */
+export async function countCompetitionsForAuthenticatedUser(user: {
+  id: string;
+  role: Role;
+  stateId: string | null;
+  districtId: string | null;
+}) {
+  const { total } = await findManyForAuthenticatedUserPaginated(user, {
+    skip: 0,
+    take: 1,
+    openOnly: true,
+  });
+  return total;
 }
 
 export function createCompetition(
@@ -367,6 +465,14 @@ export async function updateCompetitionAndGeo(
 
 export function findByIdBasic(id: string) {
   return prisma.competition.findUnique({ where: { id } });
+}
+
+export function deleteCompetition(id: string) {
+  return prisma.$transaction(async (tx) => {
+    await tx.participationRecord.deleteMany({ where: { competitionId: id } });
+    await tx.attendance.deleteMany({ where: { competitionId: id } });
+    await tx.competition.delete({ where: { id } });
+  });
 }
 
 /**

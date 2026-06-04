@@ -29,3 +29,22 @@ export const userHierarchyListQuerySchema = z.object({
 });
 
 export type UserHierarchyListQuery = z.infer<typeof userHierarchyListQuerySchema>;
+
+const OFFICIAL_USER_TYPES = ["COACH", "REFEREE"] as const;
+
+/** Query for `GET /users/officials`: hierarchy listing limited to coach/referee roles. */
+export const officialsListQuerySchema = userHierarchyListQuerySchema
+  .omit({ status: true })
+  .extend({
+    userType: z
+      .union([z.string(), z.array(z.string())])
+      .optional()
+      .transform((raw) => {
+        const parts = splitQueryParts(raw);
+        if (!parts) return undefined;
+        const parsed = parts.map((p) => z.enum(OFFICIAL_USER_TYPES).parse(p.toUpperCase()));
+        return [...new Set(parsed)];
+      }),
+  });
+
+export type OfficialsListQuery = z.infer<typeof officialsListQuerySchema>;

@@ -5,11 +5,19 @@ import crypto from "crypto";
 import * as userRepository from "../repositories/user.repository.js";
 import * as otpRepository from "../repositories/otp.repository.js";
 import { verifyPassword, hashPassword } from "../lib/password.js";
-import { signAccessToken } from "../lib/jwt.js";
+import {
+  signAccessToken,
+  signOtpVerificationToken,
+} from "../lib/jwt.js";
 import { AppError } from "../lib/errors.js";
 import { assertHierarchyEnabled, type UserForHierarchyCheck } from "../lib/access.js";
 import { withAdminRegistrationIds } from "../lib/withAdminRegistrationIds.js";
-import { queueSms } from "../lib/smsQueue.js";
+import {
+  assertRegistrationVerificationToken,
+  normalizePhoneOrEmail,
+  toSmsNumber,
+} from "../lib/otp.js";
+import { sendSmsNow } from "../lib/sms/sendSms.js";
 import { prisma } from "../lib/prisma.js";
 import * as stateRepository from "../repositories/state.repository.js";
 import * as districtRepository from "../repositories/district.repository.js";
@@ -18,6 +26,7 @@ import {
   loginSchema,
   otpConfirmSchema,
   otpRequestSchema,
+  otpVerifySchema,
   registerCoachSchema,
   registerPlayerSchema,
   registerRefereeSchema,
@@ -32,6 +41,27 @@ async function buildAuthSessionForUserId(userId: string) {
     accessToken: signAccessToken({ sub: full.id, role: full.role }),
     user: await withAdminRegistrationIds(full),
   };
+}
+
+function registrationOtpMessage(code: string) {
+  return `Dear User your one-time password is ${code} for sign in. Regards Gatka Federation Of India.`;
+}
+
+function passwordResetOtpMessage(code: string) {
+  return `Hi User, Your password reset code is ${code}. Please use this to reset your password. Regards Gatka Federation Of India`;
+}
+
+function getDltTemplateIdForPurpose(purpose: "REGISTRATION" | "PASSWORD_RESET") {
+  return purpose === "REGISTRATION"
+    ? process.env.MSG_DLT_TEMPLATE_REGISTRATION_ID
+    : process.env.MSG_DLT_TEMPLATE_PASSWORD_RESET_ID;
+}
+
+function assertRegistrationToken(
+  verificationToken: string,
+  expectedIdentifiers: string[]
+) {
+  return assertRegistrationVerificationToken(verificationToken, expectedIdentifiers);
 }
 
 export async function login(req: Request, res: Response, next: NextFunction) {
@@ -70,6 +100,10 @@ export async function me(req: Request, res: Response, next: NextFunction) {
 export async function registerPlayer(req: Request, res: Response, next: NextFunction) {
   try {
     const body = registerPlayerSchema.parse(req.body);
+    const registrationVerification = assertRegistrationToken(body.verificationToken, [
+      body.email,
+      body.mobileNo,
+    ]);
     const state = await stateRepository.findById(body.stateId);
     if (!state?.isEnabled) throw new AppError(400, "State not available");
     const district = await districtRepository.findById(body.districtId);
@@ -119,6 +153,7 @@ export async function registerPlayer(req: Request, res: Response, next: NextFunc
       },
     };
     const user = await userRepository.createPlayerWithProfile(userData);
+    await otpRepository.markConsumed(registrationVerification.otpId);
     const payload = await buildAuthSessionForUserId(user.id);
     res.status(201).json(payload);
   } catch (e) {
@@ -129,6 +164,10 @@ export async function registerPlayer(req: Request, res: Response, next: NextFunc
 export async function registerCoach(req: Request, res: Response, next: NextFunction) {
   try {
     const body = registerCoachSchema.parse(req.body);
+    const registrationVerification = assertRegistrationToken(body.verificationToken, [
+      body.email,
+      body.phone,
+    ]);
     const exists = await userRepository.findByEmail(body.email);
     if (exists) throw new AppError(409, "Email already registered");
 
@@ -168,6 +207,7 @@ export async function registerCoach(req: Request, res: Response, next: NextFunct
       },
     };
     const user = await userRepository.createPlayerWithProfile(userData);
+    await otpRepository.markConsumed(registrationVerification.otpId);
     const payload = await buildAuthSessionForUserId(user.id);
     res.status(201).json(payload);
   } catch (e) {
@@ -178,6 +218,10 @@ export async function registerCoach(req: Request, res: Response, next: NextFunct
 export async function registerReferee(req: Request, res: Response, next: NextFunction) {
   try {
     const body = registerRefereeSchema.parse(req.body);
+    const registrationVerification = assertRegistrationToken(body.verificationToken, [
+      body.email,
+      body.phone,
+    ]);
     const exists = await userRepository.findByEmail(body.email);
     if (exists) throw new AppError(409, "Email already registered");
 
@@ -219,6 +263,7 @@ export async function registerReferee(req: Request, res: Response, next: NextFun
       },
     };
     const user = await userRepository.createPlayerWithProfile(userData);
+    await otpRepository.markConsumed(registrationVerification.otpId);
     const payload = await buildAuthSessionForUserId(user.id);
     res.status(201).json(payload);
   } catch (e) {
@@ -229,6 +274,10 @@ export async function registerReferee(req: Request, res: Response, next: NextFun
 export async function registerVolunteer(req: Request, res: Response, next: NextFunction) {
   try {
     const body = registerVolunteerSchema.parse(req.body);
+    const registrationVerification = assertRegistrationToken(body.verificationToken, [
+      body.email,
+      body.phone ?? "",
+    ]);
     const exists = await userRepository.findByEmail(body.email);
     if (exists) throw new AppError(409, "Email already registered");
 
@@ -253,6 +302,7 @@ export async function registerVolunteer(req: Request, res: Response, next: NextF
       },
     };
     const user = await userRepository.createPlayerWithProfile(userData);
+    await otpRepository.markConsumed(registrationVerification.otpId);
     const payload = await buildAuthSessionForUserId(user.id);
     res.status(201).json(payload);
   } catch (e) {
@@ -267,6 +317,10 @@ export async function registerTrainingCenter(
 ) {
   try {
     const body = registerTrainingCenterSchema.parse(req.body);
+    const registrationVerification = assertRegistrationToken(body.verificationToken, [
+      body.email,
+      body.phone,
+    ]);
     const exists = await userRepository.findByEmail(body.email);
     if (exists) throw new AppError(409, "Email already registered");
 
@@ -308,6 +362,7 @@ export async function registerTrainingCenter(
       trainingCenter: { connect: { id: tc.id } },
     };
     const user = await userRepository.createPlayerWithProfile(userData);
+    await otpRepository.markConsumed(registrationVerification.otpId);
     const payload = await buildAuthSessionForUserId(user.id);
     res.status(201).json({
       ...payload,
@@ -320,27 +375,94 @@ export async function registerTrainingCenter(
 
 export async function otpRequest(req: Request, res: Response, next: NextFunction) {
   try {
-    const { phoneOrEmail } = otpRequestSchema.parse(req.body);
-    const user = await userRepository.findFirstByEmailOrPhone(phoneOrEmail);
-    if (!user) {
-      res.json({ ok: true });
-      return;
+    const { phoneOrEmail, purpose } = otpRequestSchema.parse(req.body);
+    const normalizedIdentifier = normalizePhoneOrEmail(phoneOrEmail);
+    let userId: string | null = null;
+    let recipientPhone: string | null = null;
+
+    if (purpose === "REGISTRATION") {
+      const existing = await userRepository.findFirstByEmailOrPhone(normalizedIdentifier);
+      if (existing) {
+        // Anti-enumeration: behave as success for already-registered identifiers.
+        res.json({ ok: true });
+        return;
+      }
+      recipientPhone = toSmsNumber(normalizedIdentifier);
+    } else {
+      const user = await userRepository.findFirstByEmailOrPhone(normalizedIdentifier);
+      if (!user) {
+        res.json({ ok: true });
+        return;
+      }
+      if (!user.phone) {
+        // Preserve anti-enumeration semantics; account exists but has no SMS destination.
+        res.json({ ok: true });
+        return;
+      }
+      userId = user.id;
+      recipientPhone = toSmsNumber(user.phone);
     }
+
     const code = String(crypto.randomInt(100000, 999999));
     const codeHash = await hashPassword(code);
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
     await otpRepository.createOtp({
-      user: { connect: { id: user.id } },
-      phoneOrEmail,
+      ...(userId ? { user: { connect: { id: userId } } } : {}),
+      phoneOrEmail: normalizedIdentifier,
       codeHash,
-      purpose: "PASSWORD_RESET",
+      purpose,
       expiresAt,
     });
-    const bodyText = `Your OTP is ${code}. It expires in 10 minutes.`;
-    if (user.phone) {
-      await queueSms(user.phone, bodyText, user.id);
-    }
+
+    const bodyText =
+      purpose === "REGISTRATION"
+        ? registrationOtpMessage(code)
+        : passwordResetOtpMessage(code);
+    await sendSmsNow({
+      phone: recipientPhone,
+      body: bodyText,
+      userId: userId ?? undefined,
+      templateId: getDltTemplateIdForPurpose(purpose),
+    });
+
     res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+}
+
+export async function otpVerify(req: Request, res: Response, next: NextFunction) {
+  try {
+    const body = otpVerifySchema.parse(req.body);
+    const normalizedIdentifier = normalizePhoneOrEmail(body.phoneOrEmail);
+
+    const userIdForPurpose =
+      body.purpose === "PASSWORD_RESET"
+        ? (await userRepository.findFirstByEmailOrPhone(normalizedIdentifier))?.id ?? null
+        : null;
+
+    if (body.purpose === "PASSWORD_RESET" && !userIdForPurpose) {
+      throw new AppError(400, "Invalid request");
+    }
+
+    const otp = await otpRepository.findLatestValidByPurpose({
+      phoneOrEmail: normalizedIdentifier,
+      purpose: body.purpose,
+      userId: userIdForPurpose,
+    });
+    if (!otp) throw new AppError(400, "Invalid or expired OTP");
+
+    const match = await verifyPassword(body.code, otp.codeHash);
+    if (!match) throw new AppError(400, "Invalid OTP");
+
+    const verificationToken = signOtpVerificationToken({
+      phoneOrEmail: normalizedIdentifier,
+      purpose: body.purpose,
+      otpId: otp.id,
+      typ: "OTP_VERIFICATION",
+    });
+
+    res.json({ verificationToken });
   } catch (e) {
     next(e);
   }
@@ -349,12 +471,14 @@ export async function otpRequest(req: Request, res: Response, next: NextFunction
 export async function otpConfirm(req: Request, res: Response, next: NextFunction) {
   try {
     const body = otpConfirmSchema.parse(req.body);
-    const user = await userRepository.findFirstByEmailOrPhone(body.phoneOrEmail);
+    const normalizedIdentifier = normalizePhoneOrEmail(body.phoneOrEmail);
+    const user = await userRepository.findFirstByEmailOrPhone(normalizedIdentifier);
     if (!user) throw new AppError(400, "Invalid request");
-    const otp = await otpRepository.findLatestValidPasswordReset(
-      user.id,
-      body.phoneOrEmail
-    );
+    const otp = await otpRepository.findLatestValidByPurpose({
+      userId: user.id,
+      phoneOrEmail: normalizedIdentifier,
+      purpose: "PASSWORD_RESET",
+    });
     if (!otp) throw new AppError(400, "Invalid or expired OTP");
     const match = await verifyPassword(body.code, otp.codeHash);
     if (!match) throw new AppError(400, "Invalid OTP");

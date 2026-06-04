@@ -5,7 +5,7 @@ info:
   description: |
     REST API for centralized Gatka management (roles, geography, registrations, Razorpay, competitions, camps, attendance, results, notices, migration).
 
-    **Banners:** carousel items with `imageUrl`, optional `title` / `subtitle`, ordering via `sortOrder`.
+    **Banners:** carousel rows scoped by **state**. Public carousel **requires a state filter**: `GET /banners/public?stateId=…` or `GET /banners/public/by-state/{stateId}`. Rows have `imageUrl`, optional `title` / `subtitle`, `sortOrder`. National/state admins use `/banners/admin` (`stateId` query optional for nationals).
 
     **Uploads:** Cloudflare R2 — `POST /uploads/r2/upload` (multipart) and `POST /uploads/r2/presign-put` (JSON) are **public** (no JWT); protected by **rate limits**. Store returned `publicUrl` on entities (e.g. banners, registration photos).
 
@@ -89,11 +89,21 @@ components:
           enum: [api, auth, upload]
         retryAfterSec:
           type: integer
+    BannerStateSummary:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        code: { type: string }
     Banner:
       type: object
       properties:
         id:
           type: string
+        stateId:
+          type: string
+        state:
+          $ref: "#/components/schemas/BannerStateSummary"
         imageUrl:
           type: string
         title:
@@ -114,8 +124,11 @@ components:
           format: date-time
     BannerCreate:
       type: object
-      required: [imageUrl]
+      required: [stateId, imageUrl]
       properties:
+        stateId:
+          type: string
+          description: State this carousel row belongs to. National admin may choose any state; state admin must send their own state's id.
         imageUrl:
           type: string
         title:
@@ -131,6 +144,9 @@ components:
     BannerPatch:
       type: object
       properties:
+        stateId:
+          type: string
+          description: Move banner to another state
         imageUrl:
           type: string
         title:
@@ -528,6 +544,87 @@ components:
           properties:
             role:
               $ref: "#/components/schemas/Role"
+    PublicRefereeDirectoryRow:
+      type: object
+      required: [name, state]
+      properties:
+        name:
+          type: string
+          description: "Referee display name from RefereeProfile.fullName."
+        state:
+          type: object
+          required: [id, name, code]
+          properties:
+            id: { type: string }
+            name: { type: string }
+            code: { type: string }
+        district:
+          type: object
+          nullable: true
+          description: Omit or null when no district linked
+          properties:
+            id: { type: string }
+            name: { type: string }
+    PublicRefereesDirectoryResponse:
+      type: object
+      required: [items, page, pageSize, total, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/PublicRefereeDirectoryRow" }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 200 }
+        total: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+    DashboardStatsResponse:
+      type: object
+      required:
+        - totalStates
+        - totalDistricts
+        - totalUsers
+        - ageGroups
+        - eventGroups
+        - competitions
+        - players
+        - tournamentRegistrations
+      properties:
+        totalStates:
+          type: integer
+          nullable: true
+          minimum: 0
+          description: National admin only — count of enabled states (`State.isEnabled`); null for other roles.
+        totalDistricts:
+          type: integer
+          minimum: 0
+          description: Enabled districts (`District.isEnabled`) within scope; district/TC cards use 0–1 when scope is a single district.
+        totalUsers:
+          type: integer
+          minimum: 0
+          description: Users with ACCEPTED status and active accounts, within geographic scope.
+        ageGroups:
+          type: integer
+          minimum: 0
+          description: Active age categories (`AgeCategory.isActive`) — global catalog (in use).
+        eventGroups:
+          type: integer
+          minimum: 0
+          description: Active event groups (`EventGroup.isActive`) — global catalog (in use).
+        competitions:
+          type: integer
+          minimum: 0
+          description: >-
+            Competitions visible to this user (same rules as competitions “me” list),
+            excluding closed competitions (`isClosed` false).
+        players:
+          type: integer
+          minimum: 0
+          description: Player profiles in scope whose linked user is ACCEPTED and active.
+        tournamentRegistrations:
+          type: integer
+          minimum: 0
+          description: >-
+            Tournament registrations in scope whose player user is ACCEPTED and active,
+            with profile matching the geographic filter.
     HierarchyPasswordResetRequest:
       type: object
       required: [newPassword]
@@ -678,6 +775,7 @@ components:
           aadharBackUrl,
           tShirtSize,
           playingHand,
+          verificationToken,
           acceptTerms,
         ]
       properties:
@@ -704,6 +802,9 @@ components:
         aadharBackUrl: { type: string, format: uri }
         tShirtSize: { $ref: "#/components/schemas/TShirtSize" }
         playingHand: { $ref: "#/components/schemas/PlayingHand" }
+        verificationToken:
+          type: string
+          description: Token returned by `POST /auth/otp/verify` for `REGISTRATION`.
         acceptTerms:
           type: boolean
           enum: [true]
@@ -729,6 +830,7 @@ components:
           aadharFrontUrl,
           aadharBackUrl,
           gender,
+          verificationToken,
           acceptTerms,
         ]
       properties:
@@ -749,6 +851,9 @@ components:
         aadharFrontUrl: { type: string, format: uri }
         aadharBackUrl: { type: string, format: uri }
         gender: { $ref: "#/components/schemas/Gender" }
+        verificationToken:
+          type: string
+          description: Token returned by `POST /auth/otp/verify` for `REGISTRATION`.
         acceptTerms:
           type: boolean
           enum: [true]
@@ -773,6 +878,7 @@ components:
           photoUrl,
           aadharFrontUrl,
           aadharBackUrl,
+          verificationToken,
           acceptTerms,
         ]
       properties:
@@ -793,13 +899,16 @@ components:
         photoUrl: { type: string, format: uri }
         aadharFrontUrl: { type: string, format: uri }
         aadharBackUrl: { type: string, format: uri }
+        verificationToken:
+          type: string
+          description: Token returned by `POST /auth/otp/verify` for `REGISTRATION`.
         acceptTerms:
           type: boolean
           enum: [true]
           description: Must be true — server sets `termsAcceptedAt` on the referee profile
     RegisterVolunteerRequest:
       type: object
-      required: [email, password, phone, fullName, gender, stateId]
+      required: [email, password, phone, fullName, gender, stateId, verificationToken]
       properties:
         email: { type: string, format: email }
         password: { type: string, format: password }
@@ -807,6 +916,9 @@ components:
         fullName: { type: string }
         gender: { $ref: "#/components/schemas/Gender" }
         stateId: { type: string }
+        verificationToken:
+          type: string
+          description: Token returned by `POST /auth/otp/verify` for `REGISTRATION`.
     RegisterTrainingCenterRequest:
       type: object
       required:
@@ -823,6 +935,7 @@ components:
           headPassportPhotoUrl,
           headAadharFrontUrl,
           headAadharBackUrl,
+          verificationToken,
           acceptTerms,
         ]
       properties:
@@ -844,10 +957,43 @@ components:
         headPassportPhotoUrl: { type: string, format: uri }
         headAadharFrontUrl: { type: string, format: uri }
         headAadharBackUrl: { type: string, format: uri }
+        verificationToken:
+          type: string
+          description: Token returned by `POST /auth/otp/verify` for `REGISTRATION`.
         acceptTerms:
           type: boolean
           enum: [true]
           description: Must be true — server sets `termsAcceptedAt` on the training center
+    OtpPurpose:
+      type: string
+      enum: [REGISTRATION, PASSWORD_RESET]
+    OtpRequest:
+      type: object
+      required: [phoneOrEmail]
+      properties:
+        phoneOrEmail: { type: string }
+        purpose:
+          $ref: "#/components/schemas/OtpPurpose"
+          description: Defaults to `PASSWORD_RESET` when omitted.
+    OtpVerify:
+      type: object
+      required: [phoneOrEmail, purpose, code]
+      properties:
+        phoneOrEmail: { type: string }
+        purpose: { $ref: "#/components/schemas/OtpPurpose" }
+        code: { type: string }
+    OtpVerifyResponse:
+      type: object
+      required: [verificationToken]
+      properties:
+        verificationToken: { type: string }
+    OtpConfirm:
+      type: object
+      required: [phoneOrEmail, code, newPassword]
+      properties:
+        phoneOrEmail: { type: string }
+        code: { type: string }
+        newPassword: { type: string, format: password, minLength: 8 }
     State:
       type: object
       properties:
@@ -1142,26 +1288,31 @@ components:
         updatedAt: { type: string, format: date-time }
     CompetitionAggregateResultsBody:
       type: object
-      required: [firstPlace, secondPlace, thirdPlace]
+      required: [eventId, firstPlace, secondPlace, thirdPlace]
       properties:
+        eventId:
+          type: string
+          description: Catalog event id within this competition's age scope
         firstPlace:
           type: string
-          description: Id of the single winning unit (training center, district, or state — matches competition `level`).
+          description: Id of the single winning unit (may also appear in second/third).
         secondPlace:
           type: array
           items: { type: string }
-          description: Unit ids tied for second (may be empty).
+          description: Unit ids in second place (may be empty; may overlap with first/third).
         thirdPlace:
           type: array
           items: { type: string }
-          description: Unit ids tied for third (may be empty).
+          description: Unit ids in third place (may be empty; may overlap with first/second).
       description: >
-        Replaces all aggregate standings for the competition. Each id may appear only once across the three lists.
-        District-level competitions rank training centers; state-level rank districts; national rank states.
+        Replaces aggregate standings for one event. Exactly one `firstPlace` winner; the same unit
+        may also appear in `secondPlace` and/or `thirdPlace`. District-level competitions rank training
+        centers; state-level rank districts; national rank states.
     CompetitionAggregateStandingRow:
       type: object
       properties:
         id: { type: string }
+        eventId: { type: string }
         rankBand: { type: integer, enum: [1, 2, 3] }
         unitType: { type: string, enum: [TRAINING_CENTER, DISTRICT, STATE] }
         unitId: { type: string }
@@ -1181,20 +1332,109 @@ components:
           type: object
     CompetitionAggregateResultsResponse:
       type: object
-      required: [competitionId, level, unitType, firstPlace, secondPlace, thirdPlace]
+      required: [competitionId, level, unitType, events]
       properties:
         competitionId: { type: string }
         level: { type: string, enum: [DISTRICT, STATE, NATIONAL] }
         unitType: { type: string, enum: [TRAINING_CENTER, DISTRICT, STATE] }
-        firstPlace:
+        events:
           type: array
-          items: { $ref: "#/components/schemas/CompetitionAggregateStandingRow" }
-        secondPlace:
+          items:
+            type: object
+            required: [eventId, event, ageGroup, eventGroup, firstPlace, secondPlace, thirdPlace]
+            properties:
+              eventId: { type: string }
+              event: { type: string }
+              ageGroup: { type: string }
+              eventGroup: { type: string }
+              firstPlace:
+                type: array
+                items: { $ref: "#/components/schemas/CompetitionAggregateStandingRow" }
+              secondPlace:
+                type: array
+                items: { $ref: "#/components/schemas/CompetitionAggregateStandingRow" }
+              thirdPlace:
+                type: array
+                items: { $ref: "#/components/schemas/CompetitionAggregateStandingRow" }
+    ResultListItem:
+      type: object
+      required:
+        [srNo, competitionId, eventId, competition, ageGroup, eventGroup, event, gold, silver, bronze, date]
+      properties:
+        srNo: { type: integer, minimum: 1 }
+        competitionId: { type: string }
+        eventId: { type: string }
+        competition: { type: string }
+        ageGroup: { type: string }
+        eventGroup: { type: string, description: "e.g. Saif (Male)" }
+        event: { type: string }
+        gold:
+          type: string
+          nullable: true
+          description: Single first-place unit name
+        silver:
+          type: string
+          nullable: true
+          description: Single second-place unit name
+        bronze:
           type: array
-          items: { $ref: "#/components/schemas/CompetitionAggregateStandingRow" }
-        thirdPlace:
+          items: { type: string }
+          description: Third-place unit names
+        date:
+          type: string
+          format: date-time
+          nullable: true
+          description: Latest aggregate standing update for this event, if any
+    ResultListResponse:
+      type: object
+      required: [items, page, pageSize, total, totalPages]
+      properties:
+        items:
           type: array
-          items: { $ref: "#/components/schemas/CompetitionAggregateStandingRow" }
+          items: { $ref: "#/components/schemas/ResultListItem" }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+    CompetitionRegistrationStatItem:
+      type: object
+      required:
+        [srNo, competitionId, competition, total, men, women, boys, girls]
+      properties:
+        srNo: { type: integer, minimum: 1 }
+        competitionId: { type: string }
+        competition: { type: string }
+        total:
+          type: integer
+          minimum: 0
+          description: Distinct registered players in this competition
+        men:
+          type: integer
+          minimum: 0
+          description: Senior-band male players (AgeCategory.bandType SENIOR, VETERAN, or OPEN)
+        women:
+          type: integer
+          minimum: 0
+          description: Senior-band female players
+        boys:
+          type: integer
+          minimum: 0
+          description: Junior-band male players (SUB_JUNIOR or JUNIOR)
+        girls:
+          type: integer
+          minimum: 0
+          description: Junior-band female players
+    CompetitionRegistrationsReportResponse:
+      type: object
+      required: [items, page, pageSize, total, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/CompetitionRegistrationStatItem" }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
     Session:
       type: object
       properties:
@@ -1678,6 +1918,70 @@ components:
         name: { type: string }
         message: { type: string }
         designation: { type: string, nullable: true }
+    AboutUs:
+      type: object
+      properties:
+        id: { type: string }
+        stateId: { type: string }
+        logoUrl: { type: string, format: uri }
+        stateTitle: { type: string }
+        stateTitleNative: { type: string, nullable: true }
+        phoneNo: { type: string, nullable: true }
+        email: { type: string, format: email, nullable: true }
+        fbUrl: { type: string, format: uri, nullable: true }
+        ytUrl: { type: string, format: uri, nullable: true }
+        instaUrl: { type: string, format: uri, nullable: true }
+        address: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        state:
+          type: object
+          nullable: true
+          properties:
+            id: { type: string }
+            name: { type: string }
+            code: { type: string }
+    AboutUsCreate:
+      type: object
+      required: [stateId, logoUrl, stateTitle]
+      properties:
+        stateId: { type: string }
+        logoUrl: { type: string, format: uri }
+        stateTitle: { type: string }
+        stateTitleNative: { type: string, nullable: true }
+        phoneNo: { type: string, nullable: true }
+        email: { type: string, format: email, nullable: true }
+        fbUrl: { type: string, format: uri, nullable: true }
+        ytUrl: { type: string, format: uri, nullable: true }
+        instaUrl: { type: string, format: uri, nullable: true }
+        address: { type: string, nullable: true }
+    AboutUsPatch:
+      type: object
+      properties:
+        stateId: { type: string }
+        logoUrl: { type: string, format: uri }
+        stateTitle: { type: string }
+        stateTitleNative: { type: string, nullable: true }
+        phoneNo: { type: string, nullable: true }
+        email: { type: string, format: email, nullable: true }
+        fbUrl: { type: string, format: uri, nullable: true }
+        ytUrl: { type: string, format: uri, nullable: true }
+        instaUrl: { type: string, format: uri, nullable: true }
+        address: { type: string, nullable: true }
+    StateDomain:
+      type: object
+      required: [stateId, stateName, domainName]
+      properties:
+        stateId: { type: string }
+        stateName: { type: string }
+        domainName: { type: string }
+    StateDomainPatch:
+      type: object
+      required: [domainName]
+      properties:
+        domainName:
+          type: string
+          description: Domain hostname only (example `pb.dummy.gatka.in`), no protocol/path.
     StatusChangeRequest:
       type: object
       required: [status]
@@ -1698,7 +2002,7 @@ components:
     StateRegistrationCreate:
       type: object
       required:
-        [stateId, firstName, lastName, email, password, mobileNo, address]
+        [stateId, firstName, lastName, email, password, mobileNo, verificationToken, address]
       properties:
         stateId: { type: string }
         firstName: { type: string }
@@ -1706,6 +2010,9 @@ components:
         email: { type: string, format: email }
         password: { type: string, format: password, minLength: 8 }
         mobileNo: { type: string }
+        verificationToken:
+          type: string
+          description: Token returned by `POST /auth/otp/verify` for `REGISTRATION`.
         address: { type: string }
         passportPhotoUrl: { type: string, format: uri, nullable: true }
     DistrictRegistrationCreate:
@@ -1719,6 +2026,7 @@ components:
           email,
           password,
           mobileNo,
+          verificationToken,
           address,
         ]
       properties:
@@ -1729,6 +2037,9 @@ components:
         email: { type: string, format: email }
         password: { type: string, format: password, minLength: 8 }
         mobileNo: { type: string }
+        verificationToken:
+          type: string
+          description: Token returned by `POST /auth/otp/verify` for `REGISTRATION`.
         address: { type: string }
         passportPhotoUrl: { type: string, format: uri, nullable: true }
     StateRegistration:
@@ -2080,23 +2391,42 @@ paths:
           description: Created
   /auth/otp/request:
     post:
-      summary: Request password reset OTP (SMS queued if phone on file)
+      summary: Request OTP for registration or password reset
       requestBody:
         content:
           application/json:
-            schema:
-              type: object
-              properties:
-                phoneOrEmail:
-                  type: string
+            schema: { $ref: "#/components/schemas/OtpRequest" }
+      responses:
+        "200":
+          description: OK
+  /auth/otp/verify:
+    post:
+      summary: Verify OTP and get verification token
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OtpVerify" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/OtpVerifyResponse" }
   /auth/otp/confirm:
     post:
       summary: Confirm OTP and set new password
       requestBody:
         content:
           application/json:
-            schema:
-              type: object
+            schema: { $ref: "#/components/schemas/OtpConfirm" }
+      responses:
+        "200":
+          description: OK
   /states/public:
     get:
       summary: List enabled states where state-body registration is not created yet (public, paginated)
@@ -2899,8 +3229,9 @@ paths:
         with no state/district rows remain visible to state and district admins.
         Training centers see district-level competitions that include their district in the
         competition's selected districts.
-        Other authenticated users see distinct competitions where they have at least one tournament
-        registration as the player. Items include `createdBy` when available.
+        Players see distinct competitions where they have at least one participation record
+        (`participated: true`). Other authenticated users see distinct competitions where they
+        have at least one tournament registration as the player. Items include `createdBy` when available.
       parameters:
         - name: page
           in: query
@@ -2944,10 +3275,12 @@ paths:
           description: Competition not found
     patch:
       security: [{ bearerAuth: [] }]
-      summary: Update competition (scoped admins; not when closed)
+      summary: Update competition (same-level admin only; not when closed)
       description: >
-        Partial update. Response includes `createdBy` and `createdById` like create. Supports multiple
-        `genders` and `ageCategoryIds` (replace junction when `ageCategoryIds` is sent).
+        Partial update. Only the admin role matching the competition level may edit:
+        national competitions → national admin, state → state admin, district → district admin,
+        each within their geographic scope. Response includes `createdBy` and `createdById` like create.
+        Supports multiple `genders` and `ageCategoryIds` (replace junction when `ageCategoryIds` is sent).
       requestBody:
         required: true
         content:
@@ -2962,9 +3295,23 @@ paths:
         "400":
           description: Closed competition
         "403":
-          description: Outside admin scope
+          description: Outside admin scope or wrong hierarchy level
         "409":
           description: Name taken
+    delete:
+      security: [{ bearerAuth: [] }]
+      summary: Delete competition (same-level admin only)
+      description: >
+        Permanently deletes the competition and related participation/attendance rows.
+        Only the admin role matching the competition level may delete (national → national admin,
+        state → state admin, district → district admin), within geographic scope.
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Outside admin scope or wrong hierarchy level
+        "404":
+          description: Competition not found
   /competitions/{id}/close:
     parameters:
       - name: id
@@ -3012,11 +3359,10 @@ paths:
         schema: { type: string }
     get:
       security: [{ bearerAuth: [] }]
-      summary: Get organization-level aggregate results (1st/2nd/3rd)
+      summary: Get per-event aggregate results (1st/2nd/3rd)
       description: >
-        Same manage scope as patching the competition. Returns ranked units: training centers (district-level
-        competition), districts (state-level), or states (national). `firstPlace` is at most one row; second and
-        third may list ties.
+        Same manage scope as patching the competition. Returns one entry per event that has standings,
+        with ranked units: training centers (district-level), districts (state-level), or states (national).
       responses:
         "200":
           description: OK
@@ -3029,11 +3375,10 @@ paths:
           description: Competition not found
     post:
       security: [{ bearerAuth: [] }]
-      summary: Set or replace aggregate competition results
+      summary: Set or replace aggregate results for one event
       description: >
-        Replaces all rows for this competition. Exactly one `firstPlace` id; `secondPlace` and `thirdPlace` are
-        arrays (may be empty) allowing multiple units at 2nd and 3rd. All ids must sit within the competition’s
-        geography. District-level → training center ids; state-level → district ids; national → state ids.
+        Replaces standings for the given `eventId` only. Exactly one `firstPlace` id; `secondPlace` and
+        `thirdPlace` are arrays. Repeat for each event to generate results for all events in the competition.
       requestBody:
         required: true
         content:
@@ -3194,7 +3539,10 @@ paths:
       summary: List participants (participation records) for a competition
       description: >
         Paginated `ParticipationRecord` rows with `participated` true, including nested player profile summary.
-        Scoped to the caller's hierarchy the same way as player lists (national sees all, others see their geography).
+        Available to the same-level admin and all upper hierarchy admins within geographic scope
+        (e.g. district competition → district, state, and national admins in scope; state competition
+        → state and national admins). Training centers may view district-level competitions in their district.
+        Participant rows are further filtered to the caller's geography.
       parameters:
         - name: id
           in: path
@@ -3460,6 +3808,39 @@ paths:
         "403":
           description: Forbidden for this role
   /results:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List competition results (dashboard table)
+      description: >
+        Paginated per-event aggregate results from `CompetitionAggregateStanding`. For each competition
+        that has at least one saved result, returns one row for every event in the competition's age scope
+        (including events without winners yet). Gold/silver/bronze are unit names for ranks 1/2/3.
+        Scoped to the caller's admin hierarchy.
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+        - in: query
+          name: search
+          schema: { type: string }
+          description: Case-insensitive substring match on competition name
+        - in: query
+          name: competitionId
+          schema: { type: string }
+          description: Optional filter to a single competition
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResultListResponse" }
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden for this role
     post:
       security: [{ bearerAuth: [] }]
       summary: Upsert result + QR payload
@@ -3604,6 +3985,70 @@ paths:
                   status: { type: boolean }
                   message: { type: string }
                   data: { $ref: "#/components/schemas/HierarchyUserListResponse" }
+  /users/officials:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List accepted officials — coaches and referees (hierarchy-scoped, paginated)
+      description: >
+        Returns users with role COACH and/or REFEREE, EntityStatus ACCEPTED only,
+        visible to the caller's hierarchy. Optional `userType` query filters to
+        `COACH`, `REFEREE`, or comma-separated both.
+      parameters:
+        - $ref: "#/components/parameters/userListPage"
+        - $ref: "#/components/parameters/userListPageSize"
+        - $ref: "#/components/parameters/userListStateId"
+        - $ref: "#/components/parameters/userListDistrictId"
+        - $ref: "#/components/parameters/userListTrainingCenterId"
+        - in: query
+          name: userType
+          schema:
+            type: string
+            description: "Optional filter: COACH, REFEREE, or COACH,REFEREE"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data:
+                    allOf:
+                      - $ref: "#/components/schemas/AdminUserListResponse"
+                      - type: object
+                        required: [userTypes]
+                        properties:
+                          userTypes:
+                            type: array
+                            items:
+                              type: string
+                              enum: [COACH, REFEREE]
+  /users/referees/public:
+    get:
+      summary: List accepted referees (public)
+      description: >
+        Active users with role REFEREE, EntityStatus ACCEPTED, not blacklisted.
+        Pagination via `page` and `pageSize` (defaults 1 and 50, max pageSize 200).
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/PublicRefereesDirectoryResponse" }
   /users/referees:
     get:
       security: [{ bearerAuth: [] }]
@@ -3827,6 +4272,118 @@ paths:
           description: Forbidden
         "404":
           description: User not found
+  /dashboard/stats:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Dashboard summary counts (scope by signed-in admin)
+      description: >
+        National admin sees all-India figures. State admin is limited to their state (including
+        `StateRegistration` fallback when `User.stateId` is unset). District admin is limited to their
+        district. Training center sees their center only. `totalStates` is set only for national admin
+        (enabled states). `totalDistricts` counts enabled districts only. `totalUsers`, `players`, and
+        tournament registration counts include only users with `EntityStatus` ACCEPTED and `isActive` true.
+        `ageGroups` and `eventGroups` are global active catalog counts. `competitions` counts only
+        competitions visible to the user (same rules as `GET /competitions/me`) that are not closed
+        (`isClosed` false). Tournament registrations are further limited to those whose player account
+        is ACCEPTED and active.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data:
+                    $ref: "#/components/schemas/DashboardStatsResponse"
+        "403":
+          description: Forbidden (role not allowed or hierarchy context missing)
+  /domains:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List state domains (national admin)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/StateDomain" }
+        "403":
+          description: Forbidden (NATIONAL_ADMIN only)
+  /domains/{stateId}:
+    patch:
+      security: [{ bearerAuth: [] }]
+      summary: Update state domain by state id (national admin)
+      parameters:
+        - in: path
+          name: stateId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StateDomainPatch" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/StateDomain" }
+        "404":
+          description: State not found
+        "409":
+          description: Domain already assigned to another state
+  /reports/competition-registrations:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Competition registration counts by gender and age band
+      description: >
+        Paginated summary per competition with distinct player counts. Uses `TournamentRegistration`
+        rows; age band comes from the event's `AgeCategory.bandType` — SUB_JUNIOR/JUNIOR map to
+        boys/girls, SENIOR/VETERAN/OPEN map to men/women. Scoped to the caller's admin hierarchy.
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+        - in: query
+          name: search
+          schema: { type: string }
+          description: Case-insensitive substring match on competition name
+        - in: query
+          name: competitionId
+          schema: { type: string }
+        - in: query
+          name: finalOnly
+          schema: { type: boolean, default: false }
+          description: When true, only registrations with `finalSubmittedAt` set
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CompetitionRegistrationsReportResponse" }
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden for this role
   /reports/players/expiring:
     get:
       security: [{ bearerAuth: [] }]
@@ -3835,9 +4392,16 @@ paths:
     get:
       security: [{ bearerAuth: [] }]
       summary: Expired memberships
-  /banners/public:
+  /banners/public/by-state/{stateId}:
     get:
-      summary: List active banners (public, ordered by sortOrder)
+      summary: List active banners for a state (public — state in URL path)
+      description: Equivalent to GET `/banners/public?stateId={stateId}`; returns only banners for that state.
+      parameters:
+        - name: stateId
+          in: path
+          required: true
+          schema: { type: string }
+          description: State primary key (`State.id`), same value as query `stateId` on `/banners/public`
       responses:
         "200":
           description: OK
@@ -3847,10 +4411,47 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Banner"
+        "400":
+          description: Empty state id in path
+        "404":
+          description: State id not found
+  /banners/public:
+    get:
+      summary: List active banners for a state (public — query filter)
+      description: Requires `stateId` query; only active banners for that state are returned. Alternatively use `/banners/public/by-state/{stateId}`.
+      parameters:
+        - name: stateId
+          in: query
+          required: true
+          schema: { type: string }
+          description: Which state's carousel to return
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Banner"
+        "400":
+          description: Missing or invalid stateId query
+        "404":
+          description: State id not found
   /banners/admin:
     get:
       security: [{ bearerAuth: [] }]
-      summary: List all banners (national admin)
+      summary: List banners for admin (national or state admin)
+      description: >
+        National admin may omit `stateId` to list every banner, or set `stateId` to filter.
+        State admin always sees banners for their assigned state only; if `stateId` is sent,
+        it must match that state or the request returns 403.
+      parameters:
+        - name: stateId
+          in: query
+          required: false
+          schema: { type: string }
+          description: Filter by state (national admin); state admin must omit or send their state id.
       responses:
         "200":
           description: OK
@@ -3860,6 +4461,8 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Banner"
+        "403":
+          description: Forbidden (state admin querying another state's banners)
         "429":
           description: Rate limited
           content:
@@ -3869,7 +4472,7 @@ paths:
   /banners:
     post:
       security: [{ bearerAuth: [] }]
-      summary: Create banner (national admin)
+      summary: Create banner (national or state admin)
       requestBody:
         required: true
         content:
@@ -3883,6 +4486,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Banner"
+        "403":
+          description: Forbidden (state admin attempted another state's `stateId`)
         "429":
           description: Rate limited
           content:
@@ -3892,7 +4497,7 @@ paths:
   /banners/{id}:
     get:
       security: [{ bearerAuth: [] }]
-      summary: Get banner by id (national admin)
+      summary: Get banner by id (national or state admin)
       parameters:
         - in: path
           name: id
@@ -3906,11 +4511,13 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Banner"
+        "403":
+          description: State admin banner outside assigned state
         "404":
           description: Not found
     patch:
       security: [{ bearerAuth: [] }]
-      summary: Update banner (national admin)
+      summary: Update banner (national or state admin)
       parameters:
         - in: path
           name: id
@@ -3929,9 +4536,11 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Banner"
+        "403":
+          description: Out of scope, or state admin tried to move banner to another state
     delete:
       security: [{ bearerAuth: [] }]
-      summary: Delete banner (national admin)
+      summary: Delete banner (national or state admin)
       parameters:
         - in: path
           name: id
@@ -3941,6 +4550,10 @@ paths:
       responses:
         "204":
           description: No content
+        "403":
+          description: State admin deleting a banner outside their state
+        "404":
+          description: Not found
   /uploads/r2/presign-put:
     post:
       summary: Presign PUT upload to Cloudflare R2 (public)
@@ -4294,6 +4907,15 @@ paths:
     get:
       security: [{ bearerAuth: [] }]
       summary: List all messages (national/state admin)
+      parameters:
+        - in: query
+          name: stateId
+          required: false
+          schema:
+            type: string
+          description: >
+            Filter by state id. National admins may omit this to list every state's messages or set it to filter.
+            State admins are always limited to their assigned state; if provided it must equal that state id.
       responses:
         "200":
           description: OK
@@ -4353,6 +4975,139 @@ paths:
     delete:
       security: [{ bearerAuth: [] }]
       summary: Delete message (national/state admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Deleted }
+  /about-us/public:
+    get:
+      summary: Get about-us for a state (public)
+      parameters:
+        - in: query
+          name: stateId
+          required: true
+          schema:
+            type: string
+          description: State id
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AboutUs" }
+        "404":
+          description: "State not found or no about-us configured"
+  /about-us/public/by-state/{stateId}:
+    get:
+      summary: Get about-us for a state by path (same as query variant)
+      parameters:
+        - in: path
+          name: stateId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AboutUs" }
+        "404":
+          description: "State not found or no about-us configured"
+  /about-us/by-state/{stateId}:
+    get:
+      summary: Get about-us for a state by state id (public)
+      description: Same response as `GET /about-us/public/by-state/{stateId}`; preferred short path.
+      parameters:
+        - in: path
+          name: stateId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AboutUs" }
+        "404":
+          description: "State not found or no about-us configured"
+  /about-us/admin:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List about-us entries (national/state admin)
+      parameters:
+        - in: query
+          name: stateId
+          required: false
+          schema:
+            type: string
+          description: >
+            Filter by state id. National admins may omit this to list all states' entries or set it to filter.
+            State admins are always limited to their assigned state; if provided it must equal that state id.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AboutUs" }
+  /about-us:
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Create about-us for a state (one row per state; national/state admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AboutUsCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AboutUs" }
+        "409":
+          description: "About us already exists for this state"
+  /about-us/{id}:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Get about-us by id
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AboutUs" }
+    patch:
+      security: [{ bearerAuth: [] }]
+      summary: Update about-us (national/state admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AboutUsPatch" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AboutUs" }
+    delete:
+      security: [{ bearerAuth: [] }]
+      summary: Delete about-us (national/state admin)
       parameters:
         - in: path
           name: id

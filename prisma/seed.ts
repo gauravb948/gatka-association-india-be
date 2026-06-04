@@ -172,8 +172,16 @@ async function main() {
 
   await prisma.smsTemplate.createMany({
     data: [
-      { key: "OTP", template: "Your OTP is {{code}}" },
-      { key: "REGISTRATION", template: "Registration received" },
+      {
+        key: "OTP",
+        template:
+          "Hi {{name}}, Your password reset code is {{code}}. Please use this to reset your password. Regards Gatka Federation Of India",
+      },
+      {
+        key: "REGISTRATION",
+        template:
+          "Dear User your one-time password is {{code}} for sign in. Regards Gatka Federation Of India.",
+      },
       { key: "RENEWAL", template: "Renewal received" },
       { key: "MEMBERSHIP_EXPIRY", template: "Membership expiring soon" },
       { key: "PAYMENT_SUCCESS", template: "Payment successful" },

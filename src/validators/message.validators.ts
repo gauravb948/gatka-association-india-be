@@ -1,5 +1,16 @@
 import { z } from "zod";
 
+/** Admin list — national: optional filter; state admins always scoped to their state (`stateId` query must equal theirs when provided). */
+export const messageAdminListQuerySchema = z.object({
+  stateId: z.preprocess(
+    (v) =>
+      v === "" || v === undefined || v === null ? undefined : String(v).trim(),
+    z.string().min(1).optional()
+  ),
+});
+
+export type MessageAdminListQuery = z.infer<typeof messageAdminListQuerySchema>;
+
 export const messageCreateSchema = z.object({
   imageUrl: z.string().url().optional(),
   name: z.string().min(1),

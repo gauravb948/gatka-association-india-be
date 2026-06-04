@@ -40,6 +40,12 @@ competitionsRouter.patch(
   requireRoles("DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),
   competitionsController.patch
 );
+competitionsRouter.delete(
+  "/:id",
+  requireAuth,
+  requireRoles("DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),
+  competitionsController.remove
+);
 competitionsRouter.post(
   "/:id/close",
   requireAuth,

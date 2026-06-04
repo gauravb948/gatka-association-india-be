@@ -5,6 +5,12 @@ import * as reportsController from "../controllers/reports.controller.js";
 export const reportsRouter = Router();
 
 reportsRouter.get(
+  "/competition-registrations",
+  requireAuth,
+  requireRoles("TRAINING_CENTER", "DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),
+  reportsController.competitionRegistrations
+);
+reportsRouter.get(
   "/players/expiring",
   requireAuth,
   requireRoles("TRAINING_CENTER", "DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),

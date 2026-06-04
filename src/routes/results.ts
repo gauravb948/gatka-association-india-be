@@ -4,6 +4,12 @@ import * as resultsController from "../controllers/results.controller.js";
 
 export const resultsRouter = Router();
 
+resultsRouter.get(
+  "/",
+  requireAuth,
+  requireRoles("DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),
+  resultsController.list
+);
 resultsRouter.post(
   "/",
   requireAuth,

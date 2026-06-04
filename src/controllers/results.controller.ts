@@ -3,8 +3,45 @@ import PDFDocument from "pdfkit";
 import ExcelJS from "exceljs";
 import QRCode from "qrcode";
 import * as competitionResultRepository from "../repositories/competitionResult.repository.js";
+import * as competitionAggregateStandingRepository from "../repositories/competitionAggregateStanding.repository.js";
 import { assertAttendanceForCertificate } from "../lib/eligibility.js";
-import { competitionResultBodySchema } from "../validators/competitionResult.validators.js";
+import { buildResultListItems } from "../lib/competitionResultList.js";
+import {
+  competitionResultBodySchema,
+  resultListQuerySchema,
+} from "../validators/competitionResult.validators.js";
+
+export async function list(req: Request, res: Response, next: NextFunction) {
+  try {
+    const actor = req.dbUser!;
+    const q = resultListQuerySchema.parse(req.query);
+    const ctx = await competitionAggregateStandingRepository.findResultListContext(
+      {
+        role: actor.role,
+        stateId: actor.stateId,
+        districtId: actor.districtId,
+      },
+      { competitionId: q.competitionId, search: q.search }
+    );
+    const grouped = await buildResultListItems(ctx);
+    const total = grouped.length;
+    const skip = (q.page - 1) * q.pageSize;
+    const pageItems = grouped.slice(skip, skip + q.pageSize).map((item, index) => ({
+      srNo: skip + index + 1,
+      ...item,
+    }));
+    const totalPages = total === 0 ? 0 : Math.ceil(total / q.pageSize);
+    res.json({
+      items: pageItems,
+      page: q.page,
+      pageSize: q.pageSize,
+      total,
+      totalPages,
+    });
+  } catch (e) {
+    next(e);
+  }
+}
 
 export async function upsert(req: Request, res: Response, next: NextFunction) {
   try {

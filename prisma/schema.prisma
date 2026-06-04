@@ -198,6 +198,9 @@ model State {
   messages           Message[]
   pagesContents      PagesContent[]
   competitionStates  CompetitionState[]
+  banners            Banner[]
+  aboutUs            AboutUs?
+  stateDomain        StateDomain?
 }
 
 model District {
@@ -479,6 +482,7 @@ model Event {
   participations      ParticipationRecord[]
   tournamentRegs      TournamentRegistration[]
   results             CompetitionResult[]
+  aggregateStandings  CompetitionAggregateStanding[]
 
   @@index([eventGroupId])
 }
@@ -575,12 +579,14 @@ model Competition {
   @@index([createdById])
 }
 
-/// Organization-level standings (TC / district / state) for a competition: rank 1 has exactly one unit; ranks 2 and 3 allow ties.
+/// Per-event organization standings (TC / district / state) for a competition.
 model CompetitionAggregateStanding {
   id             String   @id @default(cuid())
   competitionId  String
   competition    Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
-  /// 1 = first place (exactly one row per competition), 2 = second, 3 = third (multiple rows allowed for 2 and 3).
+  eventId        String
+  event          Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  /// 1 = first place (single winner), 2 = second, 3 = third (multiple rows per band allowed).
   rankBand       Int
   /// TRAINING_CENTER for district-level competitions, DISTRICT for state-level, STATE for national.
   unitType       String
@@ -592,8 +598,9 @@ model CompetitionAggregateStanding {
   createdById    String?
   createdBy      User?    @relation("AggregateStandingCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
-  @@unique([competitionId, unitType, unitId])
+  @@index([competitionId, eventId])
   @@index([competitionId, rankBand])
+  @@index([eventId])
 }
 
 /// Geographic scope: when rows exist, players must fall within the scope (districts take precedence over states).
@@ -807,6 +814,7 @@ model OtpCode {
   createdAt  DateTime @default(now())
 
   @@index([phoneOrEmail])
+  @@index([phoneOrEmail, purpose, consumedAt, expiresAt])
 }
 
 model MigrationRequest {
@@ -865,6 +873,8 @@ model SmsOutbox {
 
 model Banner {
   id        String   @id @default(cuid())
+  stateId   String
+  state     State    @relation(fields: [stateId], references: [id], onDelete: Cascade)
   imageUrl  String
   title     String?
   subtitle  String?
@@ -873,8 +883,41 @@ model Banner {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([stateId])
   @@index([isActive])
   @@index([sortOrder])
+}
+
+/// Single "About us" profile per state (contact + social + branding).
+model AboutUs {
+  id               String   @id @default(cuid())
+  stateId          String   @unique
+  state            State    @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  logoUrl          String
+  stateTitle       String
+  stateTitleNative String?
+  phoneNo          String?
+  email            String?
+  fbUrl            String?
+  ytUrl            String?
+  instaUrl         String?
+  address          String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([stateId])
+}
+
+/// Canonical web domain for a state (one row per state).
+model StateDomain {
+  id         String   @id @default(cuid())
+  stateId    String   @unique
+  state      State    @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  domainName String   @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([stateId])
 }
 
 model PagesContent {

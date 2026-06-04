@@ -121,3 +121,11 @@ export function update(id: string, data: Prisma.StateRegistrationUpdateInput) {
     include: registrationListInclude,
   });
 }
+
+/** State admin scope: applicant row always points at the state's registration. */
+export function findStateIdByApplicantUserId(userId: string) {
+  return prisma.stateRegistration.findUnique({
+    where: { userId },
+    select: { stateId: true },
+  });
+}

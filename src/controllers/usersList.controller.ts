@@ -1,11 +1,16 @@
-import type { EntityStatus, Prisma, Role } from "@prisma/client";
+import { EntityStatus, type Prisma, type Role } from "@prisma/client";
 import type { NextFunction, Request, Response } from "express";
 import * as userRepository from "../repositories/user.repository.js";
 import { AppError } from "../lib/errors.js";
 import { prisma } from "../lib/prisma.js";
 import { validatedOptionalGeoClauses } from "../lib/userListFilters.js";
-import { hierarchyGeoWhere } from "../lib/userListScope.js";
-import { userHierarchyListQuerySchema } from "../validators/userList.validators.js";
+import { assertCanListUserType, hierarchyGeoWhere } from "../lib/userListScope.js";
+import {
+  officialsListQuerySchema,
+  userHierarchyListQuerySchema,
+} from "../validators/userList.validators.js";
+
+const OFFICIAL_ROLES = ["COACH", "REFEREE"] as const satisfies readonly Role[];
 
 function buildListWhere(
   targetRole: Role,
@@ -22,6 +27,59 @@ function buildListWhere(
     parts.push({ status: { in: statuses } });
   }
   return parts.length === 1 ? parts[0]! : { AND: parts };
+}
+
+function resolveListableOfficialRoles(actorRole: Role, requested?: Role[]): Role[] {
+  const listable = OFFICIAL_ROLES.filter((role) => {
+    try {
+      assertCanListUserType(actorRole, role);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+  if (listable.length === 0) {
+    throw new AppError(403, "You cannot list officials at your access level", "FORBIDDEN_USER_LIST");
+  }
+  if (!requested?.length) return [...listable];
+  const effective = requested.filter((role) => listable.includes(role as (typeof OFFICIAL_ROLES)[number]));
+  if (effective.length === 0) {
+    throw new AppError(
+      403,
+      "You cannot list this user type at your access level",
+      "FORBIDDEN_USER_LIST"
+    );
+  }
+  return effective;
+}
+
+function buildOfficialsWhere(
+  actor: Parameters<typeof hierarchyGeoWhere>[0],
+  roles: Role[],
+  optional: Prisma.UserWhereInput[],
+  statuses?: EntityStatus[]
+): Prisma.UserWhereInput {
+  const roleClauses = roles.map((role) =>
+    buildListWhere(role, hierarchyGeoWhere(actor, role), optional, statuses)
+  );
+  return roleClauses.length === 1 ? roleClauses[0]! : { OR: roleClauses };
+}
+
+function enrichListItem(item: any, targetRole?: Role) {
+  const {
+    playerProfile,
+    coachProfile,
+    refereeProfile,
+    volunteerProfile,
+    stateRegistrationApplicant,
+    districtRegistrationApplicant,
+    ...rest
+  } = item;
+  const role = (targetRole ?? item.role) as Role;
+  return {
+    ...rest,
+    userTypeProfile: listItemUserTypeProfile(item, role),
+  };
 }
 
 function listItemUserTypeProfile(item: any, targetRole: Role) {
@@ -124,21 +182,7 @@ export function listUsersByRole(targetRole: Role) {
         skip,
         take: q.pageSize,
       });
-      const enrichedItems = items.map((item) => {
-        const {
-          playerProfile,
-          coachProfile,
-          refereeProfile,
-          volunteerProfile,
-          stateRegistrationApplicant,
-          districtRegistrationApplicant,
-          ...rest
-        } = item as any;
-        return {
-          ...rest,
-          userTypeProfile: listItemUserTypeProfile(item, targetRole),
-        };
-      });
+      const enrichedItems = items.map((item) => enrichListItem(item, targetRole));
       const totalPages = total === 0 ? 0 : Math.ceil(total / q.pageSize);
       res.json({
         items: enrichedItems,
@@ -152,6 +196,35 @@ export function listUsersByRole(targetRole: Role) {
       next(e);
     }
   };
+}
+
+/** `GET /users/officials` — accepted coaches and referees in one hierarchy-scoped listing. */
+export async function listOfficials(req: Request, res: Response, next: NextFunction) {
+  try {
+    const actor = req.dbUser!;
+    const q = officialsListQuerySchema.parse(req.query);
+    const roles = resolveListableOfficialRoles(actor.role, q.userType);
+    const optional = await validatedOptionalGeoClauses(actor, q);
+    const where = buildOfficialsWhere(actor, roles, optional, [EntityStatus.ACCEPTED]);
+    const skip = (q.page - 1) * q.pageSize;
+    const [items, total] = await userRepository.findManyPaginatedWithWhere({
+      where,
+      skip,
+      take: q.pageSize,
+    });
+    const enrichedItems = items.map((item) => enrichListItem(item));
+    const totalPages = total === 0 ? 0 : Math.ceil(total / q.pageSize);
+    res.json({
+      items: enrichedItems,
+      page: q.page,
+      pageSize: q.pageSize,
+      total,
+      totalPages,
+      userTypes: roles,
+    });
+  } catch (e) {
+    next(e);
+  }
 }
 
 async function getUserTypeProfile(userId: string, role: Role) {

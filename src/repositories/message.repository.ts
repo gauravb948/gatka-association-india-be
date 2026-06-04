@@ -8,8 +8,9 @@ export function findManyByState(stateId: string) {
   });
 }
 
-export function findMany() {
+export function findMany(filter?: { stateId: string }) {
   return prisma.message.findMany({
+    where: filter?.stateId ? { stateId: filter.stateId } : undefined,
     orderBy: { createdAt: "desc" },
     include: { state: { select: { id: true, name: true, code: true } } },
   });

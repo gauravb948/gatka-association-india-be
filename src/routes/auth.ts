@@ -19,4 +19,5 @@ authRouter.post(
   authController.registerTrainingCenter
 );
 authRouter.post("/otp/request", authLimiter, authController.otpRequest);
+authRouter.post("/otp/verify", authLimiter, authController.otpVerify);
 authRouter.post("/otp/confirm", authLimiter, authController.otpConfirm);

@@ -5,10 +5,12 @@ import { AppError } from "../lib/errors.js";
 import { prisma } from "../lib/prisma.js";
 import { hashPassword } from "../lib/password.js";
 import { buildRegistrationAuthPayload } from "../lib/registrationSessionResponse.js";
+import { assertRegistrationVerificationToken } from "../lib/otp.js";
 import * as districtRegistrationRepo from "../repositories/districtRegistration.repository.js";
 import * as districtRepo from "../repositories/district.repository.js";
 import * as stateRegistrationRepo from "../repositories/stateRegistration.repository.js";
 import * as userRepository from "../repositories/user.repository.js";
+import * as otpRepository from "../repositories/otp.repository.js";
 import {
   districtRegistrationCreateSchema,
   districtRegistrationListQuerySchema,
@@ -30,6 +32,10 @@ async function assertApplicantCredentialsAvailable(
 export async function create(req: Request, res: Response, next: NextFunction) {
   try {
     const body = districtRegistrationCreateSchema.parse(req.body);
+    const registrationVerification = assertRegistrationVerificationToken(body.verificationToken, [
+      body.email,
+      body.mobileNo,
+    ]);
 
     const district = await districtRepo.findByIdWithState(body.districtId);
     if (!district) throw new AppError(404, "District not found");
@@ -115,6 +121,7 @@ export async function create(req: Request, res: Response, next: NextFunction) {
       const reg = await districtRegistrationRepo.findByDistrictId(body.districtId);
       if (!reg) throw new AppError(500, "Registration missing");
       const payload = await buildRegistrationAuthPayload(userIdOut, reg);
+      await otpRepository.markConsumed(registrationVerification.otpId);
       return res.json(payload);
     }
 
@@ -136,6 +143,7 @@ export async function create(req: Request, res: Response, next: NextFunction) {
     const reg = await districtRegistrationRepo.findByDistrictId(body.districtId);
     if (!reg) throw new AppError(500, "Registration missing");
     const payload = await buildRegistrationAuthPayload(userIdOut, reg);
+    await otpRepository.markConsumed(registrationVerification.otpId);
     res.status(201).json(payload);
   } catch (e) {
     next(e);

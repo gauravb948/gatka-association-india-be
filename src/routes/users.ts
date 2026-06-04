@@ -3,10 +3,13 @@ import { requireAuth, requireRoles } from "../middleware/auth.js";
 import * as userIdCardController from "../controllers/userIdCard.controller.js";
 import * as usersPasswordController from "../controllers/usersPassword.controller.js";
 import * as usersListController from "../controllers/usersList.controller.js";
+import * as publicRefereesController from "../controllers/publicReferees.controller.js";
 
 export const usersRouter = Router();
 
 const list = usersListController.listUsersByRole;
+
+usersRouter.get("/referees/public", publicRefereesController.listAcceptedPublic);
 
 usersRouter.get(
   "/players/by-state/:stateId",
@@ -15,6 +18,7 @@ usersRouter.get(
 );
 usersRouter.get("/players", requireAuth, list("PLAYER"));
 usersRouter.get("/coaches", requireAuth, list("COACH"));
+usersRouter.get("/officials", requireAuth, usersListController.listOfficials);
 usersRouter.get("/referees", requireAuth, list("REFEREE"));
 usersRouter.get("/volunteers", requireAuth, list("VOLUNTEER"));
 usersRouter.get("/training-centers", requireAuth, list("TRAINING_CENTER"));

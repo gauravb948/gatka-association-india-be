@@ -8,6 +8,7 @@ export const stateRegistrationCreateSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8).max(128),
   mobileNo: z.string().min(10).max(15),
+  verificationToken: z.string().min(1),
   address: z.string().min(1),
   passportPhotoUrl: z.string().url().nullable().optional(),
 });

@@ -43,6 +43,7 @@ export const registerPlayerSchema = z.object({
   aadharBackUrl: z.string().url(),
   tShirtSize: z.nativeEnum(TShirtSize),
   playingHand: z.nativeEnum(PlayingHand),
+  verificationToken: z.string().min(1),
   acceptTerms: z.literal(true),
 });
 
@@ -68,6 +69,7 @@ export const registerCoachSchema = z.object({
   aadharBackUrl: z.string().url(),
   gender: personGenderSchema,
   trainingCenterId: z.string().min(1),
+  verificationToken: z.string().min(1),
   acceptTerms: z.literal(true),
 });
 
@@ -96,6 +98,7 @@ export const registerRefereeSchema = z.object({
   photoUrl: z.string().url(),
   aadharFrontUrl: z.string().url(),
   aadharBackUrl: z.string().url(),
+  verificationToken: z.string().min(1),
   acceptTerms: z.literal(true),
 });
 
@@ -106,6 +109,7 @@ export const registerVolunteerSchema = z.object({
   fullName: z.string().min(1),
   gender: personGenderSchema,
   stateId: z.string(),
+  verificationToken: z.string().min(1),
 });
 
 export const registerTrainingCenterSchema = z.object({
@@ -133,11 +137,21 @@ export const registerTrainingCenterSchema = z.object({
   headPassportPhotoUrl: z.string().url(),
   headAadharFrontUrl: z.string().url(),
   headAadharBackUrl: z.string().url(),
+  verificationToken: z.string().min(1),
   acceptTerms: z.literal(true),
 });
 
+export const otpPurposeSchema = z.enum(["REGISTRATION", "PASSWORD_RESET"]);
+
 export const otpRequestSchema = z.object({
   phoneOrEmail: z.string().min(3),
+  purpose: otpPurposeSchema.default("PASSWORD_RESET"),
+});
+
+export const otpVerifySchema = z.object({
+  phoneOrEmail: z.string().min(3),
+  purpose: otpPurposeSchema,
+  code: z.string().min(4),
 });
 
 export const otpConfirmSchema = z.object({

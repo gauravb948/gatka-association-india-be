@@ -14,6 +14,18 @@
       "value": ""
     },
     {
+      "key": "verificationToken",
+      "value": ""
+    },
+    {
+      "key": "otpCode",
+      "value": ""
+    },
+    {
+      "key": "phoneOrEmail",
+      "value": "9999999999"
+    },
+    {
       "key": "bannerId",
       "value": ""
     },
@@ -168,13 +180,74 @@
           }
         },
         {
+          "name": "OTP — request (registration)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneOrEmail\": \"{{phoneOrEmail}}\",\n  \"purpose\": \"REGISTRATION\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/otp/request"
+          }
+        },
+        {
+          "name": "OTP — verify (registration)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const payload = j.data !== undefined && j.data !== null ? j.data : j;",
+                  "if (payload.verificationToken) pm.collectionVariables.set('verificationToken', payload.verificationToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneOrEmail\": \"{{phoneOrEmail}}\",\n  \"purpose\": \"REGISTRATION\",\n  \"code\": \"{{otpCode}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/otp/verify"
+          }
+        },
+        {
+          "name": "OTP — request (password reset)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneOrEmail\": \"{{phoneOrEmail}}\",\n  \"purpose\": \"PASSWORD_RESET\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/otp/request"
+          }
+        },
+        {
+          "name": "OTP — confirm password reset",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneOrEmail\": \"{{phoneOrEmail}}\",\n  \"code\": \"{{otpCode}}\",\n  \"newPassword\": \"ChangeMe123!\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/otp/confirm"
+          }
+        },
+        {
           "name": "Register — Player",
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fullName\": \"Test Player\",\n  \"fatherName\": \"Father Name\",\n  \"motherName\": \"Mother Name\",\n  \"aadharNumber\": \"123456789012\",\n  \"maritalStatus\": \"SINGLE\",\n  \"email\": \"testplayer01@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"mobileNo\": \"9999999999\",\n  \"address\": \"Full postal address line 1 and 2\",\n  \"gender\": \"MALE\",\n  \"dateOfBirth\": \"2005-01-01T00:00:00.000Z\",\n  \"stateId\": \"{{stateId}}\",\n  \"districtId\": \"{{districtId}}\",\n  \"trainingCenterId\": \"{{trainingCenterId}}\",\n  \"photoUrl\": \"https://example.com/uploads/player-photo.png\",\n  \"aadharFrontUrl\": \"https://example.com/uploads/aadhar-front.png\",\n  \"aadharBackUrl\": \"https://example.com/uploads/aadhar-back.png\",\n  \"tShirtSize\": \"M\",\n  \"playingHand\": \"RIGHT\",\n  \"acceptTerms\": true\n}"
+              "raw": "{\n  \"fullName\": \"Test Player\",\n  \"fatherName\": \"Father Name\",\n  \"motherName\": \"Mother Name\",\n  \"aadharNumber\": \"123456789012\",\n  \"maritalStatus\": \"SINGLE\",\n  \"email\": \"testplayer01@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"mobileNo\": \"9999999999\",\n  \"address\": \"Full postal address line 1 and 2\",\n  \"gender\": \"MALE\",\n  \"dateOfBirth\": \"2005-01-01T00:00:00.000Z\",\n  \"stateId\": \"{{stateId}}\",\n  \"districtId\": \"{{districtId}}\",\n  \"trainingCenterId\": \"{{trainingCenterId}}\",\n  \"photoUrl\": \"https://example.com/uploads/player-photo.png\",\n  \"aadharFrontUrl\": \"https://example.com/uploads/aadhar-front.png\",\n  \"aadharBackUrl\": \"https://example.com/uploads/aadhar-back.png\",\n  \"tShirtSize\": \"M\",\n  \"playingHand\": \"RIGHT\",\n  \"verificationToken\": \"{{verificationToken}}\",\n  \"acceptTerms\": true\n}"
             },
             "url": "{{baseUrl}}/auth/register/player"
           }
@@ -186,7 +259,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fullName\": \"Test Coach\",\n  \"fatherName\": \"Father Name\",\n  \"aadharNumber\": \"123456789012\",\n  \"address\": \"Full postal address\",\n  \"education\": \"Bachelor of Physical Education\",\n  \"stateId\": \"{{stateId}}\",\n  \"districtId\": \"{{districtId}}\",\n  \"trainingCenterId\": \"{{trainingCenterId}}\",\n  \"email\": \"testcoach01@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"phone\": \"9999999999\",\n  \"appliedFor\": \"ASSISTANT_COACH\",\n  \"experienceInGatka\": \"Y1_3\",\n  \"photoUrl\": \"https://example.com/uploads/coach-photo.png\",\n  \"aadharFrontUrl\": \"https://example.com/uploads/coach-aadhar-front.png\",\n  \"aadharBackUrl\": \"https://example.com/uploads/coach-aadhar-back.png\",\n  \"gender\": \"MALE\",\n  \"acceptTerms\": true\n}"
+              "raw": "{\n  \"fullName\": \"Test Coach\",\n  \"fatherName\": \"Father Name\",\n  \"aadharNumber\": \"123456789012\",\n  \"address\": \"Full postal address\",\n  \"education\": \"Bachelor of Physical Education\",\n  \"stateId\": \"{{stateId}}\",\n  \"districtId\": \"{{districtId}}\",\n  \"trainingCenterId\": \"{{trainingCenterId}}\",\n  \"email\": \"testcoach01@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"phone\": \"9999999999\",\n  \"appliedFor\": \"ASSISTANT_COACH\",\n  \"experienceInGatka\": \"Y1_3\",\n  \"photoUrl\": \"https://example.com/uploads/coach-photo.png\",\n  \"aadharFrontUrl\": \"https://example.com/uploads/coach-aadhar-front.png\",\n  \"aadharBackUrl\": \"https://example.com/uploads/coach-aadhar-back.png\",\n  \"gender\": \"MALE\",\n  \"verificationToken\": \"{{verificationToken}}\",\n  \"acceptTerms\": true\n}"
             },
             "url": "{{baseUrl}}/auth/register/coach"
           }
@@ -198,7 +271,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fullName\": \"Test Referee\",\n  \"fatherName\": \"Father Name\",\n  \"aadharNumber\": \"123456789012\",\n  \"address\": \"Full postal address\",\n  \"education\": \"Graduate\",\n  \"appliedFor\": \"District referee\",\n  \"experienceInGatka\": \"Y1_3\",\n  \"email\": \"testreferee01@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"phone\": \"9999999999\",\n  \"gender\": \"MALE\",\n  \"stateId\": \"{{stateId}}\",\n  \"districtId\": \"{{districtId}}\",\n  \"photoUrl\": \"https://example.com/uploads/referee-photo.png\",\n  \"aadharFrontUrl\": \"https://example.com/uploads/referee-aadhar-front.png\",\n  \"aadharBackUrl\": \"https://example.com/uploads/referee-aadhar-back.png\",\n  \"acceptTerms\": true\n}"
+              "raw": "{\n  \"fullName\": \"Test Referee\",\n  \"fatherName\": \"Father Name\",\n  \"aadharNumber\": \"123456789012\",\n  \"address\": \"Full postal address\",\n  \"education\": \"Graduate\",\n  \"appliedFor\": \"District referee\",\n  \"experienceInGatka\": \"Y1_3\",\n  \"email\": \"testreferee01@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"phone\": \"9999999999\",\n  \"gender\": \"MALE\",\n  \"stateId\": \"{{stateId}}\",\n  \"districtId\": \"{{districtId}}\",\n  \"photoUrl\": \"https://example.com/uploads/referee-photo.png\",\n  \"aadharFrontUrl\": \"https://example.com/uploads/referee-aadhar-front.png\",\n  \"aadharBackUrl\": \"https://example.com/uploads/referee-aadhar-back.png\",\n  \"verificationToken\": \"{{verificationToken}}\",\n  \"acceptTerms\": true\n}"
             },
             "url": "{{baseUrl}}/auth/register/referee"
           }
@@ -210,7 +283,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"testvolunteer01@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"phone\": \"9999999999\",\n  \"fullName\": \"Test Volunteer\",\n  \"gender\": \"MALE\",\n  \"stateId\": \"{{stateId}}\"\n}"
+              "raw": "{\n  \"email\": \"testvolunteer01@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"phone\": \"9999999999\",\n  \"fullName\": \"Test Volunteer\",\n  \"gender\": \"MALE\",\n  \"stateId\": \"{{stateId}}\",\n  \"verificationToken\": \"{{verificationToken}}\"\n}"
             },
             "url": "{{baseUrl}}/auth/register/volunteer"
           }
@@ -222,7 +295,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"testtc01@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"phone\": \"9999999999\",\n  \"name\": \"Test Training Center\",\n  \"address\": \"Full training center address\",\n  \"stateId\": \"{{stateId}}\",\n  \"districtId\": \"{{districtId}}\",\n  \"headName\": \"Head Name\",\n  \"headAadharNumber\": \"123456789012\",\n  \"registrarNumber\": null,\n  \"registrationCertificateUrl\": null,\n  \"headPassportPhotoUrl\": \"https://example.com/uploads/tc-head-photo.png\",\n  \"headAadharFrontUrl\": \"https://example.com/uploads/tc-aadhar-front.png\",\n  \"headAadharBackUrl\": \"https://example.com/uploads/tc-aadhar-back.png\",\n  \"acceptTerms\": true\n}"
+              "raw": "{\n  \"email\": \"testtc01@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"phone\": \"9999999999\",\n  \"name\": \"Test Training Center\",\n  \"address\": \"Full training center address\",\n  \"stateId\": \"{{stateId}}\",\n  \"districtId\": \"{{districtId}}\",\n  \"headName\": \"Head Name\",\n  \"headAadharNumber\": \"123456789012\",\n  \"registrarNumber\": null,\n  \"registrationCertificateUrl\": null,\n  \"headPassportPhotoUrl\": \"https://example.com/uploads/tc-head-photo.png\",\n  \"headAadharFrontUrl\": \"https://example.com/uploads/tc-aadhar-front.png\",\n  \"headAadharBackUrl\": \"https://example.com/uploads/tc-aadhar-back.png\",\n  \"verificationToken\": \"{{verificationToken}}\",\n  \"acceptTerms\": true\n}"
             },
             "url": "{{baseUrl}}/auth/register/training-center"
           }
@@ -372,6 +445,51 @@
       ]
     },
     {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "GET — stats (scoped by role)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/dashboard/stats"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Domains",
+      "item": [
+        {
+          "name": "GET — list state domains (national)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/domains"
+          }
+        },
+        {
+          "name": "PATCH — update state domain (national)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"domainName\": \"pb.dummy.gatka.in\"\n}"
+            },
+            "url": "{{baseUrl}}/domains/{{stateId}}"
+          }
+        }
+      ]
+    },
+    {
       "name": "User directory (hierarchy)",
       "item": [
         {
@@ -392,6 +510,24 @@
               { "key": "Authorization", "value": "Bearer {{accessToken}}" }
             ],
             "url": "{{baseUrl}}/users/coaches?page=1&pageSize=20"
+          }
+        },
+        {
+          "name": "GET — list officials (coaches + referees)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/users/officials?page=1&pageSize=20"
+          }
+        },
+        {
+          "name": "GET public — list accepted referees (name, state, district)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/users/referees/public?page=1&pageSize=50"
           }
         },
         {
@@ -489,7 +625,15 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}/banners/public"
+            "url": "{{baseUrl}}/banners/public?stateId={{stateId}}"
+          }
+        },
+        {
+          "name": "GET public — by state path (same as ?stateId)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/banners/public/by-state/{{stateId}}"
           }
         },
         {
@@ -502,7 +646,7 @@
                 "value": "Bearer {{accessToken}}"
               }
             ],
-            "url": "{{baseUrl}}/banners/admin"
+            "url": "{{baseUrl}}/banners/admin?stateId={{stateId}}"
           }
         },
         {
@@ -513,7 +657,8 @@
               "script": {
                 "exec": [
                   "const j = pm.response.json();",
-                  "if (j.id) pm.collectionVariables.set('bannerId', j.id);"
+                  "const p = j.data !== undefined ? j.data : j;",
+                  "if (p.id) pm.collectionVariables.set('bannerId', p.id);"
                 ],
                 "type": "text/javascript"
               }
@@ -530,7 +675,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"imageUrl\": \"https://example.com/banner.jpg\",\n  \"title\": \"Welcome\",\n  \"subtitle\": \"Gatka Association\",\n  \"isActive\": true,\n  \"sortOrder\": 0\n}"
+              "raw": "{\n  \"stateId\": \"{{stateId}}\",\n  \"imageUrl\": \"https://example.com/banner.jpg\",\n  \"title\": \"Welcome\",\n  \"subtitle\": \"Gatka Association\",\n  \"isActive\": true,\n  \"sortOrder\": 0\n}"
             },
             "url": "{{baseUrl}}/banners"
           }
@@ -691,7 +836,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"stateId\": \"{{stateId}}\",\n  \"firstName\": \"State\",\n  \"lastName\": \"Admin\",\n  \"email\": \"stateadmin_pb@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"mobileNo\": \"9999999999\",\n  \"address\": \"State office address\",\n  \"passportPhotoUrl\": null\n}"
+              "raw": "{\n  \"stateId\": \"{{stateId}}\",\n  \"firstName\": \"State\",\n  \"lastName\": \"Admin\",\n  \"email\": \"stateadmin_pb@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"mobileNo\": \"9999999999\",\n  \"verificationToken\": \"{{verificationToken}}\",\n  \"address\": \"State office address\",\n  \"passportPhotoUrl\": null\n}"
             },
             "url": "{{baseUrl}}/state-registrations"
           }
@@ -774,7 +919,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"stateId\": \"{{stateId}}\",\n  \"districtId\": \"{{districtId}}\",\n  \"firstName\": \"District\",\n  \"lastName\": \"Admin\",\n  \"email\": \"districtadmin01@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"mobileNo\": \"9999999998\",\n  \"address\": \"District office address\",\n  \"passportPhotoUrl\": null\n}"
+              "raw": "{\n  \"stateId\": \"{{stateId}}\",\n  \"districtId\": \"{{districtId}}\",\n  \"firstName\": \"District\",\n  \"lastName\": \"Admin\",\n  \"email\": \"districtadmin01@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"mobileNo\": \"9999999998\",\n  \"verificationToken\": \"{{verificationToken}}\",\n  \"address\": \"District office address\",\n  \"passportPhotoUrl\": null\n}"
             },
             "url": "{{baseUrl}}/district-registrations"
           }
@@ -894,7 +1039,7 @@
             "header": [
               { "key": "Authorization", "value": "Bearer {{accessToken}}" }
             ],
-            "url": "{{baseUrl}}/messages"
+            "url": "{{baseUrl}}/messages?stateId={{stateId}}"
           }
         },
         {
@@ -957,6 +1102,108 @@
               { "key": "Authorization", "value": "Bearer {{accessToken}}" }
             ],
             "url": "{{baseUrl}}/messages/{{messageId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "About us",
+      "item": [
+        {
+          "name": "GET public — about us by state (query)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/about-us/public?stateId={{stateId}}"
+          }
+        },
+        {
+          "name": "GET public — about us by state (path)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/about-us/public/by-state/{{stateId}}"
+          }
+        },
+        {
+          "name": "GET public — about us by state id (short path)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/about-us/by-state/{{stateId}}"
+          }
+        },
+        {
+          "name": "GET admin — list (stateId optional)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/about-us/admin?stateId={{stateId}}"
+          }
+        },
+        {
+          "name": "POST — create about us",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const p = j.data !== undefined ? j.data : j;",
+                  "if (p && p.id) pm.collectionVariables.set('aboutUsId', p.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stateId\": \"{{stateId}}\",\n  \"logoUrl\": \"https://example.com/logo.png\",\n  \"stateTitle\": \"Gatka Association Punjab\",\n  \"stateTitleNative\": \"ਗਤਕਾ\",\n  \"phoneNo\": \"+91 9876543210\",\n  \"email\": \"contact@example.com\",\n  \"fbUrl\": \"https://facebook.com/example\",\n  \"ytUrl\": \"https://youtube.com/example\",\n  \"instaUrl\": \"https://instagram.com/example\",\n  \"address\": \"123 Stadium Road, City\"\n}"
+            },
+            "url": "{{baseUrl}}/about-us"
+          }
+        },
+        {
+          "name": "GET — about us by id",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/about-us/{{aboutUsId}}"
+          }
+        },
+        {
+          "name": "PATCH — update about us",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stateTitle\": \"Updated title\",\n  \"phoneNo\": \"+91 9000000000\"\n}"
+            },
+            "url": "{{baseUrl}}/about-us/{{aboutUsId}}"
+          }
+        },
+        {
+          "name": "DELETE — remove about us",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/about-us/{{aboutUsId}}"
           }
         }
       ]

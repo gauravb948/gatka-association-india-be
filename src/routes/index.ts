@@ -33,6 +33,9 @@ import { districtRegistrationsRouter } from "./districtRegistrations.js";
 import { galleryImagesRouter } from "./galleryImages.js";
 import { messagesRouter } from "./messages.js";
 import { membershipsRouter } from "./memberships.js";
+import { aboutUsRouter } from "./aboutUs.js";
+import { dashboardRouter } from "./dashboard.js";
+import { domainsRouter } from "./domains.js";
 export const apiRouter = Router();
 
 apiRouter.use(healthRouter);
@@ -69,3 +72,6 @@ apiRouter.use("/district-registrations", districtRegistrationsRouter);
 apiRouter.use("/gallery", galleryImagesRouter);
 apiRouter.use("/messages", messagesRouter);
 apiRouter.use("/memberships", membershipsRouter);
+apiRouter.use("/about-us", aboutUsRouter);
+apiRouter.use("/dashboard", dashboardRouter);
+apiRouter.use("/domains", domainsRouter);

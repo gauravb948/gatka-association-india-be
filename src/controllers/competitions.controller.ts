@@ -45,7 +45,7 @@ import {
   competitionsMeQuerySchema,
 } from "../validators/competition.validators.js";
 import * as participationRepository from "../repositories/participation.repository.js";
-import { assertCanManageCompetition } from "../lib/competitionManagementScope.js";
+import { assertCanManageCompetition, assertCanViewCompetitionParticipants } from "../lib/competitionManagementScope.js";
 import { prisma } from "../lib/prisma.js";
 
 type CompForParticipation = NonNullable<
@@ -541,6 +541,18 @@ export async function close(req: Request, res: Response, next: NextFunction) {
   }
 }
 
+export async function remove(req: Request, res: Response, next: NextFunction) {
+  try {
+    const comp = await competitionRepository.findByIdForPlayerEligibility(req.params.id);
+    if (!comp) throw new AppError(404, "Competition not found");
+    await assertCanManageCompetition(req.dbUser!, comp);
+    await competitionRepository.deleteCompetition(comp.id);
+    res.status(204).send();
+  } catch (e) {
+    next(e);
+  }
+}
+
 export async function eligiblePlayers(req: Request, res: Response, next: NextFunction) {
   try {
     const ctx = await competitionRepository.findByIdForParticipationContext(req.params.id);
@@ -850,8 +862,9 @@ export async function listPlayersNotParticipated(req: Request, res: Response, ne
 export async function listParticipants(req: Request, res: Response, next: NextFunction) {
   try {
     const actor = req.dbUser!;
-    const comp = await competitionRepository.findByIdBasic(req.params.id);
+    const comp = await competitionRepository.findByIdForPlayerEligibility(req.params.id);
     if (!comp) throw new AppError(404, "Competition not found");
+    await assertCanViewCompetitionParticipants(actor, comp);
 
     const scope = actorPlayerProfileScopeWhere(actor, { competitionLevel: comp.level });
     const playerProfileWhere = Object.keys(scope).length > 0 ? scope : undefined;
