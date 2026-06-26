@@ -102,15 +102,49 @@ export const registerRefereeSchema = z.object({
   acceptTerms: z.literal(true),
 });
 
-export const registerVolunteerSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-  phone: z.string().optional(),
-  fullName: z.string().min(1),
-  gender: personGenderSchema,
-  stateId: z.string(),
-  verificationToken: z.string().min(1),
-});
+export const registerVolunteerSchema = z
+  .object({
+    fullName: z.string().min(1).max(200),
+    fatherName: z.string().min(1).max(160),
+    motherName: z.string().min(1).max(160),
+    aadharNumber: z
+      .string()
+      .min(8)
+      .max(20)
+      .transform((s) => s.replace(/\s/g, "")),
+    maritalStatus: z.nativeEnum(MaritalStatus),
+    email: z.string().email(),
+    phone: z.string().min(7).max(20),
+    alternatePhone: z.preprocess(
+      (v) => (v === "" || v === null || v === undefined ? undefined : v),
+      z.string().min(7).max(20).optional()
+    ),
+    address: z.string().min(3).max(1000),
+    gender: personGenderSchema,
+    dateOfBirth: z.string().datetime(),
+    stateId: z.string().min(1),
+    districtId: z.string().min(1),
+    tShirtSize: z.nativeEnum(TShirtSize),
+    hasDisability: z.boolean(),
+    disabilityDetails: z.preprocess(
+      (v) => (v === "" || v === null || v === undefined ? undefined : v),
+      z.string().min(1).max(1000).optional()
+    ),
+    photoUrl: z.string().url(),
+    aadharFrontUrl: z.string().url(),
+    aadharBackUrl: z.string().url(),
+    verificationToken: z.string().min(1),
+    acceptTerms: z.literal(true),
+  })
+  .superRefine((val, ctx) => {
+    if (val.hasDisability && !val.disabilityDetails?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["disabilityDetails"],
+        message: "Disability details are required when hasDisability is true",
+      });
+    }
+  });
 
 export const registerTrainingCenterSchema = z.object({
   email: z.string().email(),

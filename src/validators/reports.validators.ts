@@ -11,8 +11,4 @@ export const competitionRegistrationsReportQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(10),
   search: optionalSearch,
   competitionId: z.string().min(1).optional(),
-  finalOnly: z
-    .union([z.boolean(), z.string()])
-    .optional()
-    .transform((v) => v === true || v === "true" || v === "1"),
 });

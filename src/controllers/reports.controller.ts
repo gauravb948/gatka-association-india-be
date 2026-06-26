@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import * as playerRepository from "../repositories/player.repository.js";
-import * as tournamentRegistrationRepository from "../repositories/tournamentRegistration.repository.js";
+import * as participationRepository from "../repositories/participation.repository.js";
 import { buildCompetitionRegistrationStats } from "../lib/competitionRegistrationStats.js";
 import { competitionRegistrationsReportQuerySchema } from "../validators/reports.validators.js";
 
@@ -12,7 +12,7 @@ export async function competitionRegistrations(
   try {
     const actor = req.dbUser!;
     const q = competitionRegistrationsReportQuerySchema.parse(req.query);
-    const rows = await tournamentRegistrationRepository.findRegistrationsForCompetitionStatsReport(
+    const rows = await participationRepository.findParticipationsForCompetitionStatsReport(
       {
         role: actor.role,
         stateId: actor.stateId,
@@ -21,7 +21,6 @@ export async function competitionRegistrations(
       {
         competitionId: q.competitionId,
         search: q.search,
-        finalOnly: q.finalOnly,
       }
     );
     const stats = buildCompetitionRegistrationStats(rows);

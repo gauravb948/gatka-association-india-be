@@ -137,6 +137,10 @@ enum MembershipStatus {
   EXPIRED
 }
 
+enum VolunteerRegistrationStatus {
+  REGISTERED
+}
+
 enum CoachAppliedFor {
   SENIOR_COACH
   ASSISTANT_COACH
@@ -191,6 +195,7 @@ model State {
   migrationTo        MigrationRequest[] @relation("MigrationToState")
   refereeProfiles    RefereeProfile[]
   volunteerProfiles  VolunteerProfile[]
+  volunteerRegistrations VolunteerRegistration[]
   payments           Payment[]
   registration       StateRegistration?
   districtRegistrationsApplyingFrom DistrictRegistration[] @relation("DistrictRegistrationStatePick")
@@ -219,7 +224,9 @@ model District {
   campDistricts   CampDistrict[]
   notices         Notice[]
   registration    DistrictRegistration?
-  refereeProfiles RefereeProfile[]
+  refereeProfiles    RefereeProfile[]
+  volunteerProfiles VolunteerProfile[]
+  volunteerRegistrations VolunteerRegistration[]
 
   @@unique([stateId, name])
   @@index([stateId])
@@ -403,19 +410,72 @@ model RefereeProfile {
 }
 
 model VolunteerProfile {
-  userId               String   @id
-  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId               String         @id
+  user                 User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   stateId              String
-  state                State    @relation(fields: [stateId], references: [id])
-  registrationNumber   String?  @unique
+  state                State          @relation(fields: [stateId], references: [id])
+  districtId           String?
+  district             District?      @relation(fields: [districtId], references: [id], onDelete: SetNull)
+  registrationNumber   String?        @unique
   fullName             String
+  fatherName           String?
+  motherName           String?
+  aadharNumber         String?
+  maritalStatus        MaritalStatus?
+  alternatePhone       String?
+  address              String?
+  dateOfBirth          DateTime?
+  tShirtSize           TShirtSize?
+  hasDisability        Boolean        @default(false)
+  disabilityDetails    String?
   photoUrl             String?
+  aadharFrontUrl       String?
+  aadharBackUrl        String?
   gender               Gender
+  termsAcceptedAt      DateTime?
   membershipValidUntil DateTime?
-  isBlacklisted        Boolean  @default(false)
+  isBlacklisted        Boolean        @default(false)
   blacklistRemarks     String?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  @@index([stateId])
+  @@index([districtId])
+}
+
+model VolunteerRegistration {
+  id                String                      @id @default(cuid())
+  stateId           String
+  state             State                       @relation(fields: [stateId], references: [id])
+  districtId        String
+  district          District                    @relation(fields: [districtId], references: [id])
+  fullName          String
+  fatherName        String
+  motherName        String
+  aadharNumber      String
+  maritalStatus     MaritalStatus
+  email             String                      @unique
+  phone             String
+  alternatePhone    String?
+  address           String
+  gender            Gender
+  dateOfBirth       DateTime
+  tShirtSize        TShirtSize
+  hasDisability     Boolean                     @default(false)
+  disabilityDetails String?
+  photoUrl          String
+  aadharFrontUrl    String
+  aadharBackUrl     String
+  status            VolunteerRegistrationStatus @default(REGISTERED)
+  termsAcceptedAt   DateTime
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+
+  @@index([stateId])
+  @@index([districtId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([phone])
 }
 
 model Session {

@@ -54,6 +54,10 @@
       "value": ""
     },
     {
+      "key": "volunteerRegistrationId",
+      "value": ""
+    },
+    {
       "key": "galleryImageId",
       "value": ""
     },
@@ -278,12 +282,25 @@
         },
         {
           "name": "Register — Volunteer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const payload = j.data !== undefined && j.data !== null ? j.data : j;",
+                  "if (payload.id) pm.collectionVariables.set('volunteerRegistrationId', payload.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"testvolunteer01@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"phone\": \"9999999999\",\n  \"fullName\": \"Test Volunteer\",\n  \"gender\": \"MALE\",\n  \"stateId\": \"{{stateId}}\",\n  \"verificationToken\": \"{{verificationToken}}\"\n}"
+              "raw": "{\n  \"fullName\": \"Test Volunteer\",\n  \"fatherName\": \"Father Name\",\n  \"motherName\": \"Mother Name\",\n  \"aadharNumber\": \"123456789012\",\n  \"maritalStatus\": \"SINGLE\",\n  \"email\": \"testvolunteer01@example.com\",\n  \"phone\": \"9999999999\",\n  \"alternatePhone\": \"8888888888\",\n  \"address\": \"Full home address\",\n  \"gender\": \"MALE\",\n  \"dateOfBirth\": \"1995-01-15T00:00:00.000Z\",\n  \"stateId\": \"{{stateId}}\",\n  \"districtId\": \"{{districtId}}\",\n  \"tShirtSize\": \"M\",\n  \"hasDisability\": false,\n  \"photoUrl\": \"https://example.com/uploads/volunteer-photo.png\",\n  \"aadharFrontUrl\": \"https://example.com/uploads/volunteer-aadhar-front.png\",\n  \"aadharBackUrl\": \"https://example.com/uploads/volunteer-aadhar-back.png\",\n  \"verificationToken\": \"{{verificationToken}}\",\n  \"acceptTerms\": true\n}"
             },
             "url": "{{baseUrl}}/auth/register/volunteer"
           }
@@ -456,12 +473,36 @@
             ],
             "url": "{{baseUrl}}/dashboard/stats"
           }
+        },
+        {
+          "name": "GET — overview cards (scoped by role)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/dashboard/overview"
+          }
         }
       ]
     },
     {
       "name": "Domains",
       "item": [
+        {
+          "name": "GET — state by domain name (public)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/domains/public/by-domain-name?domainName=pb.dummy.gatka.in",
+              "host": ["{{baseUrl}}"],
+              "path": ["domains", "public", "by-domain-name"],
+              "query": [
+                { "key": "domainName", "value": "pb.dummy.gatka.in" }
+              ]
+            }
+          }
+        },
         {
           "name": "GET — list state domains (national)",
           "request": {
@@ -541,13 +582,23 @@
           }
         },
         {
-          "name": "GET — list volunteers",
+          "name": "GET — list volunteer registrations",
           "request": {
             "method": "GET",
             "header": [
               { "key": "Authorization", "value": "Bearer {{accessToken}}" }
             ],
-            "url": "{{baseUrl}}/users/volunteers?page=1&pageSize=20"
+            "url": "{{baseUrl}}/volunteer-registrations?page=1&pageSize=20"
+          }
+        },
+        {
+          "name": "GET — volunteer registration by id",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/volunteer-registrations/{{volunteerRegistrationId}}"
           }
         },
         {
@@ -957,6 +1008,31 @@
               "raw": "{\n  \"status\": \"ACCEPTED\",\n  \"statusReason\": \"Approved by state admin\"\n}"
             },
             "url": "{{baseUrl}}/district-registrations/{{districtRegistrationId}}/status"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Volunteer Registrations",
+      "item": [
+        {
+          "name": "GET — list volunteer registrations",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/volunteer-registrations?page=1&pageSize=20&status=REGISTERED"
+          }
+        },
+        {
+          "name": "GET — volunteer registration by id",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/volunteer-registrations/{{volunteerRegistrationId}}"
           }
         }
       ]

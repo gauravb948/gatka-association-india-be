@@ -4,6 +4,8 @@ import * as stateDomainController from "../controllers/stateDomain.controller.js
 
 export const domainsRouter = Router();
 
+domainsRouter.get("/public/by-domain-name", stateDomainController.getPublicByDomainName);
+
 domainsRouter.get(
   "/",
   requireAuth,

@@ -22,6 +22,7 @@ import { prisma } from "../lib/prisma.js";
 import * as stateRepository from "../repositories/state.repository.js";
 import * as districtRepository from "../repositories/district.repository.js";
 import * as trainingCenterRepository from "../repositories/trainingCenter.repository.js";
+import * as volunteerRegistrationRepo from "../repositories/volunteerRegistration.repository.js";
 import {
   loginSchema,
   otpConfirmSchema,
@@ -69,6 +70,9 @@ export async function login(req: Request, res: Response, next: NextFunction) {
     const { email, password } = loginSchema.parse(req.body);
     const user = await userRepository.findByEmail(email);
     if (!user) throw new AppError(401, "Invalid credentials", "AUTH_FAILED");
+    if (user.role === Role.VOLUNTEER) {
+      throw new AppError(403, "Volunteers cannot sign in", "VOLUNTEER_NO_LOGIN");
+    }
     const ok = await verifyPassword(password, user.passwordHash);
     if (!ok) throw new AppError(401, "Invalid credentials", "AUTH_FAILED");
     const full = await userRepository.findByIdForLoginResponse(user.id);
@@ -276,35 +280,52 @@ export async function registerVolunteer(req: Request, res: Response, next: NextF
     const body = registerVolunteerSchema.parse(req.body);
     const registrationVerification = assertRegistrationToken(body.verificationToken, [
       body.email,
-      body.phone ?? "",
+      body.phone,
     ]);
-    const exists = await userRepository.findByEmail(body.email);
-    if (exists) throw new AppError(409, "Email already registered");
+    const existingUser = await userRepository.findByEmail(body.email);
+    if (existingUser) throw new AppError(409, "Email already registered");
+    const existingVolunteer = await volunteerRegistrationRepo.findByEmail(body.email);
+    if (existingVolunteer) throw new AppError(409, "Email already registered");
 
     const state = await stateRepository.findById(body.stateId);
     if (!state?.isEnabled) throw new AppError(400, "State not available");
+    const district = await districtRepository.findById(body.districtId);
+    if (!district || district.stateId !== body.stateId || !district.isEnabled) {
+      throw new AppError(400, "District not available");
+    }
 
-    const passwordHash = await hashPassword(body.password);
-    const userData: Prisma.UserCreateInput = {
+    const row = await volunteerRegistrationRepo.create({
+      state: { connect: { id: body.stateId } },
+      district: { connect: { id: body.districtId } },
+      fullName: body.fullName.trim(),
+      fatherName: body.fatherName.trim(),
+      motherName: body.motherName.trim(),
+      aadharNumber: body.aadharNumber,
+      maritalStatus: body.maritalStatus,
       email: body.email,
       phone: body.phone,
-      passwordHash,
-      role: Role.VOLUNTEER,
-      status: EntityStatus.PENDING,
-      statusReason: "Pending approval",
-      state: { connect: { id: body.stateId } },
-      volunteerProfile: {
-        create: {
-          state: { connect: { id: body.stateId } },
-          fullName: body.fullName,
-          gender: body.gender,
-        },
-      },
-    };
-    const user = await userRepository.createPlayerWithProfile(userData);
+      alternatePhone: body.alternatePhone?.trim() || null,
+      address: body.address,
+      dateOfBirth: new Date(body.dateOfBirth),
+      tShirtSize: body.tShirtSize,
+      hasDisability: body.hasDisability,
+      disabilityDetails: body.hasDisability ? body.disabilityDetails?.trim() ?? null : null,
+      photoUrl: body.photoUrl,
+      aadharFrontUrl: body.aadharFrontUrl,
+      aadharBackUrl: body.aadharBackUrl,
+      gender: body.gender,
+      termsAcceptedAt: new Date(),
+    });
     await otpRepository.markConsumed(registrationVerification.otpId);
-    const payload = await buildAuthSessionForUserId(user.id);
-    res.status(201).json(payload);
+    res.status(201).json({
+      id: row.id,
+      status: row.status,
+      fullName: row.fullName,
+      email: row.email,
+      stateId: row.stateId,
+      districtId: row.districtId,
+      createdAt: row.createdAt,
+    });
   } catch (e) {
     next(e);
   }

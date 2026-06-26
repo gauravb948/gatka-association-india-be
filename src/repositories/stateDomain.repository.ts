@@ -25,6 +25,13 @@ export function findByStateId(stateId: string) {
   });
 }
 
+export function findByDomainName(domainName: string) {
+  return stateDomainDelegate.findUnique({
+    where: { domainName },
+    ...domainIncludeState,
+  });
+}
+
 export function upsertForState(stateId: string, domainName: string) {
   const create = {
     domainName,

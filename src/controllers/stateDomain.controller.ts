@@ -6,6 +6,7 @@ import * as stateDomainRepository from "../repositories/stateDomain.repository.j
 import {
   stateDomainPatchBodySchema,
   stateDomainPathSchema,
+  stateDomainPublicQuerySchema,
 } from "../validators/stateDomain.validators.js";
 
 function toApiRow(row: {
@@ -18,6 +19,20 @@ function toApiRow(row: {
     stateName: row.state.name,
     domainName: row.domainName,
   };
+}
+
+/** `GET /domains/public/by-domain-name?domainName=` — resolve state from hostname (no auth). */
+export async function getPublicByDomainName(req: Request, res: Response, next: NextFunction) {
+  try {
+    const q = stateDomainPublicQuerySchema.parse(req.query);
+    const row = await stateDomainRepository.findByDomainName(q.domainName);
+    if (!row) {
+      throw new AppError(404, "No state configured for this domain", "STATE_DOMAIN_NOT_FOUND");
+    }
+    res.json(toApiRow(row));
+  } catch (e) {
+    next(e);
+  }
 }
 
 /** `GET /domains` — national admin list of configured state domains. */

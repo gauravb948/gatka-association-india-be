@@ -396,9 +396,22 @@ components:
       properties:
         registrationNumber: { type: string, nullable: true }
         fullName: { type: string }
+        fatherName: { type: string, nullable: true }
+        motherName: { type: string, nullable: true }
+        aadharNumber: { type: string, nullable: true }
+        maritalStatus: { $ref: "#/components/schemas/MaritalStatus" }
+        alternatePhone: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        dateOfBirth: { type: string, format: date-time, nullable: true }
+        tShirtSize: { $ref: "#/components/schemas/TShirtSize" }
+        hasDisability: { type: boolean }
+        disabilityDetails: { type: string, nullable: true }
         photoUrl: { type: string, nullable: true }
+        aadharFrontUrl: { type: string, nullable: true }
+        aadharBackUrl: { type: string, nullable: true }
         gender: { $ref: "#/components/schemas/Gender" }
         stateId: { type: string }
+        districtId: { type: string, nullable: true }
         membershipValidUntil: { type: string, format: date-time, nullable: true }
         isBlacklisted: { type: boolean }
     LoginUser:
@@ -625,6 +638,38 @@ components:
           description: >-
             Tournament registrations in scope whose player user is ACCEPTED and active,
             with profile matching the geographic filter.
+    DashboardOverviewResponse:
+      type: object
+      required:
+        - activeCoaches
+        - pendingApprovals
+        - trainingCenters
+        - refereesCertified
+      properties:
+        activeCoaches:
+          type: integer
+          minimum: 0
+          description: >-
+            Accepted, active coaches (`User.role` COACH, `EntityStatus` ACCEPTED) within the
+            signed-in admin's geographic hierarchy.
+        pendingApprovals:
+          type: integer
+          minimum: 0
+          description: >-
+            Sum of users in `SUBMITTED` status (any role) plus district registrations in
+            `SUBMITTED` status, within hierarchy scope.
+        trainingCenters:
+          type: integer
+          minimum: 0
+          description: >-
+            Accepted, enabled training centers (`TrainingCenter.status` ACCEPTED,
+            `isEnabled` true) within hierarchy scope.
+        refereesCertified:
+          type: integer
+          minimum: 0
+          description: >-
+            Accepted, active referees who are not blacklisted (`User.role` REFEREE,
+            `EntityStatus` ACCEPTED, `RefereeProfile.isBlacklisted` false) within hierarchy scope.
     HierarchyPasswordResetRequest:
       type: object
       required: [newPassword]
@@ -693,7 +738,17 @@ components:
           additionalProperties: false
           properties:
             fullName: { type: string, minLength: 1, maxLength: 200 }
+            fatherName: { type: string, nullable: true, minLength: 1, maxLength: 160 }
+            motherName: { type: string, nullable: true, minLength: 1, maxLength: 160 }
+            alternatePhone: { type: string, minLength: 7, maxLength: 25 }
+            address: { type: string, minLength: 3, maxLength: 1000 }
+            maritalStatus: { $ref: "#/components/schemas/MaritalStatus" }
+            tShirtSize: { $ref: "#/components/schemas/TShirtSize" }
+            hasDisability: { type: boolean }
+            disabilityDetails: { type: string, nullable: true, minLength: 1, maxLength: 1000 }
             photoUrl: { type: string, format: uri }
+            aadharFrontUrl: { type: string, format: uri }
+            aadharBackUrl: { type: string, format: uri }
         trainingCenterOrg:
           type: object
           additionalProperties: false
@@ -908,17 +963,123 @@ components:
           description: Must be true — server sets `termsAcceptedAt` on the referee profile
     RegisterVolunteerRequest:
       type: object
-      required: [email, password, phone, fullName, gender, stateId, verificationToken]
+      required:
+        [
+          fullName,
+          fatherName,
+          motherName,
+          aadharNumber,
+          maritalStatus,
+          email,
+          phone,
+          address,
+          gender,
+          dateOfBirth,
+          stateId,
+          districtId,
+          tShirtSize,
+          hasDisability,
+          photoUrl,
+          aadharFrontUrl,
+          aadharBackUrl,
+          verificationToken,
+          acceptTerms,
+        ]
       properties:
-        email: { type: string, format: email }
-        password: { type: string, format: password }
-        phone: { type: string }
         fullName: { type: string }
+        fatherName: { type: string }
+        motherName: { type: string }
+        aadharNumber: { type: string, description: "Digits (spaces allowed; normalized server-side)" }
+        maritalStatus: { $ref: "#/components/schemas/MaritalStatus" }
+        email: { type: string, format: email }
+        phone: { type: string }
+        alternatePhone:
+          type: string
+          description: Optional second mobile
+        address: { type: string }
         gender: { $ref: "#/components/schemas/Gender" }
+        dateOfBirth: { type: string, format: date-time }
         stateId: { type: string }
+        districtId: { type: string }
+        tShirtSize: { $ref: "#/components/schemas/TShirtSize" }
+        hasDisability: { type: boolean }
+        disabilityDetails:
+          type: string
+          description: Required when hasDisability is true
+        photoUrl: { type: string, format: uri, description: "Passport-size photo (R2 publicUrl)" }
+        aadharFrontUrl: { type: string, format: uri }
+        aadharBackUrl: { type: string, format: uri }
         verificationToken:
           type: string
           description: Token returned by `POST /auth/otp/verify` for `REGISTRATION`.
+        acceptTerms:
+          type: boolean
+          enum: [true]
+          description: Must be true — server sets `termsAcceptedAt` on the volunteer registration
+    VolunteerRegistrationStatus:
+      type: string
+      enum: [REGISTERED]
+    VolunteerRegistration:
+      type: object
+      properties:
+        id: { type: string }
+        stateId: { type: string }
+        districtId: { type: string }
+        fullName: { type: string }
+        fatherName: { type: string }
+        motherName: { type: string }
+        aadharNumber: { type: string }
+        maritalStatus: { $ref: "#/components/schemas/MaritalStatus" }
+        email: { type: string, format: email }
+        phone: { type: string }
+        alternatePhone: { type: string, nullable: true }
+        address: { type: string }
+        gender: { $ref: "#/components/schemas/Gender" }
+        dateOfBirth: { type: string, format: date-time }
+        tShirtSize: { $ref: "#/components/schemas/TShirtSize" }
+        hasDisability: { type: boolean }
+        disabilityDetails: { type: string, nullable: true }
+        photoUrl: { type: string, format: uri }
+        aadharFrontUrl: { type: string, format: uri }
+        aadharBackUrl: { type: string, format: uri }
+        status: { $ref: "#/components/schemas/VolunteerRegistrationStatus" }
+        termsAcceptedAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        state:
+          type: object
+          properties:
+            id: { type: string }
+            name: { type: string }
+            isEnabled: { type: boolean }
+        district:
+          type: object
+          properties:
+            id: { type: string }
+            name: { type: string }
+            stateId: { type: string }
+            isEnabled: { type: boolean }
+    VolunteerRegistrationSubmitResponse:
+      type: object
+      required: [id, status, fullName, email, stateId, districtId, createdAt]
+      properties:
+        id: { type: string }
+        status: { $ref: "#/components/schemas/VolunteerRegistrationStatus" }
+        fullName: { type: string }
+        email: { type: string, format: email }
+        stateId: { type: string }
+        districtId: { type: string }
+        createdAt: { type: string, format: date-time }
+    VolunteerRegistrationListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/VolunteerRegistration" }
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+        totalPages: { type: integer }
     RegisterTrainingCenterRequest:
       type: object
       required:
@@ -1407,7 +1568,7 @@ components:
         total:
           type: integer
           minimum: 0
-          description: Distinct registered players in this competition
+          description: Distinct participating players in this competition
         men:
           type: integer
           minimum: 0
@@ -2367,7 +2528,10 @@ paths:
           description: Created
   /auth/register/volunteer:
     post:
-      summary: Self-register volunteer (pending approval)
+      summary: Submit volunteer registration (public; no login account is created)
+      description: >
+        Creates a volunteer registration with status `REGISTERED`. Volunteers cannot sign in;
+        district, state, and national admins view submissions via `GET /volunteer-registrations`.
       requestBody:
         required: true
         content:
@@ -2376,7 +2540,15 @@ paths:
               $ref: "#/components/schemas/RegisterVolunteerRequest"
       responses:
         "201":
-          description: Created
+          description: Registered (envelope wraps this payload in `data`)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/VolunteerRegistrationSubmitResponse" }
   /auth/register/training-center:
     post:
       summary: Register training center + login user (pending approval)
@@ -4071,20 +4243,53 @@ paths:
                   status: { type: boolean }
                   message: { type: string }
                   data: { $ref: "#/components/schemas/HierarchyUserListResponse" }
-  /users/volunteers:
+  /volunteer-registrations:
     get:
       security: [{ bearerAuth: [] }]
-      summary: List volunteers (hierarchy-scoped, paginated)
+      summary: List volunteer registrations (national, state, or district admin)
+      description: >
+        Volunteers submit via `POST /auth/register/volunteer` and cannot sign in.
+        National admin sees all; state admin is scoped to their state; district admin to their district.
       parameters:
-        - $ref: "#/components/parameters/userListPage"
-        - $ref: "#/components/parameters/userListPageSize"
-        - $ref: "#/components/parameters/userListStatus"
-        - $ref: "#/components/parameters/userListStateId"
-        - $ref: "#/components/parameters/userListDistrictId"
-        - $ref: "#/components/parameters/userListTrainingCenterId"
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - in: query
+          name: stateId
+          schema: { type: string }
+          description: Filter by state (must be within caller scope)
+        - in: query
+          name: districtId
+          schema: { type: string }
+          description: Filter by district (must be within caller scope)
+        - in: query
+          name: gender
+          schema: { $ref: "#/components/schemas/Gender" }
+        - in: query
+          name: maritalStatus
+          schema: { $ref: "#/components/schemas/MaritalStatus" }
+        - in: query
+          name: hasDisability
+          schema: { type: string, enum: ["true", "false"] }
+        - in: query
+          name: status
+          schema: { $ref: "#/components/schemas/VolunteerRegistrationStatus" }
+        - in: query
+          name: search
+          schema: { type: string }
+          description: Matches full name, email, or phone
+        - in: query
+          name: createdFrom
+          schema: { type: string, format: date-time }
+        - in: query
+          name: createdTo
+          schema: { type: string, format: date-time }
       responses:
         "200":
-          description: OK
+          description: OK (envelope `data` holds this object)
           content:
             application/json:
               schema:
@@ -4092,7 +4297,29 @@ paths:
                 properties:
                   status: { type: boolean }
                   message: { type: string }
-                  data: { $ref: "#/components/schemas/HierarchyUserListResponse" }
+                  data: { $ref: "#/components/schemas/VolunteerRegistrationListResponse" }
+  /volunteer-registrations/{id}:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Get volunteer registration by id (national, state, or district admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK (envelope `data` holds the registration)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/VolunteerRegistration" }
+        "404":
+          description: Not found or outside scope
   /users/training-centers:
     get:
       security: [{ bearerAuth: [] }]
@@ -4300,6 +4527,53 @@ paths:
                     $ref: "#/components/schemas/DashboardStatsResponse"
         "403":
           description: Forbidden (role not allowed or hierarchy context missing)
+  /dashboard/overview:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Dashboard summary cards (scope by signed-in admin)
+      description: >
+        Returns the four home-dashboard card counts scoped to the signed-in admin hierarchy.
+        National admin sees all-India figures. State admin is limited to their state (including
+        users linked via district or training center under that state). District admin is limited
+        to their district. Training center admin sees counts for their center (coaches/referees/users)
+        and pending district registrations for their district. `activeCoaches` counts accepted,
+        active coaches. `refereesCertified` counts accepted, active, non-blacklisted referees.
+        `trainingCenters` counts accepted, enabled training center entities. `pendingApprovals`
+        is the sum of all users in `SUBMITTED` status plus district registrations in `SUBMITTED`
+        status within scope.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardOverviewResponse"
+        "403":
+          description: Forbidden (role not allowed or hierarchy context missing)
+  /domains/public/by-domain-name:
+    get:
+      summary: Resolve state by domain hostname (public)
+      description: >
+        Looks up the configured state for a web domain. Accepts hostname only (example
+        `pb.dummy.gatka.in`); optional `http://` / `https://` prefix and trailing slashes are
+        stripped. Comparison is case-insensitive.
+      parameters:
+        - in: query
+          name: domainName
+          required: true
+          schema: { type: string }
+          description: Domain hostname (example `pb.dummy.gatka.in`).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StateDomain"
+        "400":
+          description: Invalid domainName
+        "404":
+          description: No state configured for this domain
   /domains:
     get:
       security: [{ bearerAuth: [] }]
@@ -4353,9 +4627,10 @@ paths:
       security: [{ bearerAuth: [] }]
       summary: Competition registration counts by gender and age band
       description: >
-        Paginated summary per competition with distinct player counts. Uses `TournamentRegistration`
-        rows; age band comes from the event's `AgeCategory.bandType` — SUB_JUNIOR/JUNIOR map to
-        boys/girls, SENIOR/VETERAN/OPEN map to men/women. Scoped to the caller's admin hierarchy.
+        Paginated summary per competition with distinct participant counts from
+        `ParticipationRecord` (where `participated` is true). Age band comes from the
+        event's `AgeCategory.bandType` — SUB_JUNIOR/JUNIOR map to boys/girls,
+        SENIOR/VETERAN/OPEN map to men/women. Scoped to the caller's admin hierarchy.
       parameters:
         - in: query
           name: page
@@ -4370,10 +4645,6 @@ paths:
         - in: query
           name: competitionId
           schema: { type: string }
-        - in: query
-          name: finalOnly
-          schema: { type: boolean, default: false }
-          description: When true, only registrations with `finalSubmittedAt` set
       responses:
         "200":
           description: OK

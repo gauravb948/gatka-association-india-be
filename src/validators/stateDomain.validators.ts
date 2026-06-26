@@ -4,7 +4,7 @@ export const stateDomainPathSchema = z.object({
   stateId: z.string().trim().min(1, "stateId is required"),
 });
 
-const domainNameSchema = z
+export const domainNameSchema = z
   .string()
   .trim()
   .toLowerCase()
@@ -15,5 +15,9 @@ const domainNameSchema = z
   });
 
 export const stateDomainPatchBodySchema = z.object({
+  domainName: domainNameSchema,
+});
+
+export const stateDomainPublicQuerySchema = z.object({
   domainName: domainNameSchema,
 });

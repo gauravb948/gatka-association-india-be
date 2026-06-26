@@ -105,3 +105,15 @@ export async function getStats(req: Request, res: Response, next: NextFunction) 
     next(e);
   }
 }
+
+/** `GET /dashboard/overview` — hierarchy-scoped summary cards for admin home. */
+export async function getOverview(req: Request, res: Response, next: NextFunction) {
+  try {
+    const actor = req.dbUser!;
+    const { scope } = await resolveDashboardScope(actor);
+    const overview = await dashboardStatsRepository.getDashboardOverviewCounts(scope);
+    res.json(overview);
+  } catch (e) {
+    next(e);
+  }
+}

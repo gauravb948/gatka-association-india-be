@@ -10,3 +10,10 @@ dashboardRouter.get(
   requireRoles("NATIONAL_ADMIN", "STATE_ADMIN", "DISTRICT_ADMIN", "TRAINING_CENTER"),
   dashboardStatsController.getStats
 );
+
+dashboardRouter.get(
+  "/overview",
+  requireAuth,
+  requireRoles("NATIONAL_ADMIN", "STATE_ADMIN", "DISTRICT_ADMIN", "TRAINING_CENTER"),
+  dashboardStatsController.getOverview
+);

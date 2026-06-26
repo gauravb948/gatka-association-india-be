@@ -49,7 +49,7 @@ export type RegistrationStatSource = {
     eventGroup: {
       ageCategory: { bandType: AgeBandType | null };
     };
-  };
+  } | null;
   playerUser: {
     playerProfile: { gender: Gender } | null;
   };
@@ -73,7 +73,7 @@ export function buildCompetitionRegistrationStats(
 
   for (const row of rows) {
     const gender = row.playerUser.playerProfile?.gender;
-    if (!gender) continue;
+    if (!gender || !row.event) continue;
 
     const bucket = genderBucketForRegistration(
       row.event.eventGroup.ageCategory.bandType,

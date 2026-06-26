@@ -1,5 +1,45 @@
 import type { CompetitionLevel, Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
+import { buildResultsListCompetitionFilter } from "./competition.repository.js";
+import type { RegistrationStatSource } from "../lib/competitionRegistrationStats.js";
+
+export async function findParticipationsForCompetitionStatsReport(
+  user: { role: import("@prisma/client").Role; stateId: string | null; districtId: string | null },
+  opts?: { competitionId?: string; search?: string }
+): Promise<RegistrationStatSource[]> {
+  const competitionWhere = buildResultsListCompetitionFilter(user, opts);
+  if (competitionWhere === null) return [];
+
+  const where: Prisma.ParticipationRecordWhereInput = {
+    participated: true,
+    eventId: { not: null },
+    competition: competitionWhere,
+    playerUser: { playerProfile: { isNot: null } },
+  };
+
+  return prisma.participationRecord.findMany({
+    where,
+    select: {
+      competitionId: true,
+      playerUserId: true,
+      competition: { select: { id: true, name: true, createdAt: true } },
+      event: {
+        select: {
+          eventGroup: {
+            select: {
+              ageCategory: { select: { bandType: true } },
+            },
+          },
+        },
+      },
+      playerUser: {
+        select: {
+          playerProfile: { select: { gender: true } },
+        },
+      },
+    },
+  });
+}
 
 export function createParticipation(data: Prisma.ParticipationRecordCreateInput) {
   return prisma.participationRecord.create({ data });

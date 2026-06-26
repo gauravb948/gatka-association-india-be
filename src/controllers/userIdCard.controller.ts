@@ -150,12 +150,15 @@ function buildPublicIdCardPayload(user: CardUser) {
     case Role.VOLUNTEER: {
       const v = user.volunteerProfile;
       if (!v || v.isBlacklisted || !compactState(v.state)) return null;
+      if (v.district && !compactDistrict(v.district)) return null;
       return {
         ...baseHead(),
         name: v.fullName,
+        dateOfBirth: v.dateOfBirth,
         gender: v.gender,
         registrationNumber: v.registrationNumber,
         photoUrl: v.photoUrl,
+        district: v.district ? compactDistrict(v.district) : null,
         state: compactState(v.state),
       };
     }

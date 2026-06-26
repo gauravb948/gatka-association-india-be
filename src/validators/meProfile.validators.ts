@@ -55,7 +55,17 @@ export const refereeProfileSelfSchema = z
 export const volunteerProfileSelfSchema = z
   .object({
     fullName: z.string().min(1).max(200).transform((s) => s.trim()).optional(),
+    fatherName: z.string().min(1).max(160).transform((s) => s.trim()).nullable().optional(),
+    motherName: z.string().min(1).max(160).transform((s) => s.trim()).nullable().optional(),
+    alternatePhone: z.string().min(7).max(25).optional(),
+    address: z.string().min(3).max(1000).optional(),
+    maritalStatus: z.nativeEnum(MaritalStatus).optional(),
+    tShirtSize: z.nativeEnum(TShirtSize).optional(),
+    hasDisability: z.boolean().optional(),
+    disabilityDetails: z.string().min(1).max(1000).nullable().optional(),
     photoUrl: z.string().url().optional(),
+    aadharFrontUrl: z.string().url().optional(),
+    aadharBackUrl: z.string().url().optional(),
   })
   .strict();
 
