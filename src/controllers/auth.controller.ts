@@ -14,6 +14,9 @@ import { assertHierarchyEnabled, type UserForHierarchyCheck } from "../lib/acces
 import { withAdminRegistrationIds } from "../lib/withAdminRegistrationIds.js";
 import {
   assertRegistrationVerificationToken,
+  DEV_OTP_CODE,
+  isDevOtpBypass,
+  isDevelopment,
   normalizePhoneOrEmail,
   toSmsNumber,
 } from "../lib/otp.js";
@@ -424,7 +427,7 @@ export async function otpRequest(req: Request, res: Response, next: NextFunction
       recipientPhone = toSmsNumber(user.phone);
     }
 
-    const code = String(crypto.randomInt(100000, 999999));
+    const code = isDevelopment() ? DEV_OTP_CODE : String(crypto.randomInt(100000, 999999));
     const codeHash = await hashPassword(code);
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
     await otpRepository.createOtp({
@@ -435,16 +438,18 @@ export async function otpRequest(req: Request, res: Response, next: NextFunction
       expiresAt,
     });
 
-    const bodyText =
-      purpose === "REGISTRATION"
-        ? registrationOtpMessage(code)
-        : passwordResetOtpMessage(code);
-    await sendSmsNow({
-      phone: recipientPhone,
-      body: bodyText,
-      userId: userId ?? undefined,
-      templateId: getDltTemplateIdForPurpose(purpose),
-    });
+    if (!isDevelopment()) {
+      const bodyText =
+        purpose === "REGISTRATION"
+          ? registrationOtpMessage(code)
+          : passwordResetOtpMessage(code);
+      await sendSmsNow({
+        phone: recipientPhone,
+        body: bodyText,
+        userId: userId ?? undefined,
+        templateId: getDltTemplateIdForPurpose(purpose),
+      });
+    }
 
     res.json({ ok: true });
   } catch (e) {
@@ -466,14 +471,26 @@ export async function otpVerify(req: Request, res: Response, next: NextFunction)
       throw new AppError(400, "Invalid request");
     }
 
-    const otp = await otpRepository.findLatestValidByPurpose({
+    let otp = await otpRepository.findLatestValidByPurpose({
       phoneOrEmail: normalizedIdentifier,
       purpose: body.purpose,
       userId: userIdForPurpose,
     });
+
+    if (!otp && isDevOtpBypass(body.code)) {
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+      otp = await otpRepository.createOtp({
+        ...(userIdForPurpose ? { user: { connect: { id: userIdForPurpose } } } : {}),
+        phoneOrEmail: normalizedIdentifier,
+        codeHash: await hashPassword(DEV_OTP_CODE),
+        purpose: body.purpose,
+        expiresAt,
+      });
+    }
     if (!otp) throw new AppError(400, "Invalid or expired OTP");
 
-    const match = await verifyPassword(body.code, otp.codeHash);
+    const match =
+      isDevOtpBypass(body.code) || (await verifyPassword(body.code, otp.codeHash));
     if (!match) throw new AppError(400, "Invalid OTP");
 
     const verificationToken = signOtpVerificationToken({
@@ -495,13 +512,26 @@ export async function otpConfirm(req: Request, res: Response, next: NextFunction
     const normalizedIdentifier = normalizePhoneOrEmail(body.phoneOrEmail);
     const user = await userRepository.findFirstByEmailOrPhone(normalizedIdentifier);
     if (!user) throw new AppError(400, "Invalid request");
-    const otp = await otpRepository.findLatestValidByPurpose({
+    let otp = await otpRepository.findLatestValidByPurpose({
       userId: user.id,
       phoneOrEmail: normalizedIdentifier,
       purpose: "PASSWORD_RESET",
     });
+
+    if (!otp && isDevOtpBypass(body.code)) {
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+      otp = await otpRepository.createOtp({
+        user: { connect: { id: user.id } },
+        phoneOrEmail: normalizedIdentifier,
+        codeHash: await hashPassword(DEV_OTP_CODE),
+        purpose: "PASSWORD_RESET",
+        expiresAt,
+      });
+    }
     if (!otp) throw new AppError(400, "Invalid or expired OTP");
-    const match = await verifyPassword(body.code, otp.codeHash);
+
+    const match =
+      isDevOtpBypass(body.code) || (await verifyPassword(body.code, otp.codeHash));
     if (!match) throw new AppError(400, "Invalid OTP");
     const newHash = await hashPassword(body.newPassword);
     await userRepository.completePasswordResetWithOtp(user.id, newHash, otp.id);

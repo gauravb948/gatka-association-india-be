@@ -4,6 +4,16 @@ import { verifyOtpVerificationToken } from "./jwt.js";
 export const OTP_PURPOSES = ["REGISTRATION", "PASSWORD_RESET"] as const;
 export type OtpPurpose = (typeof OTP_PURPOSES)[number];
 
+export const DEV_OTP_CODE = "123456";
+
+export function isDevelopment(): boolean {
+  return process.env.NODE_ENV === "development";
+}
+
+export function isDevOtpBypass(code: string): boolean {
+  return isDevelopment() && code === DEV_OTP_CODE;
+}
+
 export function isEmailLike(value: string): boolean {
   return value.includes("@");
 }
