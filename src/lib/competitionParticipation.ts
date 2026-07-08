@@ -47,18 +47,9 @@ export function playerProfileWhereCompetitionEnabledScope(
   };
 }
 
-type ActorPlayerScopeOpts = {
-  /**
-   * For `TRAINING_CENTER`, district-level competitions list every active player in the training
-   * center's district (not only that TC). Other levels still use the training center id.
-   */
-  competitionLevel?: CompetitionLevel;
-};
-
 /** Geographic scope of players a registrar may list or sign up for participation. */
 export function actorPlayerProfileScopeWhere(
-  actor: DbUser,
-  opts?: ActorPlayerScopeOpts
+  actor: DbUser
 ): Prisma.PlayerProfileWhereInput {
   if (actor.role === "NATIONAL_ADMIN") return {};
   if (actor.role === "STATE_ADMIN") {
@@ -76,12 +67,6 @@ export function actorPlayerProfileScopeWhere(
   if (actor.role === "TRAINING_CENTER") {
     if (!actor.trainingCenterId) {
       throw new AppError(403, "Training center context missing", "FORBIDDEN_SCOPE");
-    }
-    if (opts?.competitionLevel === "DISTRICT") {
-      if (!actor.trainingCenter) {
-        throw new AppError(403, "Training center context missing", "FORBIDDEN_SCOPE");
-      }
-      return { districtId: actor.trainingCenter.district.id };
     }
     return { trainingCenterId: actor.trainingCenterId };
   }

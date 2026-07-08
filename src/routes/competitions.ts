@@ -55,6 +55,7 @@ competitionsRouter.post(
 competitionsRouter.get(
   "/:id/eligible-players",
   requireAuth,
+  requireRoles("TRAINING_CENTER", "DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),
   competitionsController.eligiblePlayers
 );
 competitionsRouter.post(

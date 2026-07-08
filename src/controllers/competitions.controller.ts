@@ -607,17 +607,11 @@ export async function eligiblePlayers(req: Request, res: Response, next: NextFun
       }
     }
 
-    const players = await playerRepository.findManyEligibleActive();
-    const tcDistrictId =
-      actor.role === "TRAINING_CENTER" && actor.trainingCenter
-        ? actor.trainingCenter.district.id
-        : null;
+    const actorScopeWhere = actorPlayerProfileScopeWhere(actor);
+    const players = await playerRepository.findManyEligibleActive(actorScopeWhere);
 
     const filtered: typeof players = [];
     for (const p of players) {
-      if (tcDistrictId && p.districtId !== tcDistrictId) {
-        continue;
-      }
       if (eventId && eventForQuery) {
         if (alreadyInThisEvent.has(p.userId)) {
           continue;
@@ -801,7 +795,7 @@ export async function listPlayersNotParticipated(req: Request, res: Response, ne
     const skip = (q.page - 1) * q.pageSize;
 
     const geoWhere = playerProfileWhereCompetitionEnabledScope(comp);
-    const actorWhere = actorPlayerProfileScopeWhere(actor, { competitionLevel: comp.level });
+    const actorWhere = actorPlayerProfileScopeWhere(actor);
     const genderWhere = playerProfileGenderWhereFromComp(comp.genders);
 
     const andParts: Prisma.PlayerProfileWhereInput[] = [
@@ -809,6 +803,7 @@ export async function listPlayersNotParticipated(req: Request, res: Response, ne
         registrationStatus: "ACTIVE",
         isBlacklisted: false,
         tcDisabled: false,
+        user: { status: "ACCEPTED", isActive: true },
       },
       geoWhere,
       actorWhere,
@@ -866,7 +861,7 @@ export async function listParticipants(req: Request, res: Response, next: NextFu
     if (!comp) throw new AppError(404, "Competition not found");
     await assertCanViewCompetitionParticipants(actor, comp);
 
-    const scope = actorPlayerProfileScopeWhere(actor, { competitionLevel: comp.level });
+    const scope = actorPlayerProfileScopeWhere(actor);
     const playerProfileWhere = Object.keys(scope).length > 0 ? scope : undefined;
 
     const q = competitionParticipationListQuerySchema.parse(req.query);

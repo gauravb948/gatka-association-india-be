@@ -1,3 +1,4 @@
+import { EntityStatus } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 
@@ -38,13 +39,17 @@ export function findProfileWithState(userId: string) {
   });
 }
 
-export function findManyEligibleActive() {
+export function findManyEligibleActive(scopeWhere?: Prisma.PlayerProfileWhereInput) {
+  const base: Prisma.PlayerProfileWhereInput = {
+    registrationStatus: "ACTIVE",
+    isBlacklisted: false,
+    tcDisabled: false,
+    user: { status: EntityStatus.ACCEPTED, isActive: true },
+  };
+  const where =
+    scopeWhere && Object.keys(scopeWhere).length > 0 ? { AND: [base, scopeWhere] } : base;
   return prisma.playerProfile.findMany({
-    where: {
-      registrationStatus: "ACTIVE",
-      isBlacklisted: false,
-      tcDisabled: false,
-    },
+    where,
     include: {
       user: true,
       state: { select: { id: true, name: true, code: true } },
