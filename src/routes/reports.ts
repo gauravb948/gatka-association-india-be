@@ -11,6 +11,24 @@ reportsRouter.get(
   reportsController.competitionRegistrations
 );
 reportsRouter.get(
+  "/competition-event-registrations",
+  requireAuth,
+  requireRoles("TRAINING_CENTER", "DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),
+  reportsController.competitionEventRegistrations
+);
+reportsRouter.get(
+  "/competition-event-group-participants",
+  requireAuth,
+  requireRoles("TRAINING_CENTER", "DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),
+  reportsController.competitionEventGroupParticipants
+);
+reportsRouter.get(
+  "/competition-age-wise",
+  requireAuth,
+  requireRoles("TRAINING_CENTER", "DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),
+  reportsController.competitionAgeWise
+);
+reportsRouter.get(
   "/players/expiring",
   requireAuth,
   requireRoles("TRAINING_CENTER", "DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),

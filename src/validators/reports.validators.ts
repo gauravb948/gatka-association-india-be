@@ -12,3 +12,18 @@ export const competitionRegistrationsReportQuerySchema = z.object({
   search: optionalSearch,
   competitionId: z.string().min(1).optional(),
 });
+
+export const competitionScopedReportQuerySchema = z.object({
+  competitionId: z.string().min(1),
+  stateId: z.string().min(1).optional(),
+  districtId: z.string().min(1).optional(),
+  gender: z.enum(["MALE", "FEMALE", "BOYS", "GIRLS"]).optional(),
+});
+
+export const competitionEventRegistrationReportQuerySchema = competitionScopedReportQuerySchema;
+export const competitionEventGroupParticipantsReportQuerySchema = competitionScopedReportQuerySchema;
+
+export const competitionAgeWiseReportQuerySchema = z.object({
+  competitionId: z.string().min(1),
+  gender: z.enum(["MALE", "FEMALE", "BOYS", "GIRLS"]),
+});

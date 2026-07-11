@@ -55,6 +55,37 @@ components:
       in: query
       schema: { type: string }
       description: Optional training center filter (national; state/district when TC is in scope).
+    competitionReportCompetitionId:
+      name: competitionId
+      in: query
+      required: true
+      schema: { type: string }
+      description: Competition primary key
+    competitionReportStateId:
+      name: stateId
+      in: query
+      schema: { type: string }
+      description: Optional player geography filter (validated against caller scope)
+    competitionReportDistrictId:
+      name: districtId
+      in: query
+      schema: { type: string }
+      description: Optional player geography filter (validated against caller scope)
+    competitionReportGender:
+      name: gender
+      in: query
+      schema:
+        type: string
+        enum: [MALE, FEMALE, BOYS, GIRLS]
+      description: Optional filter on event group gender and player profile gender
+    competitionReportGenderRequired:
+      name: gender
+      in: query
+      required: true
+      schema:
+        type: string
+        enum: [MALE, FEMALE, BOYS, GIRLS]
+      description: Filter on event group gender and player profile gender
   schemas:
     Membership:
       type: object
@@ -348,6 +379,14 @@ components:
           properties:
             id: { type: string }
             name: { type: string }
+        participatingIn:
+          type: array
+          description: Other catalog events in this competition the player is already registered for
+          items:
+            type: object
+            properties:
+              eventId: { type: string }
+              eventName: { type: string }
     LoginCoachProfile:
       type: object
       nullable: true
@@ -1596,6 +1635,98 @@ components:
         pageSize: { type: integer, minimum: 1, maximum: 100 }
         total: { type: integer, minimum: 0 }
         totalPages: { type: integer, minimum: 0 }
+    CompetitionEventRegistrationReportItem:
+      type: object
+      required: [eventName, minPlayers, maxPlayers, playersRegistered]
+      properties:
+        eventName: { type: string }
+        minPlayers: { type: integer, minimum: 0 }
+        maxPlayers: { type: integer, minimum: 0 }
+        playersRegistered:
+          type: integer
+          minimum: 0
+          description: Distinct players registered for this event
+    CompetitionEventRegistrationReport:
+      type: object
+      description: >
+        Keys are event group labels (e.g. `Bhujhang (Male)`). Values are catalog events
+        in that group with registration counts.
+      additionalProperties:
+        type: array
+        items: { $ref: "#/components/schemas/CompetitionEventRegistrationReportItem" }
+    CompetitionEventGroupParticipantRow:
+      type: object
+      required:
+        [name, fatherName, motherName, dob, age, aadharNumber, participatingIn]
+      properties:
+        name: { type: string }
+        fatherName: { type: string, nullable: true }
+        motherName: { type: string, nullable: true }
+        dob:
+          type: string
+          description: Date of birth formatted as MM/DD/YYYY (UTC)
+          example: "05/14/2010"
+        age:
+          type: integer
+          minimum: 0
+          description: Age as of the competition `ageTillDate`, or today when unset
+        aadharNumber: { type: string, nullable: true }
+        participatingIn:
+          type: array
+          items: { type: string }
+          description: Event names the player is registered for in this event group
+    CompetitionEventGroupParticipantsReport:
+      type: object
+      description: >
+        Keys are event group labels (e.g. `Saif (Male)`). Values are participant rows,
+        sorted by name. Each player appears once per group even if registered for
+        multiple events in that group.
+      additionalProperties:
+        type: array
+        items: { $ref: "#/components/schemas/CompetitionEventGroupParticipantRow" }
+    AgeWiseReportRow:
+      type: object
+      required:
+        - district
+        - teamDemo
+        - teamFariSoti
+        - teamSingleSoti
+        - indvDemo
+        - indvFariSoti
+        - indvSingleSoti
+      properties:
+        district:
+          type: integer
+          minimum: 0
+          description: Distinct players registered in any event in this age group
+        teamDemo:
+          type: integer
+          minimum: 0
+        teamFariSoti:
+          type: integer
+          minimum: 0
+        teamSingleSoti:
+          type: integer
+          minimum: 0
+        indvDemo:
+          type: integer
+          minimum: 0
+        indvFariSoti:
+          type: integer
+          minimum: 0
+        indvSingleSoti:
+          type: integer
+          minimum: 0
+    CompetitionAgeWiseReport:
+      type: object
+      description: >
+        Top-level keys depend on competition level: training center name for `DISTRICT`,
+        district name for `STATE`, state name for `NATIONAL`. Each value maps age group
+        labels (e.g. `U19`) to distinct player counts per predefined event column.
+      additionalProperties:
+        type: object
+        additionalProperties:
+          $ref: "#/components/schemas/AgeWiseReportRow"
     Session:
       type: object
       properties:
@@ -4655,6 +4786,86 @@ paths:
           description: Unauthorized
         "403":
           description: Forbidden for this role
+  /reports/competition-event-registrations:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Event registration counts grouped by event group
+      description: >
+        Returns catalog events in each event group for the competition's age scope,
+        with distinct `playersRegistered` counts from `ParticipationRecord` rows where
+        `participated` is true. Optional `stateId`, `districtId`, and `gender` filters
+        narrow players; caller hierarchy scope always applies. Training center, district,
+        state, and national admins only.
+      parameters:
+        - $ref: "#/components/parameters/competitionReportCompetitionId"
+        - $ref: "#/components/parameters/competitionReportStateId"
+        - $ref: "#/components/parameters/competitionReportDistrictId"
+        - $ref: "#/components/parameters/competitionReportGender"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CompetitionEventRegistrationReport" }
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden for this role
+        "404":
+          description: Competition not found
+  /reports/competition-event-group-participants:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Participants grouped by event group
+      description: >
+        Returns player profile details for each event group in the competition's age
+        scope. Each player appears once per group with `participatingIn` listing event
+        names they are registered for in that group. Optional `stateId`, `districtId`,
+        and `gender` filters narrow players; caller hierarchy scope always applies.
+      parameters:
+        - $ref: "#/components/parameters/competitionReportCompetitionId"
+        - $ref: "#/components/parameters/competitionReportStateId"
+        - $ref: "#/components/parameters/competitionReportDistrictId"
+        - $ref: "#/components/parameters/competitionReportGender"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CompetitionEventGroupParticipantsReport" }
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden for this role
+        "404":
+          description: Competition not found
+  /reports/competition-age-wise:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Age-wise registration counts by event type
+      description: >
+        Returns distinct player counts per geographic unit, age group, and predefined
+        event column (`teamDemo`, `teamFariSoti`, `teamSingleSoti`, `indvDemo`,
+        `indvFariSoti`, `indvSingleSoti`). Grouping follows competition level:
+        `DISTRICT` → training center name, `STATE` → district name, `NATIONAL` → state
+        name. `district` on each row is the total distinct players in that age group for
+        that unit. Age group keys use `U{ageTo+1}` (e.g. Under 19 Years → `U19`).
+        Requires `gender`. Caller hierarchy scope always applies.
+      parameters:
+        - $ref: "#/components/parameters/competitionReportCompetitionId"
+        - $ref: "#/components/parameters/competitionReportGenderRequired"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CompetitionAgeWiseReport" }
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden for this role
+        "404":
+          description: Competition not found
   /reports/players/expiring:
     get:
       security: [{ bearerAuth: [] }]

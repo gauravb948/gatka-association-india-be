@@ -1,8 +1,20 @@
 import type { NextFunction, Request, Response } from "express";
 import * as playerRepository from "../repositories/player.repository.js";
 import * as participationRepository from "../repositories/participation.repository.js";
+import * as competitionRepository from "../repositories/competition.repository.js";
 import { buildCompetitionRegistrationStats } from "../lib/competitionRegistrationStats.js";
-import { competitionRegistrationsReportQuerySchema } from "../validators/reports.validators.js";
+import { buildCompetitionEventRegistrationReport } from "../lib/competitionEventRegistrationReport.js";
+import { buildCompetitionEventGroupParticipantsReport } from "../lib/competitionEventGroupParticipantsReport.js";
+import { buildCompetitionAgeWiseReport } from "../lib/competitionAgeWiseReport.js";
+import { assertCanViewCompetitionParticipants } from "../lib/competitionManagementScope.js";
+import { AppError } from "../lib/errors.js";
+import { buildReportPlayerProfileWhere } from "../lib/reportPlayerProfileFilters.js";
+import {
+  competitionAgeWiseReportQuerySchema,
+  competitionEventGroupParticipantsReportQuerySchema,
+  competitionEventRegistrationReportQuerySchema,
+  competitionRegistrationsReportQuerySchema,
+} from "../validators/reports.validators.js";
 
 export async function competitionRegistrations(
   req: Request,
@@ -38,6 +50,77 @@ export async function competitionRegistrations(
       total,
       totalPages,
     });
+  } catch (e) {
+    next(e);
+  }
+}
+
+export async function competitionEventRegistrations(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const actor = req.dbUser!;
+    const q = competitionEventRegistrationReportQuerySchema.parse(req.query);
+    const comp = await competitionRepository.findByIdForPlayerEligibility(q.competitionId);
+    if (!comp) throw new AppError(404, "Competition not found");
+    await assertCanViewCompetitionParticipants(actor, comp);
+
+    const playerProfileWhere = await buildReportPlayerProfileWhere(actor, q);
+    const data = await buildCompetitionEventRegistrationReport(
+      q.competitionId,
+      q.gender,
+      playerProfileWhere
+    );
+    res.json(data);
+  } catch (e) {
+    next(e);
+  }
+}
+
+export async function competitionEventGroupParticipants(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const actor = req.dbUser!;
+    const q = competitionEventGroupParticipantsReportQuerySchema.parse(req.query);
+    const comp = await competitionRepository.findByIdForPlayerEligibility(q.competitionId);
+    if (!comp) throw new AppError(404, "Competition not found");
+    await assertCanViewCompetitionParticipants(actor, comp);
+
+    const playerProfileWhere = await buildReportPlayerProfileWhere(actor, q);
+    const ageAsOf = comp.ageTillDate ?? new Date();
+    const data = await buildCompetitionEventGroupParticipantsReport(
+      q.competitionId,
+      q.gender,
+      playerProfileWhere,
+      ageAsOf
+    );
+    res.json(data);
+  } catch (e) {
+    next(e);
+  }
+}
+
+export async function competitionAgeWise(req: Request, res: Response, next: NextFunction) {
+  try {
+    const actor = req.dbUser!;
+    const q = competitionAgeWiseReportQuerySchema.parse(req.query);
+    const comp = await competitionRepository.findByIdForPlayerEligibility(q.competitionId);
+    if (!comp) throw new AppError(404, "Competition not found");
+    await assertCanViewCompetitionParticipants(actor, comp);
+
+    const playerProfileWhere = await buildReportPlayerProfileWhere(actor, { gender: q.gender });
+    const data = await buildCompetitionAgeWiseReport(
+      q.competitionId,
+      comp.level,
+      q.gender,
+      playerProfileWhere
+    );
+    res.json(data);
   } catch (e) {
     next(e);
   }

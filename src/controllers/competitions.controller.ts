@@ -649,6 +649,12 @@ export async function eligiblePlayers(req: Request, res: Response, next: NextFun
       }
     }
 
+    const participatingByPlayer =
+      await participationRepository.findParticipatingEventsByPlayerUserIds(
+        comp.id,
+        filtered.map((p) => p.userId)
+      );
+
     res.json(
       filtered.map((p) => ({
         userId: p.userId,
@@ -662,6 +668,7 @@ export async function eligiblePlayers(req: Request, res: Response, next: NextFun
         state: p.state,
         district: p.district,
         trainingCenter: p.trainingCenter,
+        participatingIn: participatingByPlayer.get(p.userId) ?? [],
       }))
     );
   } catch (e) {

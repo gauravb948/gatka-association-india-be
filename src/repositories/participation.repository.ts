@@ -1,7 +1,146 @@
-import type { CompetitionLevel, Prisma } from "@prisma/client";
+import type { CompetitionLevel, Gender, Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { buildResultsListCompetitionFilter } from "./competition.repository.js";
 import type { RegistrationStatSource } from "../lib/competitionRegistrationStats.js";
+
+export async function findParticipationsForAgeWiseReport(
+  competitionId: string,
+  gender: Gender,
+  ageCategoryIds: readonly string[],
+  playerProfileWhere?: Prisma.PlayerProfileWhereInput
+) {
+  if (ageCategoryIds.length === 0) return [];
+
+  const profileFilter =
+    playerProfileWhere && Object.keys(playerProfileWhere).length > 0
+      ? { playerUser: { playerProfile: playerProfileWhere } }
+      : {};
+
+  return prisma.participationRecord.findMany({
+    where: {
+      competitionId,
+      participated: true,
+      eventId: { not: null },
+      event: {
+        isActive: true,
+        eventGroup: {
+          isActive: true,
+          gender,
+          ageCategoryId: { in: [...ageCategoryIds] },
+        },
+      },
+      ...profileFilter,
+    },
+    select: {
+      playerUserId: true,
+      playerUser: {
+        select: {
+          playerProfile: {
+            select: {
+              trainingCenter: { select: { name: true } },
+              district: { select: { name: true } },
+              state: { select: { name: true } },
+            },
+          },
+        },
+      },
+      event: {
+        select: {
+          name: true,
+          eventGroup: {
+            select: {
+              ageCategory: {
+                select: { id: true, name: true, ageTo: true, sortOrder: true },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+export async function findParticipationsForEventGroupParticipantsReport(
+  competitionId: string,
+  eventGroupIds: readonly string[],
+  playerProfileWhere?: Prisma.PlayerProfileWhereInput
+) {
+  if (eventGroupIds.length === 0) return [];
+
+  const profileFilter =
+    playerProfileWhere && Object.keys(playerProfileWhere).length > 0
+      ? { playerUser: { playerProfile: playerProfileWhere } }
+      : {};
+
+  return prisma.participationRecord.findMany({
+    where: {
+      competitionId,
+      participated: true,
+      eventId: { not: null },
+      event: {
+        isActive: true,
+        eventGroupId: { in: [...eventGroupIds] },
+        eventGroup: { isActive: true },
+      },
+      ...profileFilter,
+    },
+    select: {
+      playerUserId: true,
+      playerUser: {
+        select: {
+          playerProfile: {
+            select: {
+              fullName: true,
+              fatherName: true,
+              motherName: true,
+              dateOfBirth: true,
+              aadharNumber: true,
+            },
+          },
+        },
+      },
+      event: {
+        select: {
+          name: true,
+          eventGroup: {
+            select: { segment: true, gender: true },
+          },
+        },
+      },
+    },
+  });
+}
+
+/** Distinct registered players per catalog event, scoped by optional player profile filters. */
+export async function countDistinctPlayersByEvent(
+  competitionId: string,
+  eventIds: readonly string[],
+  playerProfileWhere?: Prisma.PlayerProfileWhereInput
+): Promise<Map<string, number>> {
+  if (eventIds.length === 0) return new Map();
+
+  const profileFilter =
+    playerProfileWhere && Object.keys(playerProfileWhere).length > 0
+      ? { playerUser: { playerProfile: playerProfileWhere } }
+      : {};
+
+  const grouped = await prisma.participationRecord.groupBy({
+    by: ["eventId", "playerUserId"],
+    where: {
+      competitionId,
+      participated: true,
+      eventId: { in: [...eventIds] },
+      ...profileFilter,
+    },
+  });
+
+  const counts = new Map<string, number>();
+  for (const row of grouped) {
+    if (!row.eventId) continue;
+    counts.set(row.eventId, (counts.get(row.eventId) ?? 0) + 1);
+  }
+  return counts;
+}
 
 export async function findParticipationsForCompetitionStatsReport(
   user: { role: import("@prisma/client").Role; stateId: string | null; districtId: string | null },
@@ -138,6 +277,41 @@ export function findParticipationsWithEventsForPlayer(competitionId: string, pla
       event: true,
     },
   });
+}
+
+/** Catalog events each player is already registered for in this competition. */
+export async function findParticipatingEventsByPlayerUserIds(
+  competitionId: string,
+  playerUserIds: readonly string[]
+): Promise<Map<string, Array<{ eventId: string; eventName: string }>>> {
+  const map = new Map<string, Array<{ eventId: string; eventName: string }>>();
+  if (playerUserIds.length === 0) return map;
+
+  const rows = await prisma.participationRecord.findMany({
+    where: {
+      competitionId,
+      playerUserId: { in: [...playerUserIds] },
+      participated: true,
+      eventId: { not: null },
+    },
+    select: {
+      playerUserId: true,
+      eventId: true,
+      event: { select: { id: true, name: true } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  for (const row of rows) {
+    if (!row.eventId || !row.event) continue;
+    const list = map.get(row.playerUserId) ?? [];
+    if (!list.some((entry) => entry.eventId === row.eventId)) {
+      list.push({ eventId: row.eventId, eventName: row.event.name });
+    }
+    map.set(row.playerUserId, list);
+  }
+
+  return map;
 }
 
 const participationListInclude = {
