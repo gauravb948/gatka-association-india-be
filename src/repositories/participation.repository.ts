@@ -95,15 +95,21 @@ export async function findParticipationsForEventGroupParticipantsReport(
               motherName: true,
               dateOfBirth: true,
               aadharNumber: true,
+              photoUrl: true,
             },
           },
         },
       },
       event: {
         select: {
+          id: true,
           name: true,
           eventGroup: {
-            select: { segment: true, gender: true },
+            select: {
+              segment: true,
+              gender: true,
+              ageCategory: { select: { name: true, ageTo: true } },
+            },
           },
         },
       },

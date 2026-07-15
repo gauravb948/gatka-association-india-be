@@ -1,6 +1,6 @@
 import type { Gender, Prisma } from "@prisma/client";
 import { prisma } from "./prisma.js";
-import { formatEventGroupLabel } from "./competitionResultList.js";
+import { formatEventGroupTitle } from "./competitionResultList.js";
 import * as competitionRepository from "../repositories/competition.repository.js";
 import * as participationRepository from "../repositories/participation.repository.js";
 
@@ -48,12 +48,16 @@ export async function buildCompetitionEventRegistrationReport(
 
   const result: CompetitionEventRegistrationReport = {};
   for (const group of filteredGroups) {
-    const label = formatEventGroupLabel(group.segment, group.gender);
+    const label = formatEventGroupTitle(group.segment, group.gender, group.ageCategory);
     if (!result[label]) result[label] = [];
   }
 
   for (const event of events) {
-    const label = formatEventGroupLabel(event.eventGroup.segment, event.eventGroup.gender);
+    const label = formatEventGroupTitle(
+      event.eventGroup.segment,
+      event.eventGroup.gender,
+      event.eventGroup.ageCategory
+    );
     if (!result[label]) result[label] = [];
     result[label].push({
       eventName: event.name,

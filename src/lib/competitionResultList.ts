@@ -1,6 +1,7 @@
 import type { Gender } from "@prisma/client";
 import type { ResultListContext } from "../repositories/competitionAggregateStanding.repository.js";
 import { enrichByUnitType } from "../repositories/competitionAggregateStanding.repository.js";
+import { ageGroupLabel } from "./competitionAgeWiseReport.js";
 
 function genderLabel(gender: Gender): string {
   if (gender === "MALE" || gender === "BOYS") return "Male";
@@ -10,6 +11,14 @@ function genderLabel(gender: Gender): string {
 
 export function formatEventGroupLabel(segment: string, gender: Gender): string {
   return `${segment} (${genderLabel(gender)})`;
+}
+
+export function formatEventGroupTitle(
+  segment: string,
+  gender: Gender,
+  ageCategory: { name: string; ageTo: number | null }
+): string {
+  return `${formatEventGroupLabel(segment, gender)} - ${ageGroupLabel(ageCategory)}`;
 }
 
 function unitDisplayName(unitType: string, unit: unknown): string | null {

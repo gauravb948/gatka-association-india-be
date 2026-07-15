@@ -1649,7 +1649,8 @@ components:
     CompetitionEventRegistrationReport:
       type: object
       description: >
-        Keys are event group labels (e.g. `Bhujhang (Male)`). Values are catalog events
+        Keys are event group labels with age group
+        (e.g. `Bhujhang (Male) - U19`). Values are catalog events
         in that group with registration counts.
       additionalProperties:
         type: array
@@ -1657,7 +1658,7 @@ components:
     CompetitionEventGroupParticipantRow:
       type: object
       required:
-        [name, fatherName, motherName, dob, age, aadharNumber, participatingIn]
+        [name, fatherName, motherName, dob, age, aadharNumber, photoUrl, participatingIn]
       properties:
         name: { type: string }
         fatherName: { type: string, nullable: true }
@@ -1671,19 +1672,38 @@ components:
           minimum: 0
           description: Age as of the competition `ageTillDate`, or today when unset
         aadharNumber: { type: string, nullable: true }
+        photoUrl:
+          type: string
+          nullable: true
+          description: Player profile image URL
         participatingIn:
           type: array
           items: { type: string }
           description: Event names the player is registered for in this event group
     CompetitionEventGroupParticipantsReport:
       type: object
+      required: [totalParticipants, totalEventsPlayed, groups]
       description: >
-        Keys are event group labels (e.g. `Saif (Male)`). Values are participant rows,
-        sorted by name. Each player appears once per group even if registered for
-        multiple events in that group.
-      additionalProperties:
-        type: array
-        items: { $ref: "#/components/schemas/CompetitionEventGroupParticipantRow" }
+        Participants by event group, plus competition-wide totals for distinct players
+        and distinct events with at least one registration (after filters).
+      properties:
+        totalParticipants:
+          type: integer
+          minimum: 0
+          description: Distinct players appearing in any event group
+        totalEventsPlayed:
+          type: integer
+          minimum: 0
+          description: Distinct catalog events with at least one registered participant
+        groups:
+          type: object
+          description: >
+            Keys are event group labels with age group (e.g. `Saif (Male) - U19`).
+            Values are participant rows, sorted by name. Each player appears once
+            per group even if registered for multiple events in that group.
+          additionalProperties:
+            type: array
+            items: { $ref: "#/components/schemas/CompetitionEventGroupParticipantRow" }
     AgeWiseReportRow:
       type: object
       required:
@@ -4819,9 +4839,11 @@ paths:
       summary: Participants grouped by event group
       description: >
         Returns player profile details for each event group in the competition's age
-        scope. Each player appears once per group with `participatingIn` listing event
-        names they are registered for in that group. Optional `stateId`, `districtId`,
-        and `gender` filters narrow players; caller hierarchy scope always applies.
+        scope under `groups`, plus `totalParticipants` (distinct players) and
+        `totalEventsPlayed` (distinct events with registrations). Each player appears
+        once per group with `participatingIn` listing event names they are registered
+        for in that group. Optional `stateId`, `districtId`, and `gender` filters
+        narrow players; caller hierarchy scope always applies.
       parameters:
         - $ref: "#/components/parameters/competitionReportCompetitionId"
         - $ref: "#/components/parameters/competitionReportStateId"
