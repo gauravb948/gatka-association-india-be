@@ -23,6 +23,12 @@ reportsRouter.get(
   reportsController.competitionEventGroupParticipants
 );
 reportsRouter.get(
+  "/download-reports-for-all-entities",
+  requireAuth,
+  requireRoles("TRAINING_CENTER", "DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),
+  reportsController.downloadReportsForAllEntities
+);
+reportsRouter.get(
   "/competition-age-wise",
   requireAuth,
   requireRoles("TRAINING_CENTER", "DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),

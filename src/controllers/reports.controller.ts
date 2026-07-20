@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import * as playerRepository from "../repositories/player.repository.js";
 import * as participationRepository from "../repositories/participation.repository.js";
 import * as competitionRepository from "../repositories/competition.repository.js";
+import * as districtRepository from "../repositories/district.repository.js";
 import { buildCompetitionRegistrationStats } from "../lib/competitionRegistrationStats.js";
 import { buildCompetitionEventRegistrationReport } from "../lib/competitionEventRegistrationReport.js";
 import { buildCompetitionEventGroupParticipantsReport } from "../lib/competitionEventGroupParticipantsReport.js";
@@ -10,10 +11,18 @@ import { assertCanViewCompetitionParticipants } from "../lib/competitionManageme
 import { AppError } from "../lib/errors.js";
 import { buildReportPlayerProfileWhere } from "../lib/reportPlayerProfileFilters.js";
 import {
+  buildSummarySheetBundlesForEntities,
+  resolveAssociationTitle,
+  resolveCompetitionPrimaryGeo,
+  resolveSummarySheetEntities,
+} from "../lib/summarySheetAllEntities.js";
+import { streamSummarySheetAllEntitiesPdf } from "../lib/summarySheetAllEntitiesPdf.js";
+import {
   competitionAgeWiseReportQuerySchema,
   competitionEventGroupParticipantsReportQuerySchema,
   competitionEventRegistrationReportQuerySchema,
   competitionRegistrationsReportQuerySchema,
+  downloadReportsForAllEntitiesQuerySchema,
 } from "../validators/reports.validators.js";
 
 export async function competitionRegistrations(
@@ -113,7 +122,7 @@ export async function competitionAgeWise(req: Request, res: Response, next: Next
     if (!comp) throw new AppError(404, "Competition not found");
     await assertCanViewCompetitionParticipants(actor, comp);
 
-    const playerProfileWhere = await buildReportPlayerProfileWhere(actor, { gender: q.gender });
+    const playerProfileWhere = await buildReportPlayerProfileWhere(actor, q);
     const data = await buildCompetitionAgeWiseReport(
       q.competitionId,
       comp.level,
@@ -121,6 +130,65 @@ export async function competitionAgeWise(req: Request, res: Response, next: Next
       playerProfileWhere
     );
     res.json(data);
+  } catch (e) {
+    next(e);
+  }
+}
+
+/** One PDF with a summary sheet section per state / district / training center (by level). */
+export async function downloadReportsForAllEntities(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const actor = req.dbUser!;
+    const q = downloadReportsForAllEntitiesQuerySchema.parse(req.query);
+    const comp = await competitionRepository.findByIdForPlayerEligibility(q.competitionId);
+    if (!comp) throw new AppError(404, "Competition not found");
+    await assertCanViewCompetitionParticipants(actor, comp);
+
+    const geo = resolveCompetitionPrimaryGeo(comp, actor);
+    const entities = await resolveSummarySheetEntities(comp.level, geo);
+    if (entities.length === 0) {
+      throw new AppError(404, "No entities found for this competition level");
+    }
+
+    const ageAsOf = comp.ageTillDate ?? new Date();
+    const bundles = await buildSummarySheetBundlesForEntities(
+      actor,
+      q.competitionId,
+      q.gender,
+      ageAsOf,
+      entities
+    );
+
+    let associationStateId = geo.stateId;
+    if (!associationStateId && geo.districtId) {
+      const district = await districtRepository.findById(geo.districtId);
+      associationStateId = district?.stateId?.trim() ?? "";
+    }
+    const associationTitle = await resolveAssociationTitle(comp.level, associationStateId);
+    const safeName = (comp.name || "summary-sheet")
+      .replace(/[^\w\s-]/g, "")
+      .trim()
+      .replace(/\s+/g, "-")
+      .slice(0, 80);
+    const filename = `${safeName || "summary-sheet"}-all-entities.pdf`;
+
+    await streamSummarySheetAllEntitiesPdf(res, {
+      filename,
+      associationTitle,
+      competition: {
+        name: comp.name,
+        level: comp.level,
+        venue: comp.venue ?? null,
+        startDate: comp.startDate ?? null,
+        endDate: comp.endDate ?? null,
+      },
+      gender: q.gender,
+      bundles,
+    });
   } catch (e) {
     next(e);
   }

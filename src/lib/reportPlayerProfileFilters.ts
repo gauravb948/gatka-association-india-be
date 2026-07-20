@@ -5,7 +5,12 @@ import type { DbUser } from "../types/user.js";
 
 export async function buildReportPlayerProfileWhere(
   actor: DbUser,
-  q: { stateId?: string; districtId?: string; gender?: Gender }
+  q: {
+    stateId?: string;
+    districtId?: string;
+    trainingCenterId?: string;
+    gender?: Gender;
+  }
 ): Promise<Prisma.PlayerProfileWhereInput> {
   const parts: Prisma.PlayerProfileWhereInput[] = [actorPlayerProfileScopeWhere(actor)];
 
@@ -14,6 +19,7 @@ export async function buildReportPlayerProfileWhere(
     pageSize: 1,
     stateId: q.stateId,
     districtId: q.districtId,
+    trainingCenterId: q.trainingCenterId,
   });
   if (geoClauses.length > 0) {
     parts.push(...(geoClauses as Prisma.PlayerProfileWhereInput[]));
