@@ -3288,6 +3288,9 @@ paths:
         After the Razorpay checkout returns on the client, post the three values.
         The server verifies the HMAC-SHA256 signature against the state's key secret,
         marks the payment as PAID, and runs all status transitions (user, registration, membership).
+
+        If the user closes the browser before this call, the Razorpay webhook
+        (`POST /webhooks/razorpay`) still marks the payment paid. Both paths are idempotent.
       requestBody:
         required: true
         content:
@@ -3316,6 +3319,46 @@ paths:
                       payment: { type: object }
         "400":
           description: Invalid signature or missing config
+  /webhooks/razorpay:
+    post:
+      summary: Single Razorpay webhook for national and all state accounts
+      description: >
+        Server-to-server callback when payment succeeds and the user may have closed
+        the browser before `/payments/verify`.
+
+        Point every Razorpay account (national + each state) at the same URL:
+        - URL: `{BASE}/api/webhooks/razorpay`
+        - Events: `payment.captured`, `order.paid`
+        - Secret: that account's `webhookSecret` in payment config
+          (national may use env `RAZORPAY_WEBHOOK_SECRET`)
+
+        The handler looks up our payment by Razorpay `order_id`, selects the matching
+        account secret, verifies `X-Razorpay-Signature`, then marks paid.
+        Safe after client verify — marking paid is idempotent.
+        No JWT. Not wrapped in the usual API response envelope.
+      parameters:
+        - name: X-Razorpay-Signature
+          in: header
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Razorpay webhook event payload
+      responses:
+        "200":
+          description: Acknowledged
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+        "400":
+          description: Invalid signature
   /payments/me:
     get:
       security: [{ bearerAuth: [] }]

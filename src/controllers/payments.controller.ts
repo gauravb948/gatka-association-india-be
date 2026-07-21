@@ -86,9 +86,12 @@ export async function listMine(req: Request, res: Response, next: NextFunction) 
  * After the Razorpay checkout modal returns, the client posts
  * `{ razorpay_order_id, razorpay_payment_id, razorpay_signature }`.
  *
- * We verify the HMAC-SHA256 signature using the state's `key_secret`,
+ * We verify the HMAC-SHA256 signature using the account `key_secret`,
  * then mark the payment as paid and run all business-side transitions
  * (user status, registration status, membership dates, etc.).
+ *
+ * If the browser closes before this call, the Razorpay webhook still confirms
+ * the payment via `POST /api/webhooks/razorpay`.
  */
 export async function verify(req: Request, res: Response, next: NextFunction) {
   try {
