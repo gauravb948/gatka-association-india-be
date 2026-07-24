@@ -6,6 +6,18 @@ export function findByEmail(email: string) {
   return prisma.user.findUnique({ where: { email } });
 }
 
+/** Primary national admin for public national-domain resolution (prefers super-national). */
+export function findPrimaryNationalAdmin() {
+  return prisma.user.findFirst({
+    where: {
+      role: "NATIONAL_ADMIN",
+      isActive: true,
+    },
+    orderBy: [{ isSuperNational: "desc" }, { createdAt: "asc" }],
+    select: { id: true, email: true, isSuperNational: true },
+  });
+}
+
 export function findFirstByEmailOrPhone(phoneOrEmail: string) {
   return prisma.user.findFirst({
     where: { OR: [{ email: phoneOrEmail }, { phone: phoneOrEmail }] },

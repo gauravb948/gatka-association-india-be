@@ -4,9 +4,9 @@ import * as aboutUsController from "../controllers/aboutUs.controller.js";
 
 export const aboutUsRouter = Router();
 
+aboutUsRouter.get("/public/national", aboutUsController.listPublicNational);
 aboutUsRouter.get("/public/by-state/:stateId", aboutUsController.listPublicByPathState);
 aboutUsRouter.get("/public", aboutUsController.listPublic);
-/** Public: same as `/public/by-state/:stateId` without the `public` prefix. */
 aboutUsRouter.get("/by-state/:stateId", aboutUsController.listPublicByPathState);
 
 aboutUsRouter.get(

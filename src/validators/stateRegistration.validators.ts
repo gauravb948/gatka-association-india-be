@@ -1,16 +1,34 @@
 import { z } from "zod";
 import { EntityStatus } from "@prisma/client";
 
+const optionalDocUrl = z.string().url().nullable().optional();
+
 export const stateRegistrationCreateSchema = z.object({
   stateId: z.string().min(1),
   firstName: z.string().min(1).max(80),
   lastName: z.string().min(1).max(80),
-  email: z.string().email(),
-  password: z.string().min(8).max(128),
-  mobileNo: z.string().min(10).max(15),
-  verificationToken: z.string().min(1),
+  /** User resident address */
   address: z.string().min(1),
-  passportPhotoUrl: z.string().url().nullable().optional(),
+  /** User contact number */
+  mobileNo: z.string().min(10).max(15),
+  associationName: z.string().min(1).max(200),
+  associationOfficeAddress: z.string().min(1),
+  /** Association email id (login email for the linked User) */
+  email: z.string().email(),
+  associationOfficialContactNumber: z.string().min(10).max(15),
+  associationRegisterNumber: z.string().min(1).max(80),
+  password: z.string().min(8).max(128),
+  verificationToken: z.string().min(1),
+  /** User passport-size photo (re-uploadable on renewal) */
+  passportPhotoUrl: optionalDocUrl,
+  /** User address proof (re-uploadable on renewal) */
+  addressProofUrl: optionalDocUrl,
+  /** Association certificate (re-uploadable on renewal) */
+  associationCertificateUrl: optionalDocUrl,
+  /** Association office address proof (re-uploadable on renewal) */
+  associationOfficeAddressProofUrl: optionalDocUrl,
+  /** Association declaration (re-uploadable on renewal) */
+  associationDeclarationUrl: optionalDocUrl,
 });
 
 export const stateRegistrationStatusSchema = z.object({

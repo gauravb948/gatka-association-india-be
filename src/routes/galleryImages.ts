@@ -4,6 +4,7 @@ import * as ctrl from "../controllers/galleryImages.controller.js";
 
 export const galleryImagesRouter = Router();
 
+galleryImagesRouter.get("/public/national", ctrl.listPublicNational);
 galleryImagesRouter.get("/public/by-state/:stateId", ctrl.listPublicByState);
 galleryImagesRouter.get(
   "/",

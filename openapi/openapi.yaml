@@ -5,7 +5,7 @@ info:
   description: |
     REST API for centralized Gatka management (roles, geography, registrations, Razorpay, competitions, camps, attendance, results, notices, migration).
 
-    **Banners:** carousel rows scoped by **state**. Public carousel **requires a state filter**: `GET /banners/public?stateId=…` or `GET /banners/public/by-state/{stateId}`. Rows have `imageUrl`, optional `title` / `subtitle`, `sortOrder`. National/state admins use `/banners/admin` (`stateId` query optional for nationals).
+    **Banners / CMS:** carousel and other site CMS (messages, about-us, gallery) are scoped by **state** or **national** (`stateId` null). Public: `GET /banners/public?stateId=…`, `/banners/public/by-state/{stateId}` (use `national` for federation site), or `/banners/public/national`. National admin creates national CMS by omitting `stateId` (or sending `null` / `"national"`).
 
     **Uploads:** Cloudflare R2 — `POST /uploads/r2/upload` (multipart) and `POST /uploads/r2/presign-put` (JSON) are **public** (no JWT); protected by **rate limits**. Store returned `publicUrl` on entities (e.g. banners, registration photos).
 
@@ -138,8 +138,12 @@ components:
           type: string
         stateId:
           type: string
+          nullable: true
+          description: Null for national federation site CMS
         state:
-          $ref: "#/components/schemas/BannerStateSummary"
+          allOf:
+            - $ref: "#/components/schemas/BannerStateSummary"
+          nullable: true
         imageUrl:
           type: string
         title:
@@ -160,11 +164,14 @@ components:
           format: date-time
     BannerCreate:
       type: object
-      required: [stateId, imageUrl]
+      required: [imageUrl]
       properties:
         stateId:
           type: string
-          description: State this carousel row belongs to. National admin may choose any state; state admin must send their own state's id.
+          nullable: true
+          description: >
+            State id for state CMS. Omit / null / `national` for national site (national admin only).
+            State admin must use their own state id (or omit to default to it).
         imageUrl:
           type: string
         title:
@@ -182,7 +189,8 @@ components:
       properties:
         stateId:
           type: string
-          description: Move banner to another state
+          nullable: true
+          description: Move banner to another state, or null/`national` for national site
         imageUrl:
           type: string
         title:
@@ -814,7 +822,15 @@ components:
             lastName: { type: string, minLength: 1, maxLength: 80 }
             mobileNo: { type: string, minLength: 10, maxLength: 15 }
             address: { type: string, minLength: 1 }
+            associationName: { type: string, minLength: 1, maxLength: 200 }
+            associationOfficeAddress: { type: string, minLength: 1 }
+            associationOfficialContactNumber: { type: string, minLength: 10, maxLength: 15 }
+            associationRegisterNumber: { type: string, minLength: 1, maxLength: 80 }
             passportPhotoUrl: { type: string, format: uri, nullable: true }
+            addressProofUrl: { type: string, format: uri, nullable: true }
+            associationCertificateUrl: { type: string, format: uri, nullable: true }
+            associationOfficeAddressProofUrl: { type: string, format: uri, nullable: true }
+            associationDeclarationUrl: { type: string, format: uri, nullable: true }
         districtRegistration:
           type: object
           additionalProperties: false
@@ -2197,16 +2213,19 @@ components:
       properties:
         id: { type: string }
         imageUrl: { type: string }
-        stateId: { type: string }
+        stateId: { type: string, nullable: true, description: Null for national CMS }
         caption: { type: string, nullable: true }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     GalleryImageCreate:
       type: object
-      required: [imageUrl, stateId]
+      required: [imageUrl]
       properties:
         imageUrl: { type: string, format: uri }
-        stateId: { type: string }
+        stateId:
+          type: string
+          nullable: true
+          description: Omit / null / `national` for national site (national admin only)
         caption: { type: string, nullable: true }
     Message:
       type: object
@@ -2216,18 +2235,21 @@ components:
         name: { type: string }
         message: { type: string }
         designation: { type: string, nullable: true }
-        stateId: { type: string }
+        stateId: { type: string, nullable: true, description: Null for national CMS }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     MessageCreate:
       type: object
-      required: [name, message, stateId]
+      required: [name, message]
       properties:
         imageUrl: { type: string, format: uri, nullable: true }
         name: { type: string }
         message: { type: string }
         designation: { type: string, nullable: true }
-        stateId: { type: string }
+        stateId:
+          type: string
+          nullable: true
+          description: Omit / null / `national` for national site (national admin only)
     MessagePatch:
       type: object
       properties:
@@ -2235,11 +2257,12 @@ components:
         name: { type: string }
         message: { type: string }
         designation: { type: string, nullable: true }
+        stateId: { type: string, nullable: true }
     AboutUs:
       type: object
       properties:
         id: { type: string }
-        stateId: { type: string }
+        stateId: { type: string, nullable: true, description: Null for national CMS }
         logoUrl: { type: string, format: uri }
         stateTitle: { type: string }
         stateTitleNative: { type: string, nullable: true }
@@ -2260,9 +2283,12 @@ components:
             code: { type: string }
     AboutUsCreate:
       type: object
-      required: [stateId, logoUrl, stateTitle]
+      required: [logoUrl, stateTitle]
       properties:
-        stateId: { type: string }
+        stateId:
+          type: string
+          nullable: true
+          description: Omit / null / `national` for national site (national admin only)
         logoUrl: { type: string, format: uri }
         stateTitle: { type: string }
         stateTitleNative: { type: string, nullable: true }
@@ -2275,7 +2301,7 @@ components:
     AboutUsPatch:
       type: object
       properties:
-        stateId: { type: string }
+        stateId: { type: string, nullable: true }
         logoUrl: { type: string, format: uri }
         stateTitle: { type: string }
         stateTitleNative: { type: string, nullable: true }
@@ -2287,11 +2313,27 @@ components:
         address: { type: string, nullable: true }
     StateDomain:
       type: object
-      required: [stateId, stateName, domainName]
+      required: [scope, domainName]
       properties:
-        stateId: { type: string }
-        stateName: { type: string }
+        scope:
+          type: string
+          enum: [STATE, NATIONAL]
+          description: >
+            `STATE` when the hostname maps to a state body; `NATIONAL` for the national
+            federation domain (`gatkafederationindia.com` by default, overridable via `NATIONAL_DOMAIN`).
+        stateId:
+          type: string
+          nullable: true
+          description: Present for `STATE` scope; null for `NATIONAL`.
+        stateName:
+          type: string
+          nullable: true
+          description: Present for `STATE` scope; null for `NATIONAL`.
         domainName: { type: string }
+        nationalAdminId:
+          type: string
+          nullable: true
+          description: Present for `NATIONAL` scope (primary national admin user id); null for `STATE`.
     StateDomainPatch:
       type: object
       required: [domainName]
@@ -2319,19 +2361,63 @@ components:
     StateRegistrationCreate:
       type: object
       required:
-        [stateId, firstName, lastName, email, password, mobileNo, verificationToken, address]
+        [
+          stateId,
+          firstName,
+          lastName,
+          address,
+          mobileNo,
+          associationName,
+          associationOfficeAddress,
+          email,
+          associationOfficialContactNumber,
+          associationRegisterNumber,
+          password,
+          verificationToken,
+        ]
       properties:
         stateId: { type: string }
         firstName: { type: string }
         lastName: { type: string }
-        email: { type: string, format: email }
+        address: { type: string, description: "User resident address" }
+        mobileNo: { type: string, description: "User contact number" }
+        associationName: { type: string }
+        associationOfficeAddress: { type: string }
+        email:
+          type: string
+          format: email
+          description: Association email id (also used as the linked User login email)
+        associationOfficialContactNumber: { type: string }
+        associationRegisterNumber: { type: string }
         password: { type: string, format: password, minLength: 8 }
-        mobileNo: { type: string }
         verificationToken:
           type: string
           description: Token returned by `POST /auth/otp/verify` for `REGISTRATION`.
-        address: { type: string }
-        passportPhotoUrl: { type: string, format: uri, nullable: true }
+        passportPhotoUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: User passport-size photo URL (re-uploadable on renewal)
+        addressProofUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: User address proof URL (re-uploadable on renewal)
+        associationCertificateUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: Association certificate URL (re-uploadable on renewal)
+        associationOfficeAddressProofUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: Association office address proof URL (re-uploadable on renewal)
+        associationDeclarationUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: Association declaration URL (re-uploadable on renewal)
     DistrictRegistrationCreate:
       type: object
       required:
@@ -2368,10 +2454,21 @@ components:
         userId: { type: string, nullable: true }
         firstName: { type: string }
         lastName: { type: string }
-        email: { type: string, format: email }
-        mobileNo: { type: string }
-        address: { type: string }
+        address: { type: string, description: "User resident address" }
+        mobileNo: { type: string, description: "User contact number" }
+        email:
+          type: string
+          format: email
+          description: Association email id (also used as the linked User login email)
+        associationName: { type: string, nullable: true }
+        associationOfficeAddress: { type: string, nullable: true }
+        associationOfficialContactNumber: { type: string, nullable: true }
+        associationRegisterNumber: { type: string, nullable: true }
         passportPhotoUrl: { type: string, nullable: true }
+        addressProofUrl: { type: string, nullable: true }
+        associationCertificateUrl: { type: string, nullable: true }
+        associationOfficeAddressProofUrl: { type: string, nullable: true }
+        associationDeclarationUrl: { type: string, nullable: true }
         status: { $ref: "#/components/schemas/EntityStatus" }
         statusReason: { type: string, nullable: true }
         paymentId: { type: string, nullable: true }
@@ -4751,17 +4848,20 @@ paths:
           description: Forbidden (role not allowed or hierarchy context missing)
   /domains/public/by-domain-name:
     get:
-      summary: Resolve state by domain hostname (public)
+      summary: Resolve state or national admin by domain hostname (public)
       description: >
-        Looks up the configured state for a web domain. Accepts hostname only (example
-        `pb.dummy.gatka.in`); optional `http://` / `https://` prefix and trailing slashes are
-        stripped. Comparison is case-insensitive.
+        Looks up the configured state for a web domain, or the national federation site.
+        Accepts hostname only (example `pb.dummy.gatka.in` or `gatkafederationindia.com`);
+        optional `http://` / `https://` prefix and trailing slashes are stripped.
+        Comparison is case-insensitive; a leading `www.` is ignored for the national domain.
+        National domain defaults to `gatkafederationindia.com` (`NATIONAL_DOMAIN` env override)
+        and returns `scope: NATIONAL` with `nationalAdminId` (primary `NATIONAL_ADMIN` user id).
       parameters:
         - in: query
           name: domainName
           required: true
           schema: { type: string }
-          description: Domain hostname (example `pb.dummy.gatka.in`).
+          description: Domain hostname (example `pb.dummy.gatka.in` or `gatkafederationindia.com`).
       responses:
         "200":
           description: OK
@@ -4772,7 +4872,7 @@ paths:
         "400":
           description: Invalid domainName
         "404":
-          description: No state configured for this domain
+          description: No state configured for this domain, or no national admin found
   /domains:
     get:
       security: [{ bearerAuth: [] }]
@@ -4950,16 +5050,30 @@ paths:
     get:
       security: [{ bearerAuth: [] }]
       summary: Expired memberships
+  /banners/public/national:
+    get:
+      summary: List active national-site banners (public)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Banner"
   /banners/public/by-state/{stateId}:
     get:
-      summary: List active banners for a state (public — state in URL path)
-      description: Equivalent to GET `/banners/public?stateId={stateId}`; returns only banners for that state.
+      summary: List active banners for a state or national (public — state in URL path)
+      description: >
+        Equivalent to GET `/banners/public?stateId={stateId}`. Pass a real state id, or the
+        literal `national` for federation-site banners.
       parameters:
         - name: stateId
           in: path
           required: true
           schema: { type: string }
-          description: State primary key (`State.id`), same value as query `stateId` on `/banners/public`
+          description: State id, or `national`
       responses:
         "200":
           description: OK
@@ -4969,20 +5083,20 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Banner"
-        "400":
-          description: Empty state id in path
         "404":
           description: State id not found
   /banners/public:
     get:
-      summary: List active banners for a state (public — query filter)
-      description: Requires `stateId` query; only active banners for that state are returned. Alternatively use `/banners/public/by-state/{stateId}`.
+      summary: List active banners (public — query filter)
+      description: >
+        Omit `stateId` (or pass `national`) for national-site banners; otherwise pass a state id.
+        Alternatively use `/banners/public/national` or `/banners/public/by-state/{stateId}`.
       parameters:
         - name: stateId
           in: query
-          required: true
-          schema: { type: string }
-          description: Which state's carousel to return
+          required: false
+          schema: { type: string, nullable: true }
+          description: State id, or omit/`national` for national CMS
       responses:
         "200":
           description: OK
@@ -4992,8 +5106,6 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Banner"
-        "400":
-          description: Missing or invalid stateId query
         "404":
           description: State id not found
   /banners/admin:
@@ -5001,15 +5113,14 @@ paths:
       security: [{ bearerAuth: [] }]
       summary: List banners for admin (national or state admin)
       description: >
-        National admin may omit `stateId` to list every banner, or set `stateId` to filter.
-        State admin always sees banners for their assigned state only; if `stateId` is sent,
-        it must match that state or the request returns 403.
+        National admin: omit `stateId` (or pass `national`) to list national-site banners only;
+        pass a state id to list that state's banners. State admin always sees their state only.
       parameters:
         - name: stateId
           in: query
           required: false
-          schema: { type: string }
-          description: Filter by state (national admin); state admin must omit or send their state id.
+          schema: { type: string, nullable: true }
+          description: Omit/`national` for national CMS only; state id for that state's banners (national admin)
       responses:
         "200":
           description: OK
@@ -5392,14 +5503,26 @@ paths:
             schema: { $ref: "#/components/schemas/TrainingCenterStatusChangeRequest" }
       responses:
         "200": { description: Updated }
+  /gallery/public/national:
+    get:
+      summary: List national-site gallery images (public)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/GalleryImage" }
   /gallery/public/by-state/{stateId}:
     get:
-      summary: List gallery images for state (public)
+      summary: List gallery images for state or national (public)
       parameters:
         - in: path
           name: stateId
           required: true
           schema: { type: string }
+          description: State id, or `national`
       responses:
         "200":
           description: OK
@@ -5411,7 +5534,13 @@ paths:
   /gallery:
     get:
       security: [{ bearerAuth: [] }]
-      summary: List all gallery images (national/state admin)
+      summary: List gallery images (national/state admin)
+      parameters:
+        - in: query
+          name: stateId
+          required: false
+          schema: { type: string, nullable: true }
+          description: Omit/`national` for national CMS only; state id for that state's banners (national admin)
       responses:
         "200":
           description: OK
@@ -5423,6 +5552,7 @@ paths:
     post:
       security: [{ bearerAuth: [] }]
       summary: Add gallery image (national/state admin)
+      description: National admin omits `stateId` (or sends null/`national`) for national-site images.
       requestBody:
         required: true
         content:
@@ -5445,14 +5575,26 @@ paths:
           schema: { type: string }
       responses:
         "204": { description: Deleted }
+  /messages/public/national:
+    get:
+      summary: List national-site messages (public)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Message" }
   /messages/public/by-state/{stateId}:
     get:
-      summary: List messages for state (public)
+      summary: List messages for state or national (public)
       parameters:
         - in: path
           name: stateId
           required: true
           schema: { type: string }
+          description: State id, or `national`
       responses:
         "200":
           description: OK
@@ -5464,16 +5606,17 @@ paths:
   /messages:
     get:
       security: [{ bearerAuth: [] }]
-      summary: List all messages (national/state admin)
+      summary: List messages (national/state admin)
       parameters:
         - in: query
           name: stateId
           required: false
           schema:
             type: string
+            nullable: true
           description: >
-            Filter by state id. National admins may omit this to list every state's messages or set it to filter.
-            State admins are always limited to their assigned state; if provided it must equal that state id.
+            Omit or pass `national` for national CMS only; pass a state id for that state.
+            State admins are always limited to their assigned state.
       responses:
         "200":
           description: OK
@@ -5485,6 +5628,7 @@ paths:
     post:
       security: [{ bearerAuth: [] }]
       summary: Create message (national/state admin)
+      description: National admin omits `stateId` (or sends null/`national`) for national-site messages.
       requestBody:
         required: true
         content:
@@ -5540,16 +5684,28 @@ paths:
           schema: { type: string }
       responses:
         "204": { description: Deleted }
+  /about-us/public/national:
+    get:
+      summary: Get national-site about-us (public)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AboutUs" }
+        "404":
+          description: No national about-us configured
   /about-us/public:
     get:
-      summary: Get about-us for a state (public)
+      summary: Get about-us for a state or national (public)
       parameters:
         - in: query
           name: stateId
-          required: true
+          required: false
           schema:
             type: string
-          description: State id
+            nullable: true
+          description: State id, or omit/`national` for national CMS
       responses:
         "200":
           description: OK
@@ -5560,12 +5716,13 @@ paths:
           description: "State not found or no about-us configured"
   /about-us/public/by-state/{stateId}:
     get:
-      summary: Get about-us for a state by path (same as query variant)
+      summary: Get about-us by path (state id or `national`)
       parameters:
         - in: path
           name: stateId
           required: true
           schema: { type: string }
+          description: State id, or `national`
       responses:
         "200":
           description: OK
@@ -5576,8 +5733,8 @@ paths:
           description: "State not found or no about-us configured"
   /about-us/by-state/{stateId}:
     get:
-      summary: Get about-us for a state by state id (public)
-      description: Same response as `GET /about-us/public/by-state/{stateId}`; preferred short path.
+      summary: Get about-us by state id (public)
+      description: Same response as `GET /about-us/public/by-state/{stateId}`; preferred short path. Supports `national`.
       parameters:
         - in: path
           name: stateId
@@ -5601,9 +5758,10 @@ paths:
           required: false
           schema:
             type: string
+            nullable: true
           description: >
-            Filter by state id. National admins may omit this to list all states' entries or set it to filter.
-            State admins are always limited to their assigned state; if provided it must equal that state id.
+            Omit or pass `national` for national CMS only; pass a state id for that state.
+            State admins are always limited to their assigned state.
       responses:
         "200":
           description: OK

@@ -16,7 +16,20 @@ export function findByStateId(stateId: string) {
   });
 }
 
-export function findAnotherByStateId(stateId: string, excludeId: string) {
+/** National about-us row (`stateId` IS NULL). */
+export function findNational() {
+  return prisma.aboutUs.findFirst({
+    where: { stateId: null },
+    ...aboutUsIncludeState,
+  });
+}
+
+export function findByCmsStateId(stateId: string | null) {
+  if (stateId === null) return findNational();
+  return findByStateId(stateId);
+}
+
+export function findAnotherByStateId(stateId: string | null, excludeId: string) {
   return prisma.aboutUs.findFirst({
     where: { stateId, NOT: { id: excludeId } },
   });
@@ -37,14 +50,14 @@ export function findById(id: string) {
   });
 }
 
-export function createAboutUs(data: Prisma.AboutUsCreateInput) {
+export function createAboutUs(data: Prisma.AboutUsUncheckedCreateInput) {
   return prisma.aboutUs.create({
     data,
     ...aboutUsIncludeState,
   });
 }
 
-export function updateAboutUs(id: string, data: Prisma.AboutUsUpdateInput) {
+export function updateAboutUs(id: string, data: Prisma.AboutUsUncheckedUpdateInput) {
   return prisma.aboutUs.update({
     where: { id },
     data,

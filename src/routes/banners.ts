@@ -4,11 +4,10 @@ import * as bannersController from "../controllers/banners.controller.js";
 
 export const bannersRouter = Router();
 
-// Public (always filtered by one state via query or path)
+bannersRouter.get("/public/national", bannersController.listPublicNational);
 bannersRouter.get("/public/by-state/:stateId", bannersController.listPublicByPathState);
 bannersRouter.get("/public", bannersController.listPublic);
 
-// Admin
 bannersRouter.get(
   "/admin",
   requireAuth,
@@ -39,4 +38,3 @@ bannersRouter.delete(
   requireRoles("NATIONAL_ADMIN", "STATE_ADMIN"),
   bannersController.remove
 );
-

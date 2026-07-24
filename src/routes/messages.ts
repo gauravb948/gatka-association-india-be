@@ -4,6 +4,7 @@ import * as ctrl from "../controllers/messages.controller.js";
 
 export const messagesRouter = Router();
 
+messagesRouter.get("/public/national", ctrl.listPublicNational);
 messagesRouter.get("/public/by-state/:stateId", ctrl.listPublicByState);
 messagesRouter.get(
   "/",
@@ -11,7 +12,12 @@ messagesRouter.get(
   requireRoles("NATIONAL_ADMIN", "STATE_ADMIN"),
   ctrl.listAll
 );
-messagesRouter.get("/:id", requireAuth, ctrl.getById);
+messagesRouter.get(
+  "/:id",
+  requireAuth,
+  requireRoles("NATIONAL_ADMIN", "STATE_ADMIN"),
+  ctrl.getById
+);
 messagesRouter.post(
   "/",
   requireAuth,

@@ -1,12 +1,9 @@
 import { z } from "zod";
+import { cmsStateIdInput, optionalNullableCmsStateId } from "../lib/cmsScope.js";
 
-/** Admin list — national: optional filter; state admins always scoped to their state (`stateId` query must equal theirs when provided). */
+/** Admin list — national: omit/`national` = national rows only; state admins scoped to their state. */
 export const messageAdminListQuerySchema = z.object({
-  stateId: z.preprocess(
-    (v) =>
-      v === "" || v === undefined || v === null ? undefined : String(v).trim(),
-    z.string().min(1).optional()
-  ),
+  stateId: optionalNullableCmsStateId,
 });
 
 export type MessageAdminListQuery = z.infer<typeof messageAdminListQuerySchema>;
@@ -16,7 +13,8 @@ export const messageCreateSchema = z.object({
   name: z.string().min(1),
   message: z.string().min(1),
   designation: z.string().optional(),
-  stateId: z.string().min(1),
+  /** Omit or null for national CMS (national admin only). */
+  stateId: optionalNullableCmsStateId,
 });
 
 export const messagePatchSchema = z.object({
@@ -24,4 +22,9 @@ export const messagePatchSchema = z.object({
   name: z.string().min(1).optional(),
   message: z.string().min(1).optional(),
   designation: z.string().nullable().optional(),
+  stateId: optionalNullableCmsStateId,
+});
+
+export const messagePublicPathStateSchema = z.object({
+  stateId: cmsStateIdInput,
 });

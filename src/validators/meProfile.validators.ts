@@ -94,7 +94,15 @@ export const stateRegistrationSelfSchema = z
     lastName: z.string().min(1).max(80).optional(),
     mobileNo: z.string().min(10).max(15).optional(),
     address: z.string().min(1).optional(),
+    associationName: z.string().min(1).max(200).optional(),
+    associationOfficeAddress: z.string().min(1).optional(),
+    associationOfficialContactNumber: z.string().min(10).max(15).optional(),
+    associationRegisterNumber: z.string().min(1).max(80).optional(),
     passportPhotoUrl: z.string().url().nullable().optional(),
+    addressProofUrl: z.string().url().nullable().optional(),
+    associationCertificateUrl: z.string().url().nullable().optional(),
+    associationOfficeAddressProofUrl: z.string().url().nullable().optional(),
+    associationDeclarationUrl: z.string().url().nullable().optional(),
   })
   .strict();
 

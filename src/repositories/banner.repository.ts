@@ -9,7 +9,7 @@ const bannerIncludeState = {
   include: { state: stateSummarySelect },
 } as const;
 
-export function findManyPublicActive(stateId: string) {
+export function findManyPublicActive(stateId: string | null) {
   return prisma.banner.findMany({
     where: { isActive: true, stateId },
     ...bannerIncludeState,
@@ -32,14 +32,14 @@ export function findById(id: string) {
   });
 }
 
-export function createBanner(data: Prisma.BannerCreateInput) {
+export function createBanner(data: Prisma.BannerUncheckedCreateInput) {
   return prisma.banner.create({
     data,
     ...bannerIncludeState,
   });
 }
 
-export function updateBanner(id: string, data: Prisma.BannerUpdateInput) {
+export function updateBanner(id: string, data: Prisma.BannerUncheckedUpdateInput) {
   return prisma.banner.update({
     where: { id },
     data,

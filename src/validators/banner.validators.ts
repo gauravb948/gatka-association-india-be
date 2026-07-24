@@ -1,25 +1,26 @@
 import { z } from "zod";
+import { cmsStateIdInput, optionalNullableCmsStateId } from "../lib/cmsScope.js";
 
-/** Public carousel: filter by state's id (required query on GET `/banners/public`; path variant `/banners/public/by-state/:stateId` uses the same id). */
+/**
+ * Public carousel filter.
+ * Omit / empty / `national` → national site banners; otherwise a state id.
+ */
 export const bannerPublicQuerySchema = z.object({
-  stateId: z.string().trim().min(1, "stateId is required"),
+  stateId: optionalNullableCmsStateId,
 });
 
 export type BannerPublicQuery = z.infer<typeof bannerPublicQuerySchema>;
 
-/** Admin list — national: optional filter; state admins only see their state (`stateId` query must equal theirs when provided). */
+/** Admin list — national: omit/`national` = national rows only; state admins scoped to their state. */
 export const bannerAdminListQuerySchema = z.object({
-  stateId: z.preprocess(
-    (v) =>
-      v === "" || v === undefined || v === null ? undefined : String(v).trim(),
-    z.string().min(1).optional()
-  ),
+  stateId: optionalNullableCmsStateId,
 });
 
 export type BannerAdminListQuery = z.infer<typeof bannerAdminListQuerySchema>;
 
 export const bannerCreateBodySchema = z.object({
-  stateId: z.string().trim().min(1),
+  /** Omit or null for national CMS (national admin only). */
+  stateId: optionalNullableCmsStateId,
   imageUrl: z.string().min(1),
   title: z.string().min(1).max(120).optional().nullable(),
   subtitle: z.string().min(1).max(220).optional().nullable(),
@@ -28,10 +29,15 @@ export const bannerCreateBodySchema = z.object({
 });
 
 export const bannerPatchBodySchema = z.object({
-  stateId: z.string().trim().min(1).optional(),
+  stateId: optionalNullableCmsStateId,
   imageUrl: z.string().min(1).optional(),
   title: z.string().min(1).max(120).optional().nullable(),
   subtitle: z.string().min(1).max(220).optional().nullable(),
   isActive: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
+});
+
+/** Path param `:stateId` — allow literal `national`. */
+export const bannerPublicPathStateSchema = z.object({
+  stateId: cmsStateIdInput,
 });

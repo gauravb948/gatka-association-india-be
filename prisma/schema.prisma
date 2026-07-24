@@ -931,10 +931,11 @@ model SmsOutbox {
   @@index([status])
 }
 
+/// Carousel banners. `stateId` null = national federation site CMS.
 model Banner {
   id        String   @id @default(cuid())
-  stateId   String
-  state     State    @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  stateId   String?
+  state     State?   @relation(fields: [stateId], references: [id], onDelete: Cascade)
   imageUrl  String
   title     String?
   subtitle  String?
@@ -948,11 +949,11 @@ model Banner {
   @@index([sortOrder])
 }
 
-/// Single "About us" profile per state (contact + social + branding).
+/// Single "About us" profile per state, or one national row when `stateId` is null.
 model AboutUs {
   id               String   @id @default(cuid())
-  stateId          String   @unique
-  state            State    @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  stateId          String?  @unique
+  state            State?   @relation(fields: [stateId], references: [id], onDelete: Cascade)
   logoUrl          String
   stateTitle       String
   stateTitleNative String?
@@ -997,23 +998,34 @@ model PagesContent {
 }
 
 model StateRegistration {
-  id                 String       @id @default(cuid())
-  stateId            String       @unique
-  state              State        @relation(fields: [stateId], references: [id], onDelete: Cascade)
-  userId             String?      @unique
-  user               User?        @relation("StateRegistrationApplicant", fields: [userId], references: [id], onDelete: SetNull)
-  firstName          String
-  lastName           String
-  email              String
-  mobileNo           String
-  address            String
-  passportPhotoUrl   String?
-  status             EntityStatus @default(PENDING)
-  statusReason       String?
-  paymentId          String?
-  payment            Payment?     @relation(fields: [paymentId], references: [id])
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
+  id                                  String       @id @default(cuid())
+  stateId                             String       @unique
+  state                               State        @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  userId                              String?      @unique
+  user                                User?        @relation("StateRegistrationApplicant", fields: [userId], references: [id], onDelete: SetNull)
+  firstName                           String
+  lastName                            String
+  /// User resident address
+  address                             String
+  /// User contact number
+  mobileNo                            String
+  /// Association email id (also used as the linked User login email)
+  email                               String
+  associationName                     String?
+  associationOfficeAddress            String?
+  associationOfficialContactNumber    String?
+  associationRegisterNumber           String?
+  passportPhotoUrl                    String?
+  addressProofUrl                     String?
+  associationCertificateUrl           String?
+  associationOfficeAddressProofUrl    String?
+  associationDeclarationUrl           String?
+  status                              EntityStatus @default(PENDING)
+  statusReason                        String?
+  paymentId                           String?
+  payment                             Payment?     @relation(fields: [paymentId], references: [id])
+  createdAt                           DateTime     @default(now())
+  updatedAt                           DateTime     @updatedAt
 
   @@index([status])
   @@index([email])
@@ -1045,11 +1057,12 @@ model DistrictRegistration {
   @@index([email])
 }
 
+/// Gallery images. `stateId` null = national federation site CMS.
 model GalleryImage {
   id        String   @id @default(cuid())
   imageUrl  String
-  stateId   String
-  state     State    @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  stateId   String?
+  state     State?   @relation(fields: [stateId], references: [id], onDelete: Cascade)
   caption   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1057,14 +1070,15 @@ model GalleryImage {
   @@index([stateId])
 }
 
+/// Leadership / site messages. `stateId` null = national federation site CMS.
 model Message {
   id          String   @id @default(cuid())
   imageUrl    String?
   name        String
   message     String
   designation String?
-  stateId     String
-  state       State    @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  stateId     String?
+  state       State?   @relation(fields: [stateId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
