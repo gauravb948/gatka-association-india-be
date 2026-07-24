@@ -9,37 +9,16 @@ aboutUsRouter.get("/public/by-state/:stateId", aboutUsController.listPublicByPat
 aboutUsRouter.get("/public", aboutUsController.listPublic);
 aboutUsRouter.get("/by-state/:stateId", aboutUsController.listPublicByPathState);
 
-aboutUsRouter.get(
-  "/admin",
-  requireAuth,
-  requireRoles("NATIONAL_ADMIN", "STATE_ADMIN"),
-  aboutUsController.listAdmin
-);
+const adminOnly = [requireAuth, requireRoles("NATIONAL_ADMIN", "STATE_ADMIN")] as const;
 
-aboutUsRouter.get(
-  "/:id",
-  requireAuth,
-  requireRoles("NATIONAL_ADMIN", "STATE_ADMIN"),
-  aboutUsController.getById
-);
+/** Current admin's about-us only (national row for national admin). */
+aboutUsRouter.get("/", ...adminOnly, aboutUsController.getMine);
+/** Alias kept for older clients. */
+aboutUsRouter.get("/admin", ...adminOnly, aboutUsController.getMine);
 
-aboutUsRouter.post(
-  "/",
-  requireAuth,
-  requireRoles("NATIONAL_ADMIN", "STATE_ADMIN"),
-  aboutUsController.create
-);
+aboutUsRouter.post("/", ...adminOnly, aboutUsController.create);
+aboutUsRouter.patch("/", ...adminOnly, aboutUsController.patchMine);
 
-aboutUsRouter.patch(
-  "/:id",
-  requireAuth,
-  requireRoles("NATIONAL_ADMIN", "STATE_ADMIN"),
-  aboutUsController.patch
-);
-
-aboutUsRouter.delete(
-  "/:id",
-  requireAuth,
-  requireRoles("NATIONAL_ADMIN", "STATE_ADMIN"),
-  aboutUsController.remove
-);
+aboutUsRouter.get("/:id", ...adminOnly, aboutUsController.getById);
+aboutUsRouter.patch("/:id", ...adminOnly, aboutUsController.patch);
+aboutUsRouter.delete("/:id", ...adminOnly, aboutUsController.remove);

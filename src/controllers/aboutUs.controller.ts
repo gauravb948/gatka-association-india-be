@@ -5,16 +5,28 @@ import { AppError } from "../lib/errors.js";
 import {
   assertCmsRowInScope,
   assertStateExistsIfPresent,
-  resolveCmsAdminStateFilter,
-  resolveCmsWriteStateId,
+  effectiveStateAdminStateId,
 } from "../lib/cmsScope.js";
+import type { DbUser } from "../types/user.js";
 import {
-  aboutUsAdminListQuerySchema,
   aboutUsCreateBodySchema,
   aboutUsPatchBodySchema,
   aboutUsPublicPathStateSchema,
   aboutUsPublicQuerySchema,
 } from "../validators/aboutUs.validators.js";
+
+/** Own CMS scope only: national admin → national (`null`); state admin → their state. */
+async function resolveOwnAboutUsStateId(actor: DbUser): Promise<string | null> {
+  if (actor.role === "NATIONAL_ADMIN") return null;
+  if (actor.role === "STATE_ADMIN") {
+    const sid = await effectiveStateAdminStateId(actor);
+    if (!sid) {
+      throw new AppError(403, "State admin has no assigned state", "FORBIDDEN_STATE");
+    }
+    return sid;
+  }
+  throw new AppError(403, "Forbidden", "FORBIDDEN_ROLE");
+}
 
 async function fetchPublicAboutUs(stateId: string | null) {
   await assertStateExistsIfPresent(stateId);
@@ -60,14 +72,20 @@ export async function listPublicByPathState(req: Request, res: Response, next: N
   }
 }
 
-export async function listAdmin(req: Request, res: Response, next: NextFunction) {
+/** `GET /about-us` — current admin's about-us only (national for national admin). */
+export async function getMine(req: Request, res: Response, next: NextFunction) {
   try {
     const actor = req.dbUser!;
-    const q = aboutUsAdminListQuerySchema.safeParse(req.query);
-    if (!q.success) throw q.error;
-    const filter = await resolveCmsAdminStateFilter(actor, q.data.stateId);
-    const rows = await aboutUsRepository.findManyForAdmin({ stateId: filter.stateId });
-    res.json(rows);
+    const stateId = await resolveOwnAboutUsStateId(actor);
+    const row = await aboutUsRepository.findByCmsStateId(stateId);
+    if (!row) {
+      throw new AppError(
+        404,
+        stateId === null ? "About us not found for national site" : "About us not found for your state",
+        "ABOUT_US_NOT_FOUND"
+      );
+    }
+    res.json(row);
   } catch (e) {
     next(e);
   }
@@ -85,24 +103,14 @@ export async function getById(req: Request, res: Response, next: NextFunction) {
   }
 }
 
+/** Create or update the current admin's about-us only. */
 export async function create(req: Request, res: Response, next: NextFunction) {
   try {
     const actor = req.dbUser!;
     const body = aboutUsCreateBodySchema.parse(req.body);
-    const stateId = await resolveCmsWriteStateId(actor, body.stateId);
+    const stateId = await resolveOwnAboutUsStateId(actor);
 
-    const existing = await aboutUsRepository.findByCmsStateId(stateId);
-    if (existing) {
-      throw new AppError(
-        409,
-        stateId === null
-          ? "About us already exists for the national site"
-          : "About us already exists for this state",
-        "CONFLICT"
-      );
-    }
-
-    const data: Prisma.AboutUsUncheckedCreateInput = {
+    const fields = {
       logoUrl: body.logoUrl,
       stateTitle: body.stateTitle,
       stateTitleNative: body.stateTitleNative ?? null,
@@ -115,7 +123,13 @@ export async function create(req: Request, res: Response, next: NextFunction) {
       stateId,
     };
 
-    const row = await aboutUsRepository.createAboutUs(data);
+    const existing = await aboutUsRepository.findByCmsStateId(stateId);
+    if (existing) {
+      const row = await aboutUsRepository.updateAboutUs(existing.id, fields);
+      return res.json(row);
+    }
+
+    const row = await aboutUsRepository.createAboutUs(fields);
     res.status(201).json(row);
   } catch (e) {
     next(e);
@@ -130,27 +144,30 @@ export async function patch(req: Request, res: Response, next: NextFunction) {
     if (!existing) throw new AppError(404, "About us not found");
     await assertCmsRowInScope(actor, existing.stateId);
 
-    let nextStateId: string | null | undefined = undefined;
-    if (body.stateId !== undefined) {
-      nextStateId = await resolveCmsWriteStateId(actor, body.stateId);
-      if (actor.role === "STATE_ADMIN" && nextStateId !== existing.stateId) {
-        throw new AppError(403, "Cannot move about-us to another state", "FORBIDDEN_STATE");
-      }
-      if (nextStateId !== existing.stateId) {
-        const clash = await aboutUsRepository.findAnotherByStateId(nextStateId, existing.id);
-        if (clash) {
-          throw new AppError(409, "About us already exists for that scope", "CONFLICT");
-        }
-      }
+    // Scope is fixed to the admin's own about-us; ignore any stateId in the body.
+    const { stateId: _sid, ...rest } = body;
+    const data: Prisma.AboutUsUncheckedUpdateInput = { ...rest };
+
+    const row = await aboutUsRepository.updateAboutUs(req.params.id, data);
+    res.json(row);
+  } catch (e) {
+    next(e);
+  }
+}
+
+/** Patch current admin's about-us without needing the row id. */
+export async function patchMine(req: Request, res: Response, next: NextFunction) {
+  try {
+    const actor = req.dbUser!;
+    const body = aboutUsPatchBodySchema.parse(req.body);
+    const stateId = await resolveOwnAboutUsStateId(actor);
+    const existing = await aboutUsRepository.findByCmsStateId(stateId);
+    if (!existing) {
+      throw new AppError(404, "About us not found", "ABOUT_US_NOT_FOUND");
     }
 
     const { stateId: _sid, ...rest } = body;
-    const data: Prisma.AboutUsUncheckedUpdateInput = {
-      ...rest,
-      ...(nextStateId !== undefined ? { stateId: nextStateId } : {}),
-    };
-
-    const row = await aboutUsRepository.updateAboutUs(req.params.id, data);
+    const row = await aboutUsRepository.updateAboutUs(existing.id, rest);
     res.json(row);
   } catch (e) {
     next(e);

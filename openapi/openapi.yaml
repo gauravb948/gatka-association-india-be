@@ -2285,12 +2285,8 @@ components:
       type: object
       required: [logoUrl, stateTitle]
       properties:
-        stateId:
-          type: string
-          nullable: true
-          description: Omit / null / `national` for national site (national admin only)
         logoUrl: { type: string, format: uri }
-        stateTitle: { type: string }
+        stateTitle: { type: string, description: Organization / association display title }
         stateTitleNative: { type: string, nullable: true }
         phoneNo: { type: string, nullable: true }
         email: { type: string, format: email, nullable: true }
@@ -2301,7 +2297,6 @@ components:
     AboutUsPatch:
       type: object
       properties:
-        stateId: { type: string, nullable: true }
         logoUrl: { type: string, format: uri }
         stateTitle: { type: string }
         stateTitleNative: { type: string, nullable: true }
@@ -5751,29 +5746,39 @@ paths:
   /about-us/admin:
     get:
       security: [{ bearerAuth: [] }]
-      summary: List about-us entries (national/state admin)
-      parameters:
-        - in: query
-          name: stateId
-          required: false
-          schema:
-            type: string
-            nullable: true
-          description: >
-            Omit or pass `national` for national CMS only; pass a state id for that state.
-            State admins are always limited to their assigned state.
+      summary: Get current admin about-us (alias of GET /about-us)
+      description: >
+        Returns the logged-in admin's about-us only. National admin gets the national row
+        (`stateId` null) if present; state admin gets their state's row. 404 if not configured.
       responses:
         "200":
           description: OK
           content:
             application/json:
-              schema:
-                type: array
-                items: { $ref: "#/components/schemas/AboutUs" }
+              schema: { $ref: "#/components/schemas/AboutUs" }
+        "404":
+          description: About-us not configured for this admin's scope
   /about-us:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Get current admin about-us
+      description: >
+        Returns the logged-in admin's about-us only. National admin gets the national row
+        if present; state admin gets their state's row. 404 if not configured.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AboutUs" }
+        "404":
+          description: About-us not configured for this admin's scope
     post:
       security: [{ bearerAuth: [] }]
-      summary: Create about-us for a state (one row per state; national/state admin)
+      summary: Create or update current admin about-us
+      description: >
+        Upserts the logged-in admin's about-us only (national for national admin, own state for
+        state admin). Scope cannot be changed via body. Updates existing row (200) or creates (201).
       requestBody:
         required: true
         content:
@@ -5785,8 +5790,28 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AboutUs" }
-        "409":
-          description: "About us already exists for this state"
+        "200":
+          description: Updated existing row for this admin's scope
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AboutUs" }
+    patch:
+      security: [{ bearerAuth: [] }]
+      summary: Update current admin about-us
+      description: Partial update of the logged-in admin's about-us (no id required).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AboutUsPatch" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AboutUs" }
+        "404":
+          description: About-us not configured yet (use POST to create)
   /about-us/{id}:
     get:
       security: [{ bearerAuth: [] }]
