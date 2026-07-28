@@ -1224,6 +1224,13 @@ components:
         isEnabled: { type: boolean }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        registration:
+          nullable: true
+          description: Present when a state-body registration exists (admin list).
+          type: object
+          properties:
+            id: { type: string }
+            status: { $ref: "#/components/schemas/EntityStatus" }
     StateCreate:
       type: object
       required: [name, code]
@@ -1348,6 +1355,13 @@ components:
         isEnabled: { type: boolean }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        registration:
+          nullable: true
+          description: Present when a district-body registration exists (admin list).
+          type: object
+          properties:
+            id: { type: string }
+            status: { $ref: "#/components/schemas/EntityStatus" }
     DistrictCreate:
       type: object
       required: [name]

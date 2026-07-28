@@ -1,4 +1,4 @@
-import type { State, Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { EntityStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 
@@ -78,9 +78,16 @@ export async function findManyAllPaginated(params: { skip: number; take: number 
   ]);
   const ids = idRows.map((r) => r.id);
   if (ids.length === 0) return [[], total] as const;
-  const rows = await prisma.state.findMany({ where: { id: { in: ids } } });
+  const rows = await prisma.state.findMany({
+    where: { id: { in: ids } },
+    include: {
+      registration: {
+        select: { id: true, status: true },
+      },
+    },
+  });
   const byId = new Map(rows.map((r) => [r.id, r]));
-  const items = ids.map((id) => byId.get(id)).filter(Boolean) as State[];
+  const items = ids.map((id) => byId.get(id)).filter(Boolean) as typeof rows;
   return [items, total] as const;
 }
 
