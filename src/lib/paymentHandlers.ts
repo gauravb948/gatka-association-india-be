@@ -103,6 +103,43 @@ async function allocateTrainingCenterRegistrationNumber(stateCode: string): Prom
   return nextRegNo(prefix, last?.registrationNumber);
 }
 
+/** Mark state/district registration SUBMITTED after payment (metadata or userId fallback). */
+async function ensureOrgRegistrationSubmitted(pay: {
+  id: string;
+  userId: string;
+  purpose: PaymentPurpose;
+  metadata: unknown;
+}) {
+  if (pay.purpose === PaymentPurpose.STATE_REGISTRATION) {
+    const meta = (pay.metadata as { stateRegistrationId?: string }) ?? {};
+    const reg = meta.stateRegistrationId
+      ? await stateRegistrationRepo.findById(meta.stateRegistrationId)
+      : await prisma.stateRegistration.findUnique({ where: { userId: pay.userId } });
+    if (reg && reg.status === EntityStatus.PENDING) {
+      await stateRegistrationRepo.update(reg.id, {
+        status: EntityStatus.SUBMITTED,
+        statusReason: "Payment completed; submitted for approval",
+        payment: { connect: { id: pay.id } },
+      });
+    }
+    return;
+  }
+
+  if (pay.purpose === PaymentPurpose.DISTRICT_REGISTRATION) {
+    const meta = (pay.metadata as { districtRegistrationId?: string }) ?? {};
+    const reg = meta.districtRegistrationId
+      ? await districtRegistrationRepo.findById(meta.districtRegistrationId)
+      : await prisma.districtRegistration.findUnique({ where: { userId: pay.userId } });
+    if (reg && reg.status === EntityStatus.PENDING) {
+      await districtRegistrationRepo.update(reg.id, {
+        status: EntityStatus.SUBMITTED,
+        statusReason: "Payment completed; submitted for approval",
+        payment: { connect: { id: pay.id } },
+      });
+    }
+  }
+}
+
 export async function applySuccessfulPayment(
   paymentId: string,
   razorpayPaymentId?: string
@@ -111,10 +148,16 @@ export async function applySuccessfulPayment(
     paymentId,
     razorpayPaymentId
   );
-  if (updated.count === 0) return;
 
   const pay = await paymentRepository.findById(paymentId);
   if (!pay) return;
+
+  // Payment already PAID — still repair org registration if it stayed PENDING
+  // (e.g. earlier verify without districtRegistrationId metadata).
+  if (updated.count === 0) {
+    await ensureOrgRegistrationSubmitted(pay);
+    return;
+  }
 
   const { validFrom, validUntil } = await getMembershipBounds();
   const isRenewal = pay.purpose in RENEWAL_PURPOSES;
@@ -293,17 +336,7 @@ export async function applySuccessfulPayment(
 
   // ── State registration ──
   if (pay.purpose === PaymentPurpose.STATE_REGISTRATION) {
-    const meta = (pay.metadata as { stateRegistrationId?: string }) ?? {};
-    if (meta.stateRegistrationId) {
-      const reg = await stateRegistrationRepo.findById(meta.stateRegistrationId);
-      if (reg && reg.status === EntityStatus.PENDING) {
-        await stateRegistrationRepo.update(reg.id, {
-          status: EntityStatus.SUBMITTED,
-          statusReason: "Payment completed; submitted for approval",
-          payment: { connect: { id: pay.id } },
-        });
-      }
-    }
+    await ensureOrgRegistrationSubmitted(pay);
     return;
   }
 
@@ -321,17 +354,7 @@ export async function applySuccessfulPayment(
 
   // ── District registration ──
   if (pay.purpose === PaymentPurpose.DISTRICT_REGISTRATION) {
-    const meta = (pay.metadata as { districtRegistrationId?: string }) ?? {};
-    if (meta.districtRegistrationId) {
-      const reg = await districtRegistrationRepo.findById(meta.districtRegistrationId);
-      if (reg && reg.status === EntityStatus.PENDING) {
-        await districtRegistrationRepo.update(reg.id, {
-          status: EntityStatus.SUBMITTED,
-          statusReason: "Payment completed; submitted for approval",
-          payment: { connect: { id: pay.id } },
-        });
-      }
-    }
+    await ensureOrgRegistrationSubmitted(pay);
     return;
   }
 

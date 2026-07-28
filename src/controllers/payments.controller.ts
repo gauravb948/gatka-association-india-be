@@ -5,6 +5,7 @@ import * as statePaymentRepository from "../repositories/statePayment.repository
 import * as paymentRepository from "../repositories/payment.repository.js";
 import * as nationalPaymentRepository from "../repositories/nationalPayment.repository.js";
 import { AppError } from "../lib/errors.js";
+import { prisma } from "../lib/prisma.js";
 import { getRazorpayForState } from "../lib/razorpayClient.js";
 import { applySuccessfulPayment } from "../lib/paymentHandlers.js";
 import { createRazorpayOrderSchema, verifyPaymentSchema } from "../validators/payment.validators.js";
@@ -40,8 +41,31 @@ export async function createRazorpayOrder(req: Request, res: Response, next: Nex
       status: PaymentStatus.PENDING,
     };
     if (body.sessionId) payData.session = { connect: { id: body.sessionId } };
-    if (body.metadata != null) {
-      payData.metadata = body.metadata as Prisma.InputJsonValue;
+
+    const meta: Record<string, unknown> =
+      body.metadata && typeof body.metadata === "object" && !Array.isArray(body.metadata)
+        ? { ...(body.metadata as Record<string, unknown>) }
+        : {};
+
+    // Server-side link so verify/webhook can mark the registration SUBMITTED
+    // even if the client omits metadata.
+    if (body.purpose === PaymentPurpose.DISTRICT_REGISTRATION && !meta.districtRegistrationId) {
+      const reg = await prisma.districtRegistration.findUnique({
+        where: { userId: u.id },
+        select: { id: true },
+      });
+      if (reg) meta.districtRegistrationId = reg.id;
+    }
+    if (body.purpose === PaymentPurpose.STATE_REGISTRATION && !meta.stateRegistrationId) {
+      const reg = await prisma.stateRegistration.findUnique({
+        where: { userId: u.id },
+        select: { id: true },
+      });
+      if (reg) meta.stateRegistrationId = reg.id;
+    }
+
+    if (Object.keys(meta).length > 0) {
+      payData.metadata = meta as Prisma.InputJsonValue;
     }
     const payment = await paymentRepository.createPayment(payData);
 
@@ -104,7 +128,10 @@ export async function verify(req: Request, res: Response, next: NextFunction) {
     }
 
     if (payment.status === PaymentStatus.PAID) {
-      return res.json({ verified: true, payment });
+      // Still run apply so PENDING org registrations get repaired if needed.
+      await applySuccessfulPayment(payment.id, razorpay_payment_id);
+      const refreshed = await paymentRepository.findById(payment.id);
+      return res.json({ verified: true, payment: refreshed ?? payment });
     }
 
     const cfg = await getRazorpayConfigForPayment(payment.purpose, payment.stateId);

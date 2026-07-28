@@ -1093,3 +1093,26 @@ model NationalPaymentConfig {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 }
+
+/// Raw Razorpay webhook deliveries (all events, including ignored / failed signature).
+model RazorpayWebhookEvent {
+  id                String   @id @default(cuid())
+  event             String?
+  razorpayEventId   String?
+  razorpayOrderId   String?
+  razorpayPaymentId String?
+  signature         String?
+  signatureValid    Boolean?
+  paymentId         String?
+  processed         Boolean  @default(false)
+  processError      String?
+  payload           Json
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([event])
+  @@index([razorpayEventId])
+  @@index([razorpayOrderId])
+  @@index([paymentId])
+  @@index([createdAt])
+}

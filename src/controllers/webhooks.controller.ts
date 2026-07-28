@@ -1,9 +1,10 @@
 import type { NextFunction, Request, Response } from "express";
 import crypto from "crypto";
-import { PaymentPurpose } from "@prisma/client";
+import { PaymentPurpose, type Prisma } from "@prisma/client";
 import * as statePaymentRepository from "../repositories/statePayment.repository.js";
 import * as nationalPaymentRepository from "../repositories/nationalPayment.repository.js";
 import * as paymentRepository from "../repositories/payment.repository.js";
+import * as razorpayWebhookRepository from "../repositories/razorpayWebhook.repository.js";
 import { applySuccessfulPayment } from "../lib/paymentHandlers.js";
 
 function verifySignature(body: string, signature: string | undefined, secret: string) {
@@ -44,45 +45,84 @@ async function resolveWebhookSecret(purpose: PaymentPurpose, stateId: string) {
  *   Events: payment.captured, order.paid
  *   Secret: that account's webhookSecret in payment config
  *
- * We look up the payment by order_id, pick the matching account secret,
- * verify X-Razorpay-Signature, then mark paid (idempotent with /payments/verify).
+ * Every delivery is stored in RazorpayWebhookEvent. We look up the payment by
+ * order_id, verify X-Razorpay-Signature, then mark paid (idempotent with
+ * /payments/verify).
  */
 export async function razorpay(req: Request, res: Response, next: NextFunction) {
+  let webhookEventId: string | undefined;
   try {
     const bodyString = rawBodyString(req.body);
-    const payload = JSON.parse(bodyString) as RazorpayWebhookPayload;
-
-    if (payload.event !== "payment.captured" && payload.event !== "order.paid") {
-      res.json({ ok: true });
-      return;
+    let payload: RazorpayWebhookPayload = {};
+    try {
+      payload = JSON.parse(bodyString) as RazorpayWebhookPayload;
+    } catch {
+      payload = {};
     }
 
     const paymentEntity = payload.payload?.payment?.entity;
     const orderId = paymentEntity?.order_id ?? payload.payload?.order?.entity?.id;
     const razorpayPaymentId = paymentEntity?.id;
+    const sig = req.get("x-razorpay-signature") ?? undefined;
+    const razorpayEventId = req.get("x-razorpay-event-id") ?? undefined;
 
-    if (!orderId) {
+    const payment = orderId
+      ? await paymentRepository.findFirstByRazorpayOrderId(orderId)
+      : null;
+
+    const row = await razorpayWebhookRepository.create({
+      event: payload.event ?? null,
+      razorpayEventId: razorpayEventId ?? null,
+      razorpayOrderId: orderId ?? null,
+      razorpayPaymentId: razorpayPaymentId ?? null,
+      signature: sig ?? null,
+      paymentId: payment?.id ?? null,
+      payload: (payload && Object.keys(payload).length > 0
+        ? payload
+        : { raw: bodyString }) as Prisma.InputJsonValue,
+    });
+    webhookEventId = row.id;
+
+    if (payload.event !== "payment.captured" && payload.event !== "order.paid") {
+      await razorpayWebhookRepository.update(row.id, { processed: true });
       res.json({ ok: true });
       return;
     }
 
-    const payment = await paymentRepository.findFirstByRazorpayOrderId(orderId);
-    if (!payment) {
-      // Unknown order — acknowledge so Razorpay does not retry forever.
+    if (!orderId || !payment) {
+      await razorpayWebhookRepository.update(row.id, {
+        processed: true,
+        processError: !orderId ? "missing_order_id" : "payment_not_found",
+      });
       res.json({ ok: true });
       return;
     }
 
     const webhookSecret = await resolveWebhookSecret(payment.purpose, payment.stateId);
-    const sig = req.get("x-razorpay-signature");
-    if (!verifySignature(bodyString, sig, webhookSecret)) {
+    const signatureValid = verifySignature(bodyString, sig, webhookSecret);
+    await razorpayWebhookRepository.update(row.id, { signatureValid });
+
+    if (!signatureValid) {
+      await razorpayWebhookRepository.update(row.id, {
+        processError: "invalid_signature",
+      });
       res.status(400).send("Invalid signature");
       return;
     }
 
     await applySuccessfulPayment(payment.id, razorpayPaymentId);
+    await razorpayWebhookRepository.update(row.id, { processed: true });
     res.json({ ok: true });
   } catch (e) {
+    if (webhookEventId) {
+      try {
+        await razorpayWebhookRepository.update(webhookEventId, {
+          processError: e instanceof Error ? e.message : "processing_failed",
+        });
+      } catch {
+        // ignore secondary persistence failure
+      }
+    }
     next(e);
   }
 }
