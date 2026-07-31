@@ -63,3 +63,33 @@ export function findById(id: string) {
 export function findFirstByRazorpayOrderId(razorpayOrderId: string) {
   return prisma.payment.findFirst({ where: { razorpayOrderId } });
 }
+
+/** PENDING payments that have a Razorpay order id (candidates for reconcile). */
+export function findPendingWithRazorpayOrder(params: {
+  take: number;
+  stateId?: string;
+  purpose?: Prisma.EnumPaymentPurposeFilter["equals"];
+}) {
+  return prisma.payment.findMany({
+    where: {
+      status: "PENDING",
+      razorpayOrderId: { not: null },
+      ...(params.stateId ? { stateId: params.stateId } : {}),
+      ...(params.purpose ? { purpose: params.purpose } : {}),
+    },
+    orderBy: { createdAt: "asc" },
+    take: params.take,
+    select: {
+      id: true,
+      userId: true,
+      stateId: true,
+      purpose: true,
+      amountPaise: true,
+      status: true,
+      razorpayOrderId: true,
+      razorpayPaymentId: true,
+      metadata: true,
+      createdAt: true,
+    },
+  });
+}

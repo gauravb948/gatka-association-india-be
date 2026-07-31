@@ -11,6 +11,13 @@ paymentsRouter.post("/razorpay/order", requireAuth, paymentsController.createRaz
 paymentsRouter.post("/verify", requireAuth, paymentsController.verify);
 paymentsRouter.get("/me", requireAuth, paymentsController.listMine);
 
+paymentsRouter.post(
+  "/reconcile-razorpay",
+  requireAuth,
+  requireRoles("NATIONAL_ADMIN"),
+  paymentsController.reconcileRazorpay
+);
+
 paymentsRouter.get(
   "/national-config",
   requireAuth,

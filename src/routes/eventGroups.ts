@@ -23,6 +23,12 @@ eventGroupsRouter.patch(
   requireRoles("NATIONAL_ADMIN"),
   eventGroupsController.patch
 );
+eventGroupsRouter.delete(
+  "/:id",
+  requireAuth,
+  requireRoles("NATIONAL_ADMIN"),
+  eventGroupsController.remove
+);
 eventGroupsRouter.get("/:id/events", eventGroupsController.listEventsByGroup);
 eventGroupsRouter.post(
   "/:id/events",
@@ -35,4 +41,10 @@ eventGroupsRouter.patch(
   requireAuth,
   requireRoles("NATIONAL_ADMIN"),
   eventGroupsController.patchEvent
+);
+eventGroupsRouter.delete(
+  "/events/:eventId",
+  requireAuth,
+  requireRoles("NATIONAL_ADMIN"),
+  eventGroupsController.removeEvent
 );

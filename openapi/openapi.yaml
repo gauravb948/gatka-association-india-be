@@ -1460,6 +1460,29 @@ components:
         isActive: { type: boolean }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+    EventBody:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        description: { type: string }
+        minPlayers: { type: integer, minimum: 0 }
+        maxPlayers: { type: integer, minimum: 0 }
+        optionalPlayers: { type: integer, minimum: 0 }
+        totalPlayers: { type: integer, minimum: 0 }
+        sortOrder: { type: integer }
+        isActive: { type: boolean }
+    EventGroupBody:
+      type: object
+      required: [segment, gender, ageCategoryId]
+      properties:
+        segment: { type: string }
+        gender:
+          type: string
+          enum: [MALE, FEMALE, BOYS, GIRLS]
+        ageCategoryId: { type: string }
+        sortOrder: { type: integer }
+        isActive: { type: boolean }
     CompetitionStateLink:
       type: object
       properties:
@@ -3356,9 +3379,94 @@ paths:
         "204": { description: Deleted }
   /event-groups:
     get:
-      summary: Active event groups with age category
+      security: []
+      summary: List active event groups with age category (public)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/EventGroup" }
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Create event group (national admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EventGroupBody" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EventGroup" }
+  /event-groups/admin:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List all event groups (national admin)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/EventGroup" }
+  /event-groups/{id}:
+    patch:
+      security: [{ bearerAuth: [] }]
+      summary: Update event group (national admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EventGroupBody" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EventGroup" }
+        "404":
+          description: Event group not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    delete:
+      security: [{ bearerAuth: [] }]
+      summary: Delete event group (national admin)
+      description: >
+        Fails with 400 if any child event is referenced by tournament registrations,
+        competition results, aggregate standings, or participation records.
+        Cascades delete of unused child events.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Deleted }
+        "400":
+          description: Event group in use
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Event group not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
   /event-groups/{id}/events:
     get:
+      security: []
       summary: List all events for an event group
       parameters:
         - name: id
@@ -3376,6 +3484,79 @@ paths:
                 items: { $ref: "#/components/schemas/Event" }
         "404":
           description: Event group not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Create event in an event group (national admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Event group id
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EventBody" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Event" }
+        "404":
+          description: Event group not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /event-groups/events/{eventId}:
+    patch:
+      security: [{ bearerAuth: [] }]
+      summary: Update event (national admin)
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EventBody" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Event" }
+        "404":
+          description: Event not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    delete:
+      security: [{ bearerAuth: [] }]
+      summary: Delete event (national admin)
+      description: >
+        Fails with 400 if the event is referenced by tournament registrations,
+        competition results, aggregate standings, or participation records.
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Deleted }
+        "400":
+          description: Event in use
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Event not found
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -3425,6 +3606,57 @@ paths:
                       payment: { type: object }
         "400":
           description: Invalid signature or missing config
+  /payments/reconcile-razorpay:
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Reconcile PENDING payments against Razorpay (national admin)
+      description: >
+        Loads PENDING local payments that have a `razorpayOrderId`, fetches each order's
+        payments from Razorpay, and if any payment is `captured` (or `authorized`), marks
+        the local row PAID and runs the same side effects as verify/webhook
+        (user/registration SUBMITTED, membership, etc.).
+
+        Use `dryRun: true` to preview without writing. Optional filters: `stateId`, `purpose`, `limit`.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                stateId: { type: string }
+                purpose:
+                  type: string
+                  description: PaymentPurpose enum value
+                limit: { type: integer, minimum: 1, maximum: 200, default: 50 }
+                dryRun: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Reconcile summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dryRun: { type: boolean }
+                  checked: { type: integer }
+                  markedPaid: { type: integer }
+                  stillUnpaid: { type: integer }
+                  skipped: { type: integer }
+                  errors: { type: integer }
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        paymentId: { type: string }
+                        razorpayOrderId: { type: string, nullable: true }
+                        action:
+                          type: string
+                          enum: [marked_paid, would_mark_paid, still_unpaid, skipped, error]
+                        razorpayPaymentId: { type: string }
+                        razorpayStatus: { type: string }
+                        error: { type: string }
   /webhooks/razorpay:
     post:
       summary: Single Razorpay webhook for national and all state accounts

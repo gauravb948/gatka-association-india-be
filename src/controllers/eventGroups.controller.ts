@@ -44,6 +44,8 @@ export async function create(req: Request, res: Response, next: NextFunction) {
 
 export async function patch(req: Request, res: Response, next: NextFunction) {
   try {
+    const existing = await eventGroupRepository.findById(req.params.id);
+    if (!existing) throw new AppError(404, "Event group not found");
     const body = eventGroupBodySchema.partial().parse(req.body);
     const { ageCategoryId, ...rest } = body;
     const data: Prisma.EventGroupUpdateInput = { ...rest };
@@ -52,6 +54,21 @@ export async function patch(req: Request, res: Response, next: NextFunction) {
     }
     const row = await eventGroupRepository.updateEventGroup(req.params.id, data);
     res.json(row);
+  } catch (e) {
+    next(e);
+  }
+}
+
+export async function remove(req: Request, res: Response, next: NextFunction) {
+  try {
+    const existing = await eventGroupRepository.findById(req.params.id);
+    if (!existing) throw new AppError(404, "Event group not found");
+    const used = await eventGroupRepository.countUsagesBlockingDelete(req.params.id);
+    if (used > 0) {
+      throw new AppError(400, "Event group in use by competitions or registrations");
+    }
+    await eventGroupRepository.deleteEventGroup(req.params.id);
+    res.status(204).send();
   } catch (e) {
     next(e);
   }
@@ -77,6 +94,10 @@ export async function createEvent(req: Request, res: Response, next: NextFunctio
       eventGroup: { connect: { id: req.params.id } },
       name: body.name,
       description: body.description,
+      minPlayers: body.minPlayers ?? 0,
+      maxPlayers: body.maxPlayers ?? 0,
+      optionalPlayers: body.optionalPlayers ?? 0,
+      totalPlayers: body.totalPlayers ?? 0,
       sortOrder: body.sortOrder ?? 0,
       isActive: body.isActive ?? true,
     });
@@ -88,9 +109,26 @@ export async function createEvent(req: Request, res: Response, next: NextFunctio
 
 export async function patchEvent(req: Request, res: Response, next: NextFunction) {
   try {
+    const existing = await eventRepository.findById(req.params.eventId);
+    if (!existing) throw new AppError(404, "Event not found");
     const body = eventBodySchema.partial().parse(req.body);
     const row = await eventRepository.updateEvent(req.params.eventId, body);
     res.json(row);
+  } catch (e) {
+    next(e);
+  }
+}
+
+export async function removeEvent(req: Request, res: Response, next: NextFunction) {
+  try {
+    const existing = await eventRepository.findById(req.params.eventId);
+    if (!existing) throw new AppError(404, "Event not found");
+    const used = await eventRepository.countUsagesBlockingDelete(req.params.eventId);
+    if (used > 0) {
+      throw new AppError(400, "Event in use by competitions or registrations");
+    }
+    await eventRepository.deleteEvent(req.params.eventId);
+    res.status(204).send();
   } catch (e) {
     next(e);
   }

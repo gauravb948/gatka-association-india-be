@@ -8,7 +8,7 @@ import { AppError } from "../lib/errors.js";
 import { prisma } from "../lib/prisma.js";
 import { getRazorpayForState } from "../lib/razorpayClient.js";
 import { applySuccessfulPayment } from "../lib/paymentHandlers.js";
-import { createRazorpayOrderSchema, verifyPaymentSchema } from "../validators/payment.validators.js";
+import { createRazorpayOrderSchema, verifyPaymentSchema, reconcileRazorpaySchema } from "../validators/payment.validators.js";
 
 async function getRazorpayConfigForPayment(purpose: PaymentPurpose, stateId: string) {
   if (purpose === PaymentPurpose.STATE_REGISTRATION) {
@@ -153,6 +153,125 @@ export async function verify(req: Request, res: Response, next: NextFunction) {
 
     const refreshed = await paymentRepository.findById(payment.id);
     res.json({ verified: true, payment: refreshed ?? payment });
+  } catch (e) {
+    next(e);
+  }
+}
+
+type RazorpayOrderPayments = {
+  items?: Array<{ id?: string; status?: string; amount?: number }>;
+};
+
+/**
+ * National-admin reconcile: for PENDING local payments, fetch the Razorpay order's
+ * payments. If any are captured (or order paid), mark local payment PAID and run
+ * applySuccessfulPayment (user/registration SUBMITTED, etc.).
+ */
+export async function reconcileRazorpay(req: Request, res: Response, next: NextFunction) {
+  try {
+    const body = reconcileRazorpaySchema.parse(req.body ?? {});
+    const pending = await paymentRepository.findPendingWithRazorpayOrder({
+      take: body.limit,
+      stateId: body.stateId,
+      purpose: body.purpose,
+    });
+
+    const clientCache = new Map<string, ReturnType<typeof getRazorpayForState>>();
+    const results: Array<{
+      paymentId: string;
+      razorpayOrderId: string | null;
+      action: "marked_paid" | "would_mark_paid" | "still_unpaid" | "skipped" | "error";
+      razorpayPaymentId?: string;
+      razorpayStatus?: string;
+      error?: string;
+    }> = [];
+
+    let markedPaid = 0;
+    let stillUnpaid = 0;
+    let skipped = 0;
+    let errors = 0;
+
+    for (const pay of pending) {
+      const orderId = pay.razorpayOrderId;
+      if (!orderId) {
+        skipped += 1;
+        results.push({
+          paymentId: pay.id,
+          razorpayOrderId: null,
+          action: "skipped",
+          error: "missing_order_id",
+        });
+        continue;
+      }
+
+      try {
+        const cfg = await getRazorpayConfigForPayment(pay.purpose, pay.stateId);
+        const cacheKey = `${cfg.razorpayKeyId}:${cfg.razorpayKeySecret}`;
+        let rz = clientCache.get(cacheKey);
+        if (!rz) {
+          rz = getRazorpayForState(cfg.razorpayKeyId, cfg.razorpayKeySecret);
+          clientCache.set(cacheKey, rz);
+        }
+
+        const orderPayments = (await rz.orders.fetchPayments(orderId)) as RazorpayOrderPayments;
+        const items = orderPayments.items ?? [];
+        const captured =
+          items.find((p) => p.status === "captured") ??
+          items.find((p) => p.status === "authorized");
+
+        if (!captured?.id) {
+          stillUnpaid += 1;
+          const latest = items[0];
+          results.push({
+            paymentId: pay.id,
+            razorpayOrderId: orderId,
+            action: "still_unpaid",
+            razorpayStatus: latest?.status ?? "no_payments",
+          });
+          continue;
+        }
+
+        if (body.dryRun) {
+          markedPaid += 1;
+          results.push({
+            paymentId: pay.id,
+            razorpayOrderId: orderId,
+            action: "would_mark_paid",
+            razorpayPaymentId: captured.id,
+            razorpayStatus: captured.status,
+          });
+          continue;
+        }
+
+        await applySuccessfulPayment(pay.id, captured.id);
+        markedPaid += 1;
+        results.push({
+          paymentId: pay.id,
+          razorpayOrderId: orderId,
+          action: "marked_paid",
+          razorpayPaymentId: captured.id,
+          razorpayStatus: captured.status,
+        });
+      } catch (e) {
+        errors += 1;
+        results.push({
+          paymentId: pay.id,
+          razorpayOrderId: orderId,
+          action: "error",
+          error: e instanceof Error ? e.message : "reconcile_failed",
+        });
+      }
+    }
+
+    res.json({
+      dryRun: body.dryRun,
+      checked: pending.length,
+      markedPaid,
+      stillUnpaid,
+      skipped,
+      errors,
+      results,
+    });
   } catch (e) {
     next(e);
   }
