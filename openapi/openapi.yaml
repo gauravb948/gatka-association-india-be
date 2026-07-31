@@ -1465,7 +1465,7 @@ components:
       required: [name]
       properties:
         name: { type: string }
-        description: { type: string }
+        description: { type: string, nullable: true }
         minPlayers: { type: integer, minimum: 0 }
         maxPlayers: { type: integer, minimum: 0 }
         optionalPlayers: { type: integer, minimum: 0 }

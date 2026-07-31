@@ -10,7 +10,7 @@ export const eventGroupBodySchema = z.object({
 
 export const eventBodySchema = z.object({
   name: z.string().min(1),
-  description: z.string().optional(),
+  description: z.string().nullable().optional(),
   minPlayers: z.number().int().min(0).optional(),
   maxPlayers: z.number().int().min(0).optional(),
   optionalPlayers: z.number().int().min(0).optional(),
