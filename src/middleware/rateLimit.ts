@@ -39,20 +39,20 @@ function rateLimitJson(
 /** Default: all `/api/*` traffic (per IP). */
 export const apiLimiter = rateLimitJson(
   msEnv("RATE_LIMIT_API_WINDOW_MS", 15 * 60 * 1000),
-  intEnv("RATE_LIMIT_API_MAX", 300),
+  intEnv("RATE_LIMIT_API_MAX", 30000),
   "api"
 );
 
 /** Stricter: auth endpoints (login, register, OTP). */
 export const authLimiter = rateLimitJson(
   msEnv("RATE_LIMIT_AUTH_WINDOW_MS", 15 * 60 * 1000),
-  intEnv("RATE_LIMIT_AUTH_MAX", 30),
+  intEnv("RATE_LIMIT_AUTH_MAX", 3000),
   "auth"
 );
 
 /** Stricter: presigned upload URLs. */
 export const uploadLimiter = rateLimitJson(
   msEnv("RATE_LIMIT_UPLOAD_WINDOW_MS", 60 * 60 * 1000),
-  intEnv("RATE_LIMIT_UPLOAD_MAX", 60),
+  intEnv("RATE_LIMIT_UPLOAD_MAX", 6000),
   "upload"
 );
