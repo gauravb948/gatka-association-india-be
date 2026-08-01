@@ -351,6 +351,27 @@ const participationListInclude = {
       eventGroupId: true,
       minPlayers: true,
       maxPlayers: true,
+      eventGroup: {
+        select: {
+          id: true,
+          segment: true,
+          gender: true,
+          ageCategoryId: true,
+          sortOrder: true,
+          isActive: true,
+          ageCategory: {
+            select: {
+              id: true,
+              name: true,
+              ageFrom: true,
+              ageTo: true,
+              bandType: true,
+              sortOrder: true,
+              isActive: true,
+            },
+          },
+        },
+      },
     },
   },
 } satisfies Prisma.ParticipationRecordInclude;

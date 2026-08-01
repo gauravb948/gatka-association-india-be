@@ -868,11 +868,28 @@ export async function listParticipants(req: Request, res: Response, next: NextFu
     if (!comp) throw new AppError(404, "Competition not found");
     await assertCanViewCompetitionParticipants(actor, comp);
 
-    const scope = actorPlayerProfileScopeWhere(actor);
-    const playerProfileWhere = Object.keys(scope).length > 0 ? scope : undefined;
-
     const q = competitionParticipationListQuerySchema.parse(req.query);
     const skip = (q.page - 1) * q.pageSize;
+
+    const andParts: Prisma.PlayerProfileWhereInput[] = [];
+    const scope = actorPlayerProfileScopeWhere(actor);
+    if (Object.keys(scope).length > 0) andParts.push(scope);
+    if (q.search) {
+      andParts.push({
+        OR: [
+          { fullName: { contains: q.search, mode: "insensitive" } },
+          { fatherName: { contains: q.search, mode: "insensitive" } },
+          { motherName: { contains: q.search, mode: "insensitive" } },
+        ],
+      });
+    }
+    const playerProfileWhere =
+      andParts.length === 0
+        ? undefined
+        : andParts.length === 1
+          ? andParts[0]!
+          : { AND: andParts };
+
     const { items, total } = await participationRepository.findManyByCompetitionPaginated(
       comp.id,
       {

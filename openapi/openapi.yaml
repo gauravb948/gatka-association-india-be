@@ -4253,11 +4253,13 @@ paths:
       security: [{ bearerAuth: [] }]
       summary: List participants (participation records) for a competition
       description: >
-        Paginated `ParticipationRecord` rows with `participated` true, including nested player profile summary.
+        Paginated `ParticipationRecord` rows with `participated` true, including nested player profile summary
+        and the catalog `event` with its `eventGroup` and `ageCategory` (age group).
         Available to the same-level admin and all upper hierarchy admins within geographic scope
         (e.g. district competition → district, state, and national admins in scope; state competition
         → state and national admins). Training centers may view district-level competitions in their district.
         Participant rows are further filtered to the caller's geography.
+        Optional `search` matches player full name, father name, or mother name.
       parameters:
         - name: id
           in: path
@@ -4265,6 +4267,7 @@ paths:
           schema: { type: string }
         - $ref: "#/components/parameters/userListPage"
         - $ref: "#/components/parameters/userListPageSize"
+        - $ref: "#/components/parameters/competitionReportPlayerNameSearch"
       responses:
         "200":
           description: OK (envelope with paginated items)
