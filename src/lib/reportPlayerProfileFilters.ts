@@ -10,6 +10,7 @@ export async function buildReportPlayerProfileWhere(
     districtId?: string;
     trainingCenterId?: string;
     gender?: Gender;
+    search?: string;
   }
 ): Promise<Prisma.PlayerProfileWhereInput> {
   const parts: Prisma.PlayerProfileWhereInput[] = [actorPlayerProfileScopeWhere(actor)];
@@ -27,6 +28,17 @@ export async function buildReportPlayerProfileWhere(
 
   if (q.gender) {
     parts.push({ gender: q.gender });
+  }
+
+  const search = q.search?.trim();
+  if (search) {
+    parts.push({
+      OR: [
+        { fullName: { contains: search, mode: "insensitive" } },
+        { fatherName: { contains: search, mode: "insensitive" } },
+        { motherName: { contains: search, mode: "insensitive" } },
+      ],
+    });
   }
 
   return parts.length === 1 ? parts[0]! : { AND: parts };

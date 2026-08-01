@@ -91,6 +91,12 @@ components:
         type: string
         enum: [MALE, FEMALE, BOYS, GIRLS]
       description: Filter on event group gender and player profile gender
+    competitionReportPlayerNameSearch:
+      name: search
+      in: query
+      schema: { type: string }
+      description: >
+        Case-insensitive substring match on player full name, father name, or mother name
   schemas:
     Membership:
       type: object
@@ -5232,14 +5238,16 @@ paths:
         scope under `groups`, plus `totalParticipants` (distinct players) and
         `totalEventsPlayed` (distinct events with registrations). Each player appears
         once per group with `participatingIn` listing event names they are registered
-        for in that group. Optional `stateId`, `districtId`, `trainingCenterId`, and
-        `gender` filters narrow players; caller hierarchy scope always applies.
+        for in that group. Optional `stateId`, `districtId`, `trainingCenterId`,
+        `gender`, and `search` (player/father/mother name) filters narrow players;
+        caller hierarchy scope always applies.
       parameters:
         - $ref: "#/components/parameters/competitionReportCompetitionId"
         - $ref: "#/components/parameters/competitionReportStateId"
         - $ref: "#/components/parameters/competitionReportDistrictId"
         - $ref: "#/components/parameters/competitionReportTrainingCenterId"
         - $ref: "#/components/parameters/competitionReportGender"
+        - $ref: "#/components/parameters/competitionReportPlayerNameSearch"
       responses:
         "200":
           description: OK

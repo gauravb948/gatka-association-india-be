@@ -22,7 +22,10 @@ export const competitionScopedReportQuerySchema = z.object({
 });
 
 export const competitionEventRegistrationReportQuerySchema = competitionScopedReportQuerySchema;
-export const competitionEventGroupParticipantsReportQuerySchema = competitionScopedReportQuerySchema;
+export const competitionEventGroupParticipantsReportQuerySchema =
+  competitionScopedReportQuerySchema.extend({
+    search: optionalSearch,
+  });
 
 export const competitionAgeWiseReportQuerySchema = z.object({
   competitionId: z.string().min(1),
