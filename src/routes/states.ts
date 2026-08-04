@@ -18,6 +18,7 @@ statesRouter.get(
   statesController.getById
 );
 statesRouter.patch("/:id", requireAuth, requireRoles("NATIONAL_ADMIN"), statesController.patch);
+statesRouter.delete("/:id", requireAuth, requireRoles("NATIONAL_ADMIN"), statesController.remove);
 statesRouter.get(
   "/:id/payment-config",
   requireAuth,

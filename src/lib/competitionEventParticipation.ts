@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import type { CompetitionLevel } from "@prisma/client";
 import { fitsAgeCategory } from "./age.js";
 import { AppError } from "./errors.js";
 import { FARI_SOTI_EVENT_IDS, SINGLE_SOTI_EVENT_IDS } from "./sotiEventCatalogIds.js";
@@ -17,6 +18,22 @@ export function isTeamEvent(event: EventLike): boolean {
   const min = event.minPlayers ?? 0;
   const max = event.maxPlayers ?? 0;
   return max > 1 || min > 1;
+}
+
+/** Org unit that may send only one player into an individual event (by competition level). */
+export function orgUnitKeyForIndividualEvent(
+  level: CompetitionLevel,
+  profile: { trainingCenterId: string; districtId: string; stateId: string }
+): string {
+  if (level === "DISTRICT") return `tc:${profile.trainingCenterId}`;
+  if (level === "STATE") return `district:${profile.districtId}`;
+  return `state:${profile.stateId}`;
+}
+
+export function orgUnitLabelForCompetitionLevel(level: CompetitionLevel): string {
+  if (level === "DISTRICT") return "training center";
+  if (level === "STATE") return "district";
+  return "state";
 }
 
 export function isFariSotiEvent(event: Pick<EventLike, "name">): boolean {
@@ -59,6 +76,10 @@ export type ParticipationWithEvent = {
   eventId: string | null;
   event: (EventLike & { eventGroupId?: string; id?: string }) | null;
 };
+
+export function playerHasTeamEventParticipation(rows: ParticipationWithEvent[]): boolean {
+  return rows.some((r) => r.event != null && isTeamEvent(r.event));
+}
 
 export function playerHasFariSotiParticipation(rows: ParticipationWithEvent[]): boolean {
   return rows.some(

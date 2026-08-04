@@ -285,6 +285,40 @@ export function findParticipationsWithEventsForPlayer(competitionId: string, pla
   });
 }
 
+/**
+ * Another player from the same org unit already in this individual event.
+ * Org unit = TC (district comps), district (state comps), or state (national comps).
+ */
+export function findOrgUnitConflictForIndividualEvent(
+  competitionId: string,
+  eventId: string,
+  level: CompetitionLevel,
+  profile: {
+    userId: string;
+    trainingCenterId: string;
+    districtId: string;
+    stateId: string;
+  }
+) {
+  const profileWhere =
+    level === "DISTRICT"
+      ? { trainingCenterId: profile.trainingCenterId }
+      : level === "STATE"
+        ? { districtId: profile.districtId }
+        : { stateId: profile.stateId };
+
+  return prisma.participationRecord.findFirst({
+    where: {
+      competitionId,
+      eventId,
+      participated: true,
+      playerUserId: { not: profile.userId },
+      playerUser: { playerProfile: profileWhere },
+    },
+    select: { id: true, playerUserId: true },
+  });
+}
+
 /** Catalog events each player is already registered for in this competition. */
 export async function findParticipatingEventsByPlayerUserIds(
   competitionId: string,

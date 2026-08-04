@@ -13,6 +13,8 @@ import { AppError } from "../lib/errors.js";
 import { assertHierarchyEnabled, type UserForHierarchyCheck } from "../lib/access.js";
 import { withAdminRegistrationIds } from "../lib/withAdminRegistrationIds.js";
 import {
+  accountNotFoundMessage,
+  alreadyRegisteredMessage,
   assertRegistrationVerificationToken,
   DEV_OTP_CODE,
   isDevOtpBypass,
@@ -68,6 +70,18 @@ function assertRegistrationToken(
   return assertRegistrationVerificationToken(verificationToken, expectedIdentifiers);
 }
 
+async function assertEmailAndPhoneAvailable(email: string, phone: string) {
+  const existingEmail = await userRepository.findByEmail(email);
+  if (existingEmail) {
+    throw new AppError(409, "Email already registered", "EMAIL_IN_USE");
+  }
+  const normalizedPhone = normalizePhoneOrEmail(phone);
+  const existingPhone = await userRepository.findByPhone(normalizedPhone);
+  if (existingPhone) {
+    throw new AppError(409, "Mobile number already registered", "PHONE_IN_USE");
+  }
+}
+
 export async function login(req: Request, res: Response, next: NextFunction) {
   try {
     const { email, password } = loginSchema.parse(req.body);
@@ -121,8 +135,7 @@ export async function registerPlayer(req: Request, res: Response, next: NextFunc
     if (!tc || tc.districtId !== body.districtId || !tc.isEnabled) {
       throw new AppError(400, "Training center not available");
     }
-    const exists = await userRepository.findByEmail(body.email);
-    if (exists) throw new AppError(409, "Email already registered");
+    await assertEmailAndPhoneAvailable(body.email, body.mobileNo);
 
     const passwordHash = await hashPassword(body.password);
     const userData: Prisma.UserCreateInput = {
@@ -175,8 +188,7 @@ export async function registerCoach(req: Request, res: Response, next: NextFunct
       body.email,
       body.phone,
     ]);
-    const exists = await userRepository.findByEmail(body.email);
-    if (exists) throw new AppError(409, "Email already registered");
+    await assertEmailAndPhoneAvailable(body.email, body.phone);
 
     const tc = await trainingCenterRepository.findByIdWithDistrict(body.trainingCenterId);
     if (!tc || !tc.isEnabled) throw new AppError(400, "Training center not available");
@@ -229,8 +241,7 @@ export async function registerReferee(req: Request, res: Response, next: NextFun
       body.email,
       body.phone,
     ]);
-    const exists = await userRepository.findByEmail(body.email);
-    if (exists) throw new AppError(409, "Email already registered");
+    await assertEmailAndPhoneAvailable(body.email, body.phone);
 
     const state = await stateRepository.findById(body.stateId);
     if (!state?.isEnabled) throw new AppError(400, "State not available");
@@ -285,10 +296,17 @@ export async function registerVolunteer(req: Request, res: Response, next: NextF
       body.email,
       body.phone,
     ]);
-    const existingUser = await userRepository.findByEmail(body.email);
-    if (existingUser) throw new AppError(409, "Email already registered");
+    await assertEmailAndPhoneAvailable(body.email, body.phone);
     const existingVolunteer = await volunteerRegistrationRepo.findByEmail(body.email);
-    if (existingVolunteer) throw new AppError(409, "Email already registered");
+    if (existingVolunteer) {
+      throw new AppError(409, "Email already registered", "EMAIL_IN_USE");
+    }
+    const existingVolunteerPhone = await volunteerRegistrationRepo.findByPhone(
+      normalizePhoneOrEmail(body.phone)
+    );
+    if (existingVolunteerPhone) {
+      throw new AppError(409, "Mobile number already registered", "PHONE_IN_USE");
+    }
 
     const state = await stateRepository.findById(body.stateId);
     if (!state?.isEnabled) throw new AppError(400, "State not available");
@@ -345,8 +363,7 @@ export async function registerTrainingCenter(
       body.email,
       body.phone,
     ]);
-    const exists = await userRepository.findByEmail(body.email);
-    if (exists) throw new AppError(409, "Email already registered");
+    await assertEmailAndPhoneAvailable(body.email, body.phone);
 
     const district = await districtRepository.findByIdWithState(body.districtId);
     if (!district || !district.isEnabled || !district.state.isEnabled) {
@@ -407,21 +424,24 @@ export async function otpRequest(req: Request, res: Response, next: NextFunction
     if (purpose === "REGISTRATION") {
       const existing = await userRepository.findFirstByEmailOrPhone(normalizedIdentifier);
       if (existing) {
-        // Anti-enumeration: behave as success for already-registered identifiers.
-        res.json({ ok: true });
-        return;
+        throw new AppError(
+          409,
+          alreadyRegisteredMessage(normalizedIdentifier),
+          "ALREADY_REGISTERED"
+        );
       }
       recipientPhone = toSmsNumber(normalizedIdentifier);
     } else {
       const user = await userRepository.findFirstByEmailOrPhone(normalizedIdentifier);
       if (!user) {
-        res.json({ ok: true });
-        return;
+        throw new AppError(404, accountNotFoundMessage(normalizedIdentifier), "ACCOUNT_NOT_FOUND");
       }
       if (!user.phone) {
-        // Preserve anti-enumeration semantics; account exists but has no SMS destination.
-        res.json({ ok: true });
-        return;
+        throw new AppError(
+          400,
+          "No mobile number linked to this account",
+          "PHONE_MISSING"
+        );
       }
       userId = user.id;
       recipientPhone = toSmsNumber(user.phone);

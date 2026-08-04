@@ -99,6 +99,24 @@ export async function patch(req: Request, res: Response, next: NextFunction) {
   }
 }
 
+export async function remove(req: Request, res: Response, next: NextFunction) {
+  try {
+    const existing = await stateRepository.findById(req.params.id);
+    if (!existing) throw new AppError(404, "State not found");
+    const used = await stateRepository.countUsagesBlockingDelete(existing.id);
+    if (used > 0) {
+      throw new AppError(
+        400,
+        "State in use by users, profiles, payments, migrations, or volunteer registrations"
+      );
+    }
+    await stateRepository.deleteState(existing.id);
+    res.status(204).send();
+  } catch (e) {
+    next(e);
+  }
+}
+
 export async function getPaymentConfig(req: Request, res: Response, next: NextFunction) {
   try {
     const u = req.dbUser!;

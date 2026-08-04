@@ -2861,7 +2861,13 @@ paths:
             schema: { $ref: "#/components/schemas/OtpRequest" }
       responses:
         "200":
-          description: OK
+          description: OTP sent successfully
+        "404":
+          description: Password reset — no account found for the identifier
+        "409":
+          description: Registration — email or mobile number already registered
+        "400":
+          description: Password reset — account has no mobile number linked
   /auth/otp/verify:
     post:
       summary: Verify OTP and get verification token
@@ -2983,6 +2989,30 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/State" }
+    delete:
+      security: [{ bearerAuth: [] }]
+      summary: Delete state (national admin)
+      description: >
+        Hard-deletes the state. Cascades unused child rows (districts, CMS, registrations, payment config).
+        Fails with 400 if the state is referenced by users, player/referee/volunteer profiles,
+        payments, migration requests, volunteer registrations, or coaches under its districts.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Deleted }
+        "400":
+          description: State in use
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: State not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
   /states/{id}/payment-config:
     get:
       security: [{ bearerAuth: [] }]
@@ -3230,6 +3260,32 @@ paths:
           description: District not found
         "409":
           description: Renamed to a name that already exists in this state
+    delete:
+      security: [{ bearerAuth: [] }]
+      summary: Delete district (national/state admin)
+      description: >
+        Hard-deletes the district. Cascades unused child rows (empty training centers, district registration).
+        State admins may only delete districts in their own state.
+        Fails with 400 if the district is referenced by users, players, coaches, or volunteer registrations.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Deleted }
+        "400":
+          description: District in use
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "403":
+          description: State admin targeting a district outside their state
+        "404":
+          description: District not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
   /training-centers/public/by-district/{districtId}:
     get:
       security: []
@@ -4156,9 +4212,10 @@ paths:
       description: >
         Each item targets one catalog `Event` (`eventId`) with `playerUserIds` (one for individual
         events, team size between event min/max for team events). Enforces hierarchy by competition `createdAt` year,
-        max two events per player in this competition (e.g. team and/or Single Soti, or team and/or Fari Soti; Fari and
-        Single Soti are mutually exclusive), at most one Individual Single Soti per event group, and team size bounds. All
-        items validated before any insert.
+        max two events per player, at most one team event per player, Fari Soti and Single Soti mutually exclusive,
+        at most one Individual Single Soti per event group, team size bounds, and for individual events only one player
+        per org unit (training center for district comps, district for state comps, state for national comps).
+        Cross-item rules are applied across the whole bulk request. All items validated before any insert.
       parameters:
         - name: id
           in: path
@@ -4221,7 +4278,8 @@ paths:
           description: Created
         "400":
           description: >
-            Closed competition, eligibility, gender, geo, age, caps, team size, or Fari/Single Soti mutual exclusion
+            Closed competition, eligibility, gender, geo, age, caps, team size, org-unit individual cap
+            (`EVENT_CAP`, `TEAM_EVENT_CAP`, `ORG_UNIT_INDIVIDUAL_CAP`), or Fari/Single Soti mutual exclusion
             (`FARI_SOTI_BLOCKS_SINGLE_SOTI`, `SINGLE_SOTI_BLOCKS_FARI_SOTI`).
         "403":
           description: Role/level mismatch or player outside registrar scope

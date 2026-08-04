@@ -218,3 +218,18 @@ export function createDistrict(data: Prisma.DistrictCreateInput) {
 export function updateDistrict(id: string, data: Prisma.DistrictUpdateInput) {
   return prisma.district.update({ where: { id }, data });
 }
+
+export function deleteDistrict(id: string) {
+  return prisma.district.delete({ where: { id } });
+}
+
+/** Users / players / coaches / volunteer regs that block hard delete (FK restrict or nested cascade). */
+export async function countUsagesBlockingDelete(districtId: string) {
+  const [players, volunteerRegs, coaches, users] = await prisma.$transaction([
+    prisma.playerProfile.count({ where: { districtId } }),
+    prisma.volunteerRegistration.count({ where: { districtId } }),
+    prisma.coachProfile.count({ where: { trainingCenter: { districtId } } }),
+    prisma.user.count({ where: { districtId } }),
+  ]);
+  return players + volunteerRegs + coaches + users;
+}

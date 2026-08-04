@@ -180,3 +180,43 @@ export function createState(data: Prisma.StateCreateInput) {
 export function updateState(id: string, data: Prisma.StateUpdateInput) {
   return prisma.state.update({ where: { id }, data });
 }
+
+export function deleteState(id: string) {
+  return prisma.state.delete({ where: { id } });
+}
+
+/** Profiles / payments / migrations / users that block hard delete (FK restrict or nested cascade). */
+export async function countUsagesBlockingDelete(stateId: string) {
+  const [
+    players,
+    referees,
+    volunteers,
+    volunteerRegs,
+    payments,
+    migrationsFrom,
+    migrationsTo,
+    coaches,
+    users,
+  ] = await prisma.$transaction([
+    prisma.playerProfile.count({ where: { stateId } }),
+    prisma.refereeProfile.count({ where: { stateId } }),
+    prisma.volunteerProfile.count({ where: { stateId } }),
+    prisma.volunteerRegistration.count({ where: { stateId } }),
+    prisma.payment.count({ where: { stateId } }),
+    prisma.migrationRequest.count({ where: { fromStateId: stateId } }),
+    prisma.migrationRequest.count({ where: { toStateId: stateId } }),
+    prisma.coachProfile.count({ where: { trainingCenter: { district: { stateId } } } }),
+    prisma.user.count({ where: { stateId } }),
+  ]);
+  return (
+    players +
+    referees +
+    volunteers +
+    volunteerRegs +
+    payments +
+    migrationsFrom +
+    migrationsTo +
+    coaches +
+    users
+  );
+}

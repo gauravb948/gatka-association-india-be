@@ -21,10 +21,13 @@ import {
   isSingleSotiCatalogEventId,
   isTeamEvent,
   newParticipationTeamId,
+  orgUnitKeyForIndividualEvent,
+  orgUnitLabelForCompetitionLevel,
   type ParticipationWithEvent,
   playerFitsEventGroupAge,
   playerHasFariSotiParticipation,
   playerHasSingleSotiParticipation,
+  playerHasTeamEventParticipation,
 } from "../lib/competitionEventParticipation.js";
 import {
   actorPlayerProfileScopeWhere,
@@ -149,7 +152,9 @@ async function playerSaturatedForCompetition(playerUserId: string, ctx: CompWith
     try {
       await validatePlayersForCompetitionEvent(comp, comp, null, ev, [playerUserId], {
         dryRun: true,
-        existingByPlayer: new Map([[playerUserId, existing]]),
+        existingByPlayer: new Map([
+          [playerUserId, existing as ParticipationWithEvent[]],
+        ]),
       });
     } catch {
       continue;
@@ -161,7 +166,9 @@ async function playerSaturatedForCompetition(playerUserId: string, ctx: CompWith
 
 type ValidateParticipationOpts = {
   dryRun?: boolean;
-  existingByPlayer?: Map<string, Awaited<ReturnType<typeof participationRepository.findParticipationsWithEventsForPlayer>>>;
+  existingByPlayer?: Map<string, ParticipationWithEvent[]>;
+  /** Per catalog event: org-unit keys already claimed in this request batch (individual events only). */
+  claimedOrgUnitsByEvent?: Map<string, Set<string>>;
 };
 
 async function validatePlayersForCompetitionEvent(
@@ -204,14 +211,32 @@ async function validatePlayersForCompetitionEvent(
       assertRegistrarCanRecordParticipation(actor, compGeo, profile);
     }
 
-    const existingRaw =
+    const existing: ParticipationWithEvent[] =
       opts.existingByPlayer?.get(playerUserId) ??
-      (await participationRepository.findParticipationsWithEventsForPlayer(compFull.id, playerUserId));
-    const existing = existingRaw as unknown as ParticipationWithEvent[];
+      ((await participationRepository.findParticipationsWithEventsForPlayer(
+        compFull.id,
+        playerUserId
+      )) as ParticipationWithEvent[]);
 
     const dup = existing.find((r) => r.eventId === catalogEvent.id);
     if (dup) {
       throw new AppError(409, "Player already registered for this event", "ALREADY_IN_EVENT");
+    }
+
+    if (existing.length + 1 > 2) {
+      throw new AppError(
+        400,
+        "Player may participate in at most two events in this competition",
+        "EVENT_CAP"
+      );
+    }
+
+    if (team && playerHasTeamEventParticipation(existing)) {
+      throw new AppError(
+        400,
+        "Player may participate in at most one team event in this competition",
+        "TEAM_EVENT_CAP"
+      );
     }
 
     const signingUpSingleSoti =
@@ -244,12 +269,41 @@ async function validatePlayersForCompetitionEvent(
       }
     }
 
-    if (existing.length + 1 > 2) {
-      throw new AppError(
-        400,
-        "Player may participate in at most two events in this competition",
-        "EVENT_CAP"
+    if (!team) {
+      const orgKey = orgUnitKeyForIndividualEvent(compFull.level, profile);
+      const claimed = opts.claimedOrgUnitsByEvent?.get(catalogEvent.id);
+      if (claimed?.has(orgKey)) {
+        const unit = orgUnitLabelForCompetitionLevel(compFull.level);
+        throw new AppError(
+          400,
+          `Only one player from a ${unit} may participate in this individual event`,
+          "ORG_UNIT_INDIVIDUAL_CAP"
+        );
+      }
+      const conflict = await participationRepository.findOrgUnitConflictForIndividualEvent(
+        compFull.id,
+        catalogEvent.id,
+        compFull.level,
+        {
+          userId: profile.userId,
+          trainingCenterId: profile.trainingCenterId,
+          districtId: profile.districtId,
+          stateId: profile.stateId,
+        }
       );
+      if (conflict) {
+        const unit = orgUnitLabelForCompetitionLevel(compFull.level);
+        throw new AppError(
+          400,
+          `Only one player from a ${unit} may participate in this individual event`,
+          "ORG_UNIT_INDIVIDUAL_CAP"
+        );
+      }
+      if (opts.claimedOrgUnitsByEvent) {
+        const set = opts.claimedOrgUnitsByEvent.get(catalogEvent.id) ?? new Set<string>();
+        set.add(orgKey);
+        opts.claimedOrgUnitsByEvent.set(catalogEvent.id, set);
+      }
     }
   }
 }
@@ -737,13 +791,24 @@ export async function createParticipationBulk(req: Request, res: Response, next:
       throw new AppError(400, "Competition is closed", "COMPETITION_CLOSED");
     }
 
-    for (const item of body.items) {
-      const ev = catalogEvents.find((e) => e.id === item.eventId);
-      if (!ev) {
-        throw new AppError(400, `Unknown or inactive event: ${item.eventId}`, "UNKNOWN_EVENT");
-      }
-      await validatePlayersForCompetitionEvent(comp, comp, actor, ev, item.playerUserIds);
-    }
+    const allPlayerIds = [
+      ...new Set(
+        body.items.flatMap((item) => item.playerUserIds.map((s) => s.trim()).filter(Boolean))
+      ),
+    ];
+    const existingByPlayer = new Map<string, ParticipationWithEvent[]>();
+    await Promise.all(
+      allPlayerIds.map(async (playerUserId) => {
+        existingByPlayer.set(
+          playerUserId,
+          (await participationRepository.findParticipationsWithEventsForPlayer(
+            comp.id,
+            playerUserId
+          )) as ParticipationWithEvent[]
+        );
+      })
+    );
+    const claimedOrgUnitsByEvent = new Map<string, Set<string>>();
 
     const rows: Array<{
       competitionId: string;
@@ -755,9 +820,17 @@ export async function createParticipationBulk(req: Request, res: Response, next:
     }> = [];
 
     for (const item of body.items) {
-      const ev = catalogEvents.find((e) => e.id === item.eventId)!;
-      const teamId = isTeamEvent(ev) ? newParticipationTeamId() : null;
+      const ev = catalogEvents.find((e) => e.id === item.eventId);
+      if (!ev) {
+        throw new AppError(400, `Unknown or inactive event: ${item.eventId}`, "UNKNOWN_EVENT");
+      }
       const ids = [...new Set(item.playerUserIds.map((s) => s.trim()).filter(Boolean))];
+      await validatePlayersForCompetitionEvent(comp, comp, actor, ev, ids, {
+        existingByPlayer,
+        claimedOrgUnitsByEvent,
+      });
+
+      const teamId = isTeamEvent(ev) ? newParticipationTeamId() : null;
       for (const playerUserId of ids) {
         rows.push({
           competitionId: comp.id,
@@ -767,12 +840,16 @@ export async function createParticipationBulk(req: Request, res: Response, next:
           eventId: ev.id,
           teamId,
         });
+        const prior = existingByPlayer.get(playerUserId) ?? [];
+        existingByPlayer.set(playerUserId, [
+          ...prior,
+          { eventId: ev.id, event: ev },
+        ]);
       }
     }
 
     await participationRepository.createManyParticipationRecords(rows);
 
-    const allPlayerIds = [...new Set(rows.map((r) => r.playerUserId))];
     const records = await prisma.participationRecord.findMany({
       where: { competitionId: comp.id, playerUserId: { in: allPlayerIds }, participated: true },
       include: { event: true },

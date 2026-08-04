@@ -38,6 +38,18 @@ export function toSmsNumber(input: string): string {
   return v;
 }
 
+export function alreadyRegisteredMessage(identifier: string): string {
+  return isEmailLike(identifier)
+    ? "Email already registered"
+    : "Mobile number already registered";
+}
+
+export function accountNotFoundMessage(identifier: string): string {
+  return isEmailLike(identifier)
+    ? "No account found with this email"
+    : "No account found with this mobile number";
+}
+
 export function assertRegistrationVerificationToken(
   verificationToken: string,
   expectedIdentifiers: string[]

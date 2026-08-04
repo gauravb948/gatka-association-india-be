@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma.js";
 import { AppError } from "../lib/errors.js";
 import { assertHierarchyEnabled, type UserForHierarchyCheck } from "../lib/access.js";
 import { withAdminRegistrationIds } from "../lib/withAdminRegistrationIds.js";
+import { normalizePhoneOrEmail } from "../lib/otp.js";
 import * as userRepository from "../repositories/user.repository.js";
 import { patchMyProfileBodySchema } from "../validators/meProfile.validators.js";
 
@@ -49,7 +50,18 @@ export async function patchMyProfile(req: Request, res: Response, next: NextFunc
     if (body.email !== undefined && body.email !== actor.email) {
       const taken = await userRepository.findByEmail(body.email);
       if (taken && taken.id !== actor.id) {
-        throw new AppError(409, "Email already in use", "EMAIL_IN_USE");
+        throw new AppError(409, "Email already registered", "EMAIL_IN_USE");
+      }
+    }
+
+    if (body.phone !== undefined && body.phone !== null) {
+      const normalizedPhone = normalizePhoneOrEmail(body.phone);
+      const currentPhone = actor.phone ? normalizePhoneOrEmail(actor.phone) : null;
+      if (normalizedPhone !== currentPhone) {
+        const takenPhone = await userRepository.findByPhone(normalizedPhone);
+        if (takenPhone && takenPhone.id !== actor.id) {
+          throw new AppError(409, "Mobile number already registered", "PHONE_IN_USE");
+        }
       }
     }
 

@@ -6,6 +6,10 @@ export function findByEmail(email: string) {
   return prisma.user.findUnique({ where: { email } });
 }
 
+export function findByPhone(phone: string) {
+  return prisma.user.findFirst({ where: { phone } });
+}
+
 /** Primary national admin for public national-domain resolution (prefers super-national). */
 export function findPrimaryNationalAdmin() {
   return prisma.user.findFirst({

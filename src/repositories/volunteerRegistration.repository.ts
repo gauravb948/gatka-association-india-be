@@ -10,6 +10,10 @@ export function findByEmail(email: string) {
   return prisma.volunteerRegistration.findUnique({ where: { email } });
 }
 
+export function findByPhone(phone: string) {
+  return prisma.volunteerRegistration.findFirst({ where: { phone } });
+}
+
 export function findById(id: string) {
   return prisma.volunteerRegistration.findUnique({
     where: { id },

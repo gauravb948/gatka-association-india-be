@@ -5,7 +5,7 @@ import { AppError } from "../lib/errors.js";
 import { prisma } from "../lib/prisma.js";
 import { hashPassword } from "../lib/password.js";
 import { buildRegistrationAuthPayload } from "../lib/registrationSessionResponse.js";
-import { assertRegistrationVerificationToken } from "../lib/otp.js";
+import { assertRegistrationVerificationToken, normalizePhoneOrEmail } from "../lib/otp.js";
 import * as districtRegistrationRepo from "../repositories/districtRegistration.repository.js";
 import * as districtRepo from "../repositories/district.repository.js";
 import * as stateRegistrationRepo from "../repositories/stateRegistration.repository.js";
@@ -19,12 +19,20 @@ import {
 
 async function assertApplicantCredentialsAvailable(
   email: string,
-  ctx?: { previousEmail?: string; previousUserId?: string | null }
+  mobileNo: string,
+  ctx?: { previousEmail?: string; previousUserId?: string | null; previousMobileNo?: string }
 ) {
   if (email !== ctx?.previousEmail) {
     const u = await userRepository.findByEmail(email);
     if (u && u.id !== ctx?.previousUserId) {
-      throw new AppError(409, "Email already in use", "EMAIL_IN_USE");
+      throw new AppError(409, "Email already registered", "EMAIL_IN_USE");
+    }
+  }
+  const normalizedPhone = normalizePhoneOrEmail(mobileNo);
+  if (normalizedPhone !== ctx?.previousMobileNo) {
+    const byPhone = await userRepository.findByPhone(normalizedPhone);
+    if (byPhone && byPhone.id !== ctx?.previousUserId) {
+      throw new AppError(409, "Mobile number already registered", "PHONE_IN_USE");
     }
   }
 }
@@ -85,9 +93,10 @@ export async function create(req: Request, res: Response, next: NextFunction) {
     let userIdOut: string;
 
     if (existing) {
-      await assertApplicantCredentialsAvailable(body.email, {
+      await assertApplicantCredentialsAvailable(body.email, body.mobileNo, {
         previousEmail: existing.email,
         previousUserId: existing.userId,
+        previousMobileNo: normalizePhoneOrEmail(existing.mobileNo),
       });
 
       userIdOut = await prisma.$transaction(async (tx) => {
@@ -125,7 +134,7 @@ export async function create(req: Request, res: Response, next: NextFunction) {
       return res.json(payload);
     }
 
-    await assertApplicantCredentialsAvailable(body.email);
+    await assertApplicantCredentialsAvailable(body.email, body.mobileNo);
 
     userIdOut = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({ data: userCreateBase });

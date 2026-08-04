@@ -286,3 +286,22 @@ export async function patchOne(req: Request, res: Response, next: NextFunction) 
     next(e);
   }
 }
+
+export async function remove(req: Request, res: Response, next: NextFunction) {
+  try {
+    const u = req.dbUser!;
+    const existing = await districtRepository.findById(req.params.id);
+    if (!existing) throw new AppError(404, "District not found");
+    if (u.role === "STATE_ADMIN" && u.stateId !== existing.stateId) {
+      throw new AppError(403, "Cannot modify other state");
+    }
+    const used = await districtRepository.countUsagesBlockingDelete(existing.id);
+    if (used > 0) {
+      throw new AppError(400, "District in use by users, players, coaches, or volunteer registrations");
+    }
+    await districtRepository.deleteDistrict(existing.id);
+    res.status(204).send();
+  } catch (e) {
+    next(e);
+  }
+}

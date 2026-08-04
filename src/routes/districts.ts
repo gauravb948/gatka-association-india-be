@@ -55,3 +55,9 @@ districtsRouter.patch(
   requireRoles("STATE_ADMIN", "NATIONAL_ADMIN"),
   districtsController.patch
 );
+districtsRouter.delete(
+  "/:id",
+  requireAuth,
+  requireRoles("STATE_ADMIN", "NATIONAL_ADMIN"),
+  districtsController.remove
+);
