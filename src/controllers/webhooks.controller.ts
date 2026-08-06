@@ -6,6 +6,8 @@ import * as nationalPaymentRepository from "../repositories/nationalPayment.repo
 import * as paymentRepository from "../repositories/payment.repository.js";
 import * as razorpayWebhookRepository from "../repositories/razorpayWebhook.repository.js";
 import { applySuccessfulPayment } from "../lib/paymentHandlers.js";
+import { fetchCapturedPaymentForOrder, getRazorpayForState } from "../lib/razorpayClient.js";
+import { getRazorpayConfigForPayment } from "../lib/razorpayConfig.js";
 
 function verifySignature(body: string, signature: string | undefined, secret: string) {
   if (!signature || !secret) return false;
@@ -48,6 +50,13 @@ async function resolveWebhookSecret(purpose: PaymentPurpose, stateId: string) {
  * Every delivery is stored in RazorpayWebhookEvent. We look up the payment by
  * order_id, verify X-Razorpay-Signature, then mark paid (idempotent with
  * /payments/verify).
+ *
+ * If the signature check fails, we fall back to asking Razorpay's API directly
+ * (via our own key/secret, not the webhook secret) whether the order's payment is
+ * captured before rejecting — this stops a misconfigured webhookSecret from
+ * stranding an already-captured payment. The mismatch is still recorded on the
+ * RazorpayWebhookEvent row (`invalid_signature_recovered_via_api`) and logged so
+ * the stored webhookSecret can be fixed.
  */
 export async function razorpay(req: Request, res: Response, next: NextFunction) {
   let webhookEventId: string | undefined;
@@ -103,6 +112,37 @@ export async function razorpay(req: Request, res: Response, next: NextFunction) 
     await razorpayWebhookRepository.update(row.id, { signatureValid });
 
     if (!signatureValid) {
+      // The stored webhookSecret may be misconfigured even though the order/key
+      // secret is correct. Before rejecting, independently re-confirm capture with
+      // Razorpay's API (authenticated with our own key/secret) so a bad webhookSecret
+      // doesn't strand an already-captured payment. Never trust the webhook body itself
+      // for this decision — only Razorpay's authoritative response for this orderId.
+      let recoveredViaApi = false;
+      try {
+        const cfg = await getRazorpayConfigForPayment(payment.purpose, payment.stateId);
+        const rz = getRazorpayForState(cfg.razorpayKeyId, cfg.razorpayKeySecret);
+        const captured = await fetchCapturedPaymentForOrder(rz, orderId);
+        if (captured?.id) {
+          await applySuccessfulPayment(payment.id, captured.id);
+          recoveredViaApi = true;
+        }
+      } catch (fallbackErr) {
+        console.error("Razorpay webhook invalid-signature API fallback check failed", fallbackErr);
+      }
+
+      if (recoveredViaApi) {
+        console.error(
+          `Razorpay webhook signature mismatch for state ${payment.stateId} (purpose ${payment.purpose}) — ` +
+            `payment ${payment.id} recovered via API fallback. Check StatePaymentConfig.webhookSecret for this state.`
+        );
+        await razorpayWebhookRepository.update(row.id, {
+          processed: true,
+          processError: "invalid_signature_recovered_via_api",
+        });
+        res.json({ ok: true });
+        return;
+      }
+
       await razorpayWebhookRepository.update(row.id, {
         processError: "invalid_signature",
       });

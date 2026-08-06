@@ -1,31 +1,13 @@
 import crypto from "crypto";
 import { PaymentPurpose, PaymentStatus, type Prisma } from "@prisma/client";
 import type { NextFunction, Request, Response } from "express";
-import * as statePaymentRepository from "../repositories/statePayment.repository.js";
 import * as paymentRepository from "../repositories/payment.repository.js";
-import * as nationalPaymentRepository from "../repositories/nationalPayment.repository.js";
 import { AppError } from "../lib/errors.js";
 import { prisma } from "../lib/prisma.js";
-import { getRazorpayForState } from "../lib/razorpayClient.js";
+import { fetchCapturedPaymentForOrder, getRazorpayForState } from "../lib/razorpayClient.js";
+import { getRazorpayConfigForPayment } from "../lib/razorpayConfig.js";
 import { applySuccessfulPayment } from "../lib/paymentHandlers.js";
 import { createRazorpayOrderSchema, verifyPaymentSchema, reconcileRazorpaySchema } from "../validators/payment.validators.js";
-
-async function getRazorpayConfigForPayment(purpose: PaymentPurpose, stateId: string) {
-  if (purpose === PaymentPurpose.STATE_REGISTRATION) {
-    const cfg = await nationalPaymentRepository.findSingleton();
-    if (cfg) return cfg;
-    const keyId = process.env.RAZORPAY_KEY_ID;
-    const keySecret = process.env.RAZORPAY_KEY_SECRET;
-    if (keyId && keySecret) {
-      return { razorpayKeyId: keyId, razorpayKeySecret: keySecret, webhookSecret: "" };
-    }
-    throw new AppError(400, "National Razorpay config not set", "RZ_NOT_CONFIGURED");
-  }
-
-  const cfg = await statePaymentRepository.findByStateId(stateId);
-  if (!cfg) throw new AppError(400, "Razorpay not configured for state", "RZ_NOT_CONFIGURED");
-  return cfg;
-}
 
 export async function createRazorpayOrder(req: Request, res: Response, next: NextFunction) {
   try {
@@ -158,10 +140,6 @@ export async function verify(req: Request, res: Response, next: NextFunction) {
   }
 }
 
-type RazorpayOrderPayments = {
-  items?: Array<{ id?: string; status?: string; amount?: number }>;
-};
-
 /**
  * National-admin reconcile: for PENDING local payments, fetch the Razorpay order's
  * payments. If any are captured (or order paid), mark local payment PAID and run
@@ -213,20 +191,15 @@ export async function reconcileRazorpay(req: Request, res: Response, next: NextF
           clientCache.set(cacheKey, rz);
         }
 
-        const orderPayments = (await rz.orders.fetchPayments(orderId)) as RazorpayOrderPayments;
-        const items = orderPayments.items ?? [];
-        const captured =
-          items.find((p) => p.status === "captured") ??
-          items.find((p) => p.status === "authorized");
+        const captured = await fetchCapturedPaymentForOrder(rz, orderId);
 
         if (!captured?.id) {
           stillUnpaid += 1;
-          const latest = items[0];
           results.push({
             paymentId: pay.id,
             razorpayOrderId: orderId,
             action: "still_unpaid",
-            razorpayStatus: latest?.status ?? "no_payments",
+            razorpayStatus: "not_captured",
           });
           continue;
         }
