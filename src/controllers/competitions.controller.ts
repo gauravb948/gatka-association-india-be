@@ -44,6 +44,7 @@ import {
   competitionParticipationBulkBodySchema,
   competitionParticipationListQuerySchema,
   competitionPatchSchema,
+  competitionUnregisterParticipationBodySchema,
   competitionsListQuerySchema,
   competitionsMeQuerySchema,
 } from "../validators/competition.validators.js";
@@ -775,6 +776,60 @@ export async function createParticipation(req: Request, res: Response, next: Nex
     });
 
     res.status(201).json({ teamId, count: records.length, items: records });
+  } catch (e) {
+    next(e);
+  }
+}
+
+/**
+ * Unregister a player from a competition: deletes all of their participation rows,
+ * or only the given `eventId` when provided. Same registrar roles/scope as signup.
+ */
+export async function removeParticipation(req: Request, res: Response, next: NextFunction) {
+  try {
+    const body = competitionUnregisterParticipationBodySchema.parse(req.body);
+    const actor = req.dbUser!;
+    const ctx = await competitionRepository.findByIdForParticipationContext(req.params.id);
+    if (!ctx) throw new AppError(404, "Competition not found");
+    const { comp } = ctx;
+    if (comp.isClosed) {
+      throw new AppError(400, "Competition is closed", "COMPETITION_CLOSED");
+    }
+
+    const profile = await playerRepository.findProfileByUserId(body.playerUserId);
+    if (!profile) throw new AppError(404, "Player profile not found", "PLAYER_NOT_FOUND");
+    assertRegistrarCanRecordParticipation(actor, comp, profile);
+
+    const existing = await participationRepository.findParticipationsWithEventsForPlayer(
+      comp.id,
+      body.playerUserId
+    );
+    if (existing.length === 0) {
+      throw new AppError(404, "Player is not registered in this competition", "NOT_PARTICIPATING");
+    }
+
+    if (body.eventId) {
+      const inEvent = existing.some((r) => r.eventId === body.eventId);
+      if (!inEvent) {
+        throw new AppError(
+          404,
+          "Player is not registered for this event in the competition",
+          "NOT_IN_EVENT"
+        );
+      }
+    }
+
+    const result = await participationRepository.deleteParticipationsForPlayer(
+      comp.id,
+      body.playerUserId,
+      body.eventId
+    );
+
+    res.status(200).json({
+      unregisteredCount: result.count,
+      playerUserId: body.playerUserId,
+      eventId: body.eventId ?? null,
+    });
   } catch (e) {
     next(e);
   }

@@ -10,10 +10,17 @@ function splitQueryParts(raw: unknown): string[] | undefined {
   return parts.length ? parts : undefined;
 }
 
+const optionalNameSearch = z.preprocess((v) => {
+  if (v === undefined || v === null) return undefined;
+  const s = String(v).trim();
+  return s.length > 0 ? s : undefined;
+}, z.string().max(120).optional());
+
 /** Shared query for `GET /users/*` hierarchy listings. */
 export const userHierarchyListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  search: optionalNameSearch,
   status: z
     .union([z.string(), z.array(z.string())])
     .optional()

@@ -10,6 +10,12 @@ playersRouter.get(
   requireRoles("PLAYER"),
   playersController.getMyProfile
 );
+playersRouter.patch(
+  "/:userId/profile",
+  requireAuth,
+  requireRoles("STATE_ADMIN", "NATIONAL_ADMIN"),
+  playersController.updatePlayerByAdmin
+);
 playersRouter.post(
   "/me/renewal-payment",
   requireAuth,

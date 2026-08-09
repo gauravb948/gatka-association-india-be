@@ -55,6 +55,14 @@ components:
       in: query
       schema: { type: string }
       description: Optional training center filter (national; state/district when TC is in scope).
+    userListSearch:
+      name: search
+      in: query
+      schema: { type: string, maxLength: 120 }
+      description: >
+        Optional case-insensitive name search. Matches profile full name (players/coaches/referees/volunteers),
+        training center name or head name, state/district registration first/last/association name, or email for
+        national admins.
     competitionReportCompetitionId:
       name: competitionId
       in: query
@@ -1743,7 +1751,11 @@ components:
         participatingIn:
           type: array
           items: { type: string }
-          description: Event names the player is registered for in this event group
+          description: >
+            Single event name for this row. If a player is registered in multiple events
+            in the same group, they appear as separate rows (one event each).
+          minItems: 1
+          maxItems: 1
     CompetitionEventGroupParticipantsReport:
       type: object
       required: [totalParticipants, totalEventsPlayed, groups]
@@ -3952,6 +3964,56 @@ paths:
     get:
       security: [{ bearerAuth: [] }]
       summary: Player profile
+  /players/{userId}/profile:
+    patch:
+      security: [{ bearerAuth: [] }]
+      summary: Update player profile (state admin for own-state players, or national admin)
+      description: >
+        Updates player profile fields. State admins may only update players in their state.
+        Optional `districtId` / `trainingCenterId` move the player within the same state
+        (training center must belong to the resulting district). Does not change `stateId`.
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                phone: { type: string, nullable: true }
+                fullName: { type: string }
+                fatherName: { type: string, nullable: true }
+                motherName: { type: string, nullable: true }
+                aadharNumber: { type: string, nullable: true }
+                maritalStatus:
+                  type: string
+                  nullable: true
+                  enum: [SINGLE, MARRIED, DIVORCED, WIDOWED, SEPARATED, OTHER]
+                whatsappNo: { type: string, nullable: true }
+                tShirtSize: { type: string, enum: [XS, S, M, L, XL, XXL, XXXL], nullable: true }
+                playingHand: { type: string, enum: [LEFT, RIGHT, BOTH], nullable: true }
+                photoUrl: { type: string, format: uri, nullable: true }
+                aadharFrontUrl: { type: string, format: uri, nullable: true }
+                aadharBackUrl: { type: string, format: uri, nullable: true }
+                address: { type: string, nullable: true }
+                gender: { type: string, enum: [MALE, FEMALE, BOYS, GIRLS] }
+                dateOfBirth: { type: string, format: date-time }
+                districtId: { type: string }
+                trainingCenterId: { type: string }
+      responses:
+        "200":
+          description: Player updated successfully
+        "403":
+          description: Player outside state admin scope
+        "404":
+          description: Player not found
+        "409":
+          description: Phone already registered
   /competitions:
     get:
       summary: List competitions
@@ -4285,6 +4347,48 @@ paths:
           description: Role/level mismatch or player outside registrar scope
         "409":
           description: Player already in this event or duplicate single-soti in group
+    delete:
+      security: [{ bearerAuth: [] }]
+      summary: Unregister a player from a competition (or one event)
+      description: >
+        Deletes `ParticipationRecord` rows for `playerUserId` in this competition.
+        Omit `eventId` to remove all of the player's events; set `eventId` to remove only that event.
+        Same registrar roles and hierarchy/scope rules as participation create.
+        Blocked when the competition is closed.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [playerUserId]
+              properties:
+                playerUserId: { type: string }
+                eventId:
+                  type: string
+                  description: Optional catalog event id; when omitted, all events for the player are removed
+      responses:
+        "200":
+          description: Player unregistered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  unregisteredCount: { type: integer }
+                  playerUserId: { type: string }
+                  eventId: { type: string, nullable: true }
+        "400":
+          description: Competition closed
+        "403":
+          description: Role/level mismatch or player outside registrar scope
+        "404":
+          description: Competition, player, or participation not found
   /competitions/{id}/players-not-participated:
     get:
       security: [{ bearerAuth: [] }]
@@ -4698,6 +4802,7 @@ paths:
         - $ref: "#/components/parameters/userListStatus"
         - $ref: "#/components/parameters/userListDistrictId"
         - $ref: "#/components/parameters/userListTrainingCenterId"
+        - $ref: "#/components/parameters/userListSearch"
       responses:
         "200":
           description: OK (envelope `data` holds this object; includes `stateId` echo)
@@ -4728,6 +4833,7 @@ paths:
         - $ref: "#/components/parameters/userListStateId"
         - $ref: "#/components/parameters/userListDistrictId"
         - $ref: "#/components/parameters/userListTrainingCenterId"
+        - $ref: "#/components/parameters/userListSearch"
       responses:
         "200":
           description: OK (envelope `data` holds this object)
@@ -4750,6 +4856,7 @@ paths:
         - $ref: "#/components/parameters/userListStateId"
         - $ref: "#/components/parameters/userListDistrictId"
         - $ref: "#/components/parameters/userListTrainingCenterId"
+        - $ref: "#/components/parameters/userListSearch"
       responses:
         "200":
           description: OK
@@ -4775,6 +4882,7 @@ paths:
         - $ref: "#/components/parameters/userListStateId"
         - $ref: "#/components/parameters/userListDistrictId"
         - $ref: "#/components/parameters/userListTrainingCenterId"
+        - $ref: "#/components/parameters/userListSearch"
         - in: query
           name: userType
           schema:
@@ -4836,6 +4944,7 @@ paths:
         - $ref: "#/components/parameters/userListStateId"
         - $ref: "#/components/parameters/userListDistrictId"
         - $ref: "#/components/parameters/userListTrainingCenterId"
+        - $ref: "#/components/parameters/userListSearch"
       responses:
         "200":
           description: OK
@@ -4935,6 +5044,7 @@ paths:
         - $ref: "#/components/parameters/userListStateId"
         - $ref: "#/components/parameters/userListDistrictId"
         - $ref: "#/components/parameters/userListTrainingCenterId"
+        - $ref: "#/components/parameters/userListSearch"
       responses:
         "200":
           description: OK
@@ -4957,6 +5067,7 @@ paths:
         - $ref: "#/components/parameters/userListStateId"
         - $ref: "#/components/parameters/userListDistrictId"
         - $ref: "#/components/parameters/userListTrainingCenterId"
+        - $ref: "#/components/parameters/userListSearch"
       responses:
         "200":
           description: OK
@@ -4979,6 +5090,7 @@ paths:
         - $ref: "#/components/parameters/userListStateId"
         - $ref: "#/components/parameters/userListDistrictId"
         - $ref: "#/components/parameters/userListTrainingCenterId"
+        - $ref: "#/components/parameters/userListSearch"
       responses:
         "200":
           description: OK
@@ -5001,6 +5113,7 @@ paths:
         - $ref: "#/components/parameters/userListStateId"
         - $ref: "#/components/parameters/userListDistrictId"
         - $ref: "#/components/parameters/userListTrainingCenterId"
+        - $ref: "#/components/parameters/userListSearch"
       responses:
         "200":
           description: OK
@@ -5297,11 +5410,12 @@ paths:
       description: >
         Returns player profile details for each event group in the competition's age
         scope under `groups`, plus `totalParticipants` (distinct players) and
-        `totalEventsPlayed` (distinct events with registrations). Each player appears
-        once per group with `participatingIn` listing event names they are registered
-        for in that group. Optional `stateId`, `districtId`, `trainingCenterId`,
-        `gender`, and `search` (player/father/mother name) filters narrow players;
-        caller hierarchy scope always applies.
+        `totalEventsPlayed` (distinct events with registrations). Each participation
+        is one row: if a player is in two events in the same group, they appear twice
+        with `participatingIn` containing only that one event name each time.
+        Optional `stateId`, `districtId`, `trainingCenterId`, `gender`, and `search`
+        (player/father/mother name) filters narrow players; caller hierarchy scope
+        always applies.
       parameters:
         - $ref: "#/components/parameters/competitionReportCompetitionId"
         - $ref: "#/components/parameters/competitionReportStateId"

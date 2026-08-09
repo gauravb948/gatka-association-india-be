@@ -3,7 +3,7 @@ import type { NextFunction, Request, Response } from "express";
 import * as userRepository from "../repositories/user.repository.js";
 import { AppError } from "../lib/errors.js";
 import { prisma } from "../lib/prisma.js";
-import { validatedOptionalGeoClauses } from "../lib/userListFilters.js";
+import { validatedOptionalGeoClauses, nameSearchWhereForRole } from "../lib/userListFilters.js";
 import { assertCanListUserType, hierarchyGeoWhere } from "../lib/userListScope.js";
 import {
   officialsListQuerySchema,
@@ -16,7 +16,8 @@ function buildListWhere(
   targetRole: Role,
   geo: Prisma.UserWhereInput,
   optional: Prisma.UserWhereInput[],
-  statuses?: EntityStatus[]
+  statuses?: EntityStatus[],
+  search?: string
 ): Prisma.UserWhereInput {
   const parts: Prisma.UserWhereInput[] = [{ role: targetRole }];
   if (Object.keys(geo).length > 0) {
@@ -25,6 +26,10 @@ function buildListWhere(
   parts.push(...optional);
   if (statuses?.length) {
     parts.push({ status: { in: statuses } });
+  }
+  const nameSearch = nameSearchWhereForRole(targetRole, search);
+  if (nameSearch) {
+    parts.push(nameSearch);
   }
   return parts.length === 1 ? parts[0]! : { AND: parts };
 }
@@ -57,10 +62,11 @@ function buildOfficialsWhere(
   actor: Parameters<typeof hierarchyGeoWhere>[0],
   roles: Role[],
   optional: Prisma.UserWhereInput[],
-  statuses?: EntityStatus[]
+  statuses?: EntityStatus[],
+  search?: string
 ): Prisma.UserWhereInput {
   const roleClauses = roles.map((role) =>
-    buildListWhere(role, hierarchyGeoWhere(actor, role), optional, statuses)
+    buildListWhere(role, hierarchyGeoWhere(actor, role), optional, statuses, search)
   );
   return roleClauses.length === 1 ? roleClauses[0]! : { OR: roleClauses };
 }
@@ -131,7 +137,7 @@ export async function listPlayersByState(req: Request, res: Response, next: Next
       actor.role === "TRAINING_CENTER"
         ? []
         : await validatedOptionalGeoClauses(actor, { ...q, stateId });
-    const where = buildListWhere("PLAYER", geo, optional, q.status);
+    const where = buildListWhere("PLAYER", geo, optional, q.status, q.search);
     const skip = (q.page - 1) * q.pageSize;
     const [items, total] = await userRepository.findManyPaginatedWithWhere({
       where,
@@ -175,7 +181,7 @@ export function listUsersByRole(targetRole: Role) {
       const q = userHierarchyListQuerySchema.parse(req.query);
       const geo = hierarchyGeoWhere(actor, targetRole);
       const optional = await validatedOptionalGeoClauses(actor, q);
-      const where = buildListWhere(targetRole, geo, optional, q.status);
+      const where = buildListWhere(targetRole, geo, optional, q.status, q.search);
       const skip = (q.page - 1) * q.pageSize;
       const [items, total] = await userRepository.findManyPaginatedWithWhere({
         where,
@@ -205,7 +211,7 @@ export async function listOfficials(req: Request, res: Response, next: NextFunct
     const q = officialsListQuerySchema.parse(req.query);
     const roles = resolveListableOfficialRoles(actor.role, q.userType);
     const optional = await validatedOptionalGeoClauses(actor, q);
-    const where = buildOfficialsWhere(actor, roles, optional, [EntityStatus.ACCEPTED]);
+    const where = buildOfficialsWhere(actor, roles, optional, [EntityStatus.ACCEPTED], q.search);
     const skip = (q.page - 1) * q.pageSize;
     const [items, total] = await userRepository.findManyPaginatedWithWhere({
       where,

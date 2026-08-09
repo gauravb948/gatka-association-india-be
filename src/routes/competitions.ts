@@ -70,6 +70,12 @@ competitionsRouter.post(
   requireRoles("TRAINING_CENTER", "DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),
   competitionsController.createParticipation
 );
+competitionsRouter.delete(
+  "/:id/participations",
+  requireAuth,
+  requireRoles("TRAINING_CENTER", "DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),
+  competitionsController.removeParticipation
+);
 competitionsRouter.get(
   "/:id/players-not-participated",
   requireAuth,

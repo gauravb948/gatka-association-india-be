@@ -209,6 +209,21 @@ export async function createManyParticipationRecords(
   return prisma.participationRecord.createMany({ data });
 }
 
+/** Hard-delete participation rows for a player in a competition (optionally one event). */
+export function deleteParticipationsForPlayer(
+  competitionId: string,
+  playerUserId: string,
+  eventId?: string
+) {
+  return prisma.participationRecord.deleteMany({
+    where: {
+      competitionId,
+      playerUserId,
+      ...(eventId ? { eventId } : {}),
+    },
+  });
+}
+
 export function findManyByCompetitionAndPlayers(competitionId: string, playerUserIds: string[]) {
   return prisma.participationRecord.findMany({
     where: {

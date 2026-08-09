@@ -24,6 +24,12 @@ export const competitionParticipationBodySchema = z.object({
   playerUserIds: z.array(z.string().min(1)).min(1).max(32),
 });
 
+/** Body for `DELETE /competitions/:id/participations` — unregister a player (all events, or one if `eventId` set). */
+export const competitionUnregisterParticipationBodySchema = z.object({
+  playerUserId: z.string().min(1),
+  eventId: z.string().min(1).optional(),
+});
+
 /** Body for `POST /competitions/:id/participations/bulk` — multiple event signups in one request. */
 export const competitionParticipationBulkBodySchema = z.object({
   items: z.array(competitionParticipationBodySchema).min(1).max(30),

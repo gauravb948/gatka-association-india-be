@@ -12,6 +12,7 @@ export type CompetitionEventGroupParticipantRow = {
   age: number;
   aadharNumber: string | null;
   photoUrl: string | null;
+  /** One event name per row (multi-event players get multiple rows in the same group). */
   participatingIn: string[];
 };
 
@@ -89,10 +90,15 @@ export async function buildCompetitionEventGroupParticipantsReport(
 
   const allPlayerIds = new Set<string>();
   const allEventIds = new Set<string>();
+  /** Per event-group label: one entry per (player, event) so multi-event players become multiple rows. */
   const byGroup = new Map<
     string,
-    Map<string, { profile: NonNullable<(typeof rows)[number]["playerUser"]["playerProfile"]>; events: Set<string> }>
+    Array<{
+      profile: NonNullable<(typeof rows)[number]["playerUser"]["playerProfile"]>;
+      eventName: string;
+    }>
   >();
+
   for (const row of rows) {
     const profile = row.playerUser.playerProfile;
     const event = row.event;
@@ -106,25 +112,24 @@ export async function buildCompetitionEventGroupParticipantsReport(
       event.eventGroup.gender,
       event.eventGroup.ageCategory
     );
-    let players = byGroup.get(label);
-    if (!players) {
-      players = new Map();
-      byGroup.set(label, players);
+    let entries = byGroup.get(label);
+    if (!entries) {
+      entries = [];
+      byGroup.set(label, entries);
     }
-    let entry = players.get(row.playerUserId);
-    if (!entry) {
-      entry = { profile, events: new Set() };
-      players.set(row.playerUserId, entry);
-    }
-    entry.events.add(event.name);
+    entries.push({ profile, eventName: event.name });
   }
 
-  for (const [label, players] of byGroup) {
-    result[label] = [...players.values()]
-      .map(({ profile, events }) =>
-        mapProfileToRow(profile, ageAsOf, [...events].sort((a, b) => a.localeCompare(b)))
-      )
-      .sort((a, b) => a.name.localeCompare(b.name));
+  for (const [label, entries] of byGroup) {
+    result[label] = entries
+      .map(({ profile, eventName }) => mapProfileToRow(profile, ageAsOf, [eventName]))
+      .sort((a, b) => {
+        const byName = a.name.localeCompare(b.name);
+        if (byName !== 0) return byName;
+        const aEvent = a.participatingIn[0] ?? "";
+        const bEvent = b.participatingIn[0] ?? "";
+        return aEvent.localeCompare(bEvent);
+      });
   }
 
   return {

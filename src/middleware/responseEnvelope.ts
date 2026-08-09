@@ -34,6 +34,12 @@ function messageForKnownRoute(req: Request): string | null {
   if (method === "PATCH" && /\/auth\/me\/profile\/?$/.test(path)) {
     return "Profile updated successfully";
   }
+  if (method === "PATCH" && /\/players\/[^/]+\/profile\/?$/.test(path)) {
+    return "Player updated successfully";
+  }
+  if (method === "DELETE" && /\/competitions\/[^/]+\/participations\/?$/.test(path)) {
+    return "Player unregistered successfully";
+  }
 
   if (method !== "POST") return null;
 

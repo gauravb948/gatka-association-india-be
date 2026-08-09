@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import type { Prisma, Role } from "@prisma/client";
 import { prisma } from "./prisma.js";
 import { AppError } from "./errors.js";
 import type { DbUser } from "../types/user.js";
@@ -6,6 +6,64 @@ import type { UserHierarchyListQuery } from "../validators/userList.validators.j
 
 function hasAnyGeoFilter(q: UserHierarchyListQuery) {
   return Boolean(q.stateId || q.districtId || q.trainingCenterId);
+}
+
+const nameContains = (search: string) => ({ contains: search, mode: "insensitive" as const });
+
+/**
+ * Role-aware name search clause for hierarchy user listings.
+ * Matches profile full name / TC name / registration name fields (and email for national admins).
+ */
+export function nameSearchWhereForRole(
+  targetRole: Role,
+  search: string | undefined
+): Prisma.UserWhereInput | null {
+  const q = search?.trim();
+  if (!q) return null;
+  const contains = nameContains(q);
+
+  switch (targetRole) {
+    case "PLAYER":
+      return { playerProfile: { is: { fullName: contains } } };
+    case "COACH":
+      return { coachProfile: { is: { fullName: contains } } };
+    case "REFEREE":
+      return { refereeProfile: { is: { fullName: contains } } };
+    case "VOLUNTEER":
+      return { volunteerProfile: { is: { fullName: contains } } };
+    case "TRAINING_CENTER":
+      return {
+        trainingCenter: {
+          is: {
+            OR: [{ name: contains }, { headName: contains }],
+          },
+        },
+      };
+    case "STATE_ADMIN":
+      return {
+        stateRegistrationApplicant: {
+          is: {
+            OR: [
+              { firstName: contains },
+              { lastName: contains },
+              { associationName: contains },
+            ],
+          },
+        },
+      };
+    case "DISTRICT_ADMIN":
+      return {
+        districtRegistrationApplicant: {
+          is: {
+            OR: [{ firstName: contains }, { lastName: contains }],
+          },
+        },
+      };
+    case "NATIONAL_ADMIN":
+      return { email: contains };
+    default:
+      return null;
+  }
 }
 
 /**
