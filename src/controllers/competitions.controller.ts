@@ -49,7 +49,10 @@ import {
   competitionsMeQuerySchema,
 } from "../validators/competition.validators.js";
 import * as participationRepository from "../repositories/participation.repository.js";
-import { assertCanManageCompetition, assertCanViewCompetitionParticipants } from "../lib/competitionManagementScope.js";
+import {
+  assertCanManageCompetition,
+  assertCanViewCompetitionScopedReport,
+} from "../lib/competitionManagementScope.js";
 import { prisma } from "../lib/prisma.js";
 
 type CompForParticipation = NonNullable<
@@ -998,7 +1001,7 @@ export async function listParticipants(req: Request, res: Response, next: NextFu
     const actor = req.dbUser!;
     const comp = await competitionRepository.findByIdForPlayerEligibility(req.params.id);
     if (!comp) throw new AppError(404, "Competition not found");
-    await assertCanViewCompetitionParticipants(actor, comp);
+    await assertCanViewCompetitionScopedReport(actor, comp);
 
     const q = competitionParticipationListQuerySchema.parse(req.query);
     const skip = (q.page - 1) * q.pageSize;
