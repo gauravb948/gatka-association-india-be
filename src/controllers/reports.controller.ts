@@ -7,7 +7,10 @@ import { buildCompetitionRegistrationStats } from "../lib/competitionRegistratio
 import { buildCompetitionEventRegistrationReport } from "../lib/competitionEventRegistrationReport.js";
 import { buildCompetitionEventGroupParticipantsReport } from "../lib/competitionEventGroupParticipantsReport.js";
 import { buildCompetitionAgeWiseReport } from "../lib/competitionAgeWiseReport.js";
-import { assertCanViewCompetitionParticipants } from "../lib/competitionManagementScope.js";
+import {
+  assertCanViewCompetitionParticipants,
+  assertCanViewCompetitionScopedReport,
+} from "../lib/competitionManagementScope.js";
 import { AppError } from "../lib/errors.js";
 import { buildReportPlayerProfileWhere } from "../lib/reportPlayerProfileFilters.js";
 import {
@@ -74,7 +77,7 @@ export async function competitionEventRegistrations(
     const q = competitionEventRegistrationReportQuerySchema.parse(req.query);
     const comp = await competitionRepository.findByIdForPlayerEligibility(q.competitionId);
     if (!comp) throw new AppError(404, "Competition not found");
-    await assertCanViewCompetitionParticipants(actor, comp);
+    await assertCanViewCompetitionScopedReport(actor, comp);
 
     const playerProfileWhere = await buildReportPlayerProfileWhere(actor, q);
     const data = await buildCompetitionEventRegistrationReport(
@@ -98,7 +101,7 @@ export async function competitionEventGroupParticipants(
     const q = competitionEventGroupParticipantsReportQuerySchema.parse(req.query);
     const comp = await competitionRepository.findByIdForPlayerEligibility(q.competitionId);
     if (!comp) throw new AppError(404, "Competition not found");
-    await assertCanViewCompetitionParticipants(actor, comp);
+    await assertCanViewCompetitionScopedReport(actor, comp);
 
     const playerProfileWhere = await buildReportPlayerProfileWhere(actor, q);
     const ageAsOf = comp.ageTillDate ?? new Date();

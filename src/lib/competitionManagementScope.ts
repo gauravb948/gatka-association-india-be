@@ -128,3 +128,81 @@ export async function assertCanViewCompetitionParticipants(user: DbUser, comp: C
 
   await assertCompetitionWithinActorGeography(user, comp);
 }
+
+/**
+ * Competition is in-scope for the actor if their unit overlaps the competition geography
+ * (competition may be wider than the actor — used for lower-hierarchy report viewing).
+ */
+async function assertCompetitionOverlapsActorGeography(user: DbUser, comp: CompetitionGeo) {
+  if (user.role === "NATIONAL_ADMIN") return;
+
+  const unrestricted = comp.states.length === 0 && comp.districts.length === 0;
+
+  if (user.role === "STATE_ADMIN") {
+    if (!user.stateId) throw new AppError(403, "Forbidden", "FORBIDDEN_SCOPE");
+    if (unrestricted) return;
+    if (comp.states.some((s) => s.stateId === user.stateId)) return;
+    if (comp.districts.length > 0) {
+      const inState = await prisma.district.count({
+        where: {
+          id: { in: comp.districts.map((d) => d.districtId) },
+          stateId: user.stateId,
+        },
+      });
+      if (inState > 0) return;
+    }
+    throw new AppError(403, "Forbidden", "FORBIDDEN_SCOPE");
+  }
+
+  if (user.role === "DISTRICT_ADMIN") {
+    if (!user.districtId) throw new AppError(403, "Forbidden", "FORBIDDEN_SCOPE");
+    if (unrestricted) return;
+    if (comp.districts.some((d) => d.districtId === user.districtId)) return;
+    if (comp.districts.length === 0 && user.stateId) {
+      if (comp.states.some((s) => s.stateId === user.stateId)) return;
+    }
+    throw new AppError(403, "Forbidden", "FORBIDDEN_SCOPE");
+  }
+
+  if (user.role === "TRAINING_CENTER") {
+    const districtId = user.trainingCenter?.district.id ?? user.districtId;
+    const stateId = user.trainingCenter?.district.state.id ?? user.stateId;
+    if (!districtId) throw new AppError(403, "Forbidden", "FORBIDDEN_SCOPE");
+    if (unrestricted) return;
+    if (comp.districts.some((d) => d.districtId === districtId)) return;
+    if (comp.districts.length === 0 && stateId) {
+      if (comp.states.some((s) => s.stateId === stateId)) return;
+    }
+    throw new AppError(403, "Forbidden", "FORBIDDEN_SCOPE");
+  }
+
+  throw new AppError(403, "Forbidden", "FORBIDDEN_ROLE");
+}
+
+/**
+ * Scoped competition reports: same/upper hierarchy keeps full-containment geography checks;
+ * lower hierarchy may still view the competition and receive only their own scope's records
+ * (caller must filter players by actor geography).
+ */
+export async function assertCanViewCompetitionScopedReport(
+  user: DbUser,
+  comp: CompetitionGeo
+) {
+  if (user.role === "TRAINING_CENTER") {
+    await assertCompetitionOverlapsActorGeography(user, comp);
+    return;
+  }
+
+  const adminLevel = ADMIN_LEVEL[user.role];
+  if (adminLevel === undefined) {
+    throw new AppError(403, "Forbidden", "FORBIDDEN_ROLE");
+  }
+
+  const compLevel = COMPETITION_LEVEL_RANK[comp.level];
+  if (adminLevel < compLevel) {
+    await assertCompetitionOverlapsActorGeography(user, comp);
+    return;
+  }
+
+  await assertCompetitionWithinActorGeography(user, comp);
+}
