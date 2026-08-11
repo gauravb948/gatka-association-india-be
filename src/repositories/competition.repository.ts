@@ -361,6 +361,119 @@ export async function findManyForAuthenticatedUserPaginated(
   return { items, total };
 }
 
+/**
+ * Competitions for report/summary-sheet filter dropdowns.
+ * Uses the older hierarchy visibility (state admins see NATIONAL + STATE only — not lower DISTRICT comps).
+ * No session-year filter.
+ */
+export async function findManyForReportFiltersPaginated(
+  user: {
+    id: string;
+    role: Role;
+    stateId: string | null;
+    districtId: string | null;
+  },
+  pagination: { skip: number; take: number; nameContains?: string }
+) {
+  const { skip, take, nameContains } = pagination;
+
+  if (user.role === "NATIONAL_ADMIN") {
+    const where = withNameContains(adminCompetitionCreatorWhere(user), nameContains);
+    const [total, items] = await Promise.all([
+      prisma.competition.count({ where }),
+      prisma.competition.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take,
+        include: meListInclude,
+      }),
+    ]);
+    return { items, total };
+  }
+
+  if (user.role === "STATE_ADMIN") {
+    if (!user.stateId) return { items: [], total: 0 };
+    const geo: Prisma.CompetitionWhereInput = {
+      level: { in: ["NATIONAL", "STATE"] },
+      OR: [
+        { states: { some: { stateId: user.stateId } } },
+        { districts: { some: { district: { stateId: user.stateId } } } },
+        {
+          AND: [{ states: { none: {} } }, { districts: { none: {} } }],
+        },
+      ],
+    };
+    const where = withNameContains(geo, nameContains);
+    const [total, items] = await Promise.all([
+      prisma.competition.count({ where }),
+      prisma.competition.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take,
+        include: meListInclude,
+      }),
+    ]);
+    return { items, total };
+  }
+
+  if (user.role === "DISTRICT_ADMIN") {
+    if (!user.districtId) return { items: [], total: 0 };
+    const or: Prisma.CompetitionWhereInput[] = [
+      { districts: { some: { districtId: user.districtId } } },
+    ];
+    if (user.stateId) {
+      or.push({
+        AND: [
+          { districts: { none: {} } },
+          { states: { some: { stateId: user.stateId } } },
+        ],
+      });
+    }
+    or.push({
+      AND: [{ states: { none: {} } }, { districts: { none: {} } }],
+    });
+    const geo: Prisma.CompetitionWhereInput = {
+      level: { in: ["STATE", "DISTRICT"] },
+      OR: or,
+    };
+    const where = withNameContains(geo, nameContains);
+    const [total, items] = await Promise.all([
+      prisma.competition.count({ where }),
+      prisma.competition.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take,
+        include: meListInclude,
+      }),
+    ]);
+    return { items, total };
+  }
+
+  if (user.role === "TRAINING_CENTER" && user.districtId) {
+    const geo: Prisma.CompetitionWhereInput = {
+      level: "DISTRICT",
+      districts: { some: { districtId: user.districtId } },
+    };
+    const where = withNameContains(geo, nameContains);
+    const [total, items] = await Promise.all([
+      prisma.competition.count({ where }),
+      prisma.competition.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take,
+        include: meListInclude,
+      }),
+    ]);
+    return { items, total };
+  }
+
+  return { items: [], total: 0 };
+}
+
 /** Distinct UTC calendar years that have at least one competition (`createdAt`). Newest first. */
 export async function findDistinctCompetitionSessionYears(): Promise<number[]> {
   const rows = await prisma.$queryRaw<Array<{ year: number | bigint }>>`

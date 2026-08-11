@@ -15,6 +15,11 @@ competitionsRouter.get(
   requireAuth,
   competitionsController.listCompetitionSessions
 );
+competitionsRouter.get(
+  "/me/for-reports",
+  requireAuth,
+  competitionsController.listForReports
+);
 competitionsRouter.get("/", competitionsController.list);
 competitionsRouter.get(
   "/:id/event-groups",

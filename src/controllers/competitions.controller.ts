@@ -48,6 +48,7 @@ import {
   competitionUnregisterParticipationBodySchema,
   competitionsListQuerySchema,
   competitionsMeQuerySchema,
+  competitionsForReportsQuerySchema,
 } from "../validators/competition.validators.js";
 import * as participationRepository from "../repositories/participation.repository.js";
 import {
@@ -441,6 +442,46 @@ export async function listForCurrentUser(req: Request, res: Response, next: Next
     const { items, total } = await competitionRepository.findManyForAuthenticatedUserPaginated(
       listUser,
       { skip, take: q.pageSize, nameContains: q.name, sessionYear: q.session }
+    );
+    const totalPages = total === 0 ? 0 : Math.ceil(total / q.pageSize);
+    res.json({
+      items,
+      page: q.page,
+      pageSize: q.pageSize,
+      total,
+      totalPages,
+    });
+  } catch (e) {
+    next(e);
+  }
+}
+
+/**
+ * Competitions for report filter dropdowns (summary sheet, etc.).
+ * Older hierarchy visibility — excludes lower-level comps (e.g. state admin does not list DISTRICT).
+ */
+export async function listForReports(req: Request, res: Response, next: NextFunction) {
+  try {
+    const q = competitionsForReportsQuerySchema.parse(req.query);
+    const skip = (q.page - 1) * q.pageSize;
+    const u = req.dbUser!;
+    const listUser =
+      u.role === "TRAINING_CENTER"
+        ? {
+            id: u.id,
+            role: u.role,
+            stateId: u.stateId ?? u.trainingCenter?.district.state.id ?? null,
+            districtId: u.districtId ?? u.trainingCenter?.district.id ?? null,
+          }
+        : {
+            id: u.id,
+            role: u.role,
+            stateId: u.stateId,
+            districtId: u.districtId,
+          };
+    const { items, total } = await competitionRepository.findManyForReportFiltersPaginated(
+      listUser,
+      { skip, take: q.pageSize, nameContains: q.name }
     );
     const totalPages = total === 0 ? 0 : Math.ceil(total / q.pageSize);
     res.json({

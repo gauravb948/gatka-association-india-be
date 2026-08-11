@@ -19,6 +19,16 @@ export const competitionsMeQuerySchema = z.object({
   session: z.coerce.number().int().min(2000).max(2100).optional(),
 });
 
+/**
+ * Query for `GET /competitions/me/for-reports` — report filter dropdowns.
+ * Uses pre–lower-hierarchy visibility (no session year filter).
+ */
+export const competitionsForReportsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  name: optionalNameSearch,
+});
+
 /** Body for `POST /competitions/:id/participations` — catalog `Event.id`; multiple ids for team events. */
 export const competitionParticipationBodySchema = z.object({
   eventId: z.string().min(1),
