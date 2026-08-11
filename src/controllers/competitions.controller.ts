@@ -44,6 +44,7 @@ import {
   competitionParticipationBulkBodySchema,
   competitionParticipationListQuerySchema,
   competitionPatchSchema,
+  competitionReplaceParticipationBodySchema,
   competitionUnregisterParticipationBodySchema,
   competitionsListQuerySchema,
   competitionsMeQuerySchema,
@@ -173,6 +174,8 @@ type ValidateParticipationOpts = {
   existingByPlayer?: Map<string, ParticipationWithEvent[]>;
   /** Per catalog event: org-unit keys already claimed in this request batch (individual events only). */
   claimedOrgUnitsByEvent?: Map<string, Set<string>>;
+  /** Skip batch min/max size check (e.g. single-player replace onto an existing team). */
+  skipBatchTeamSizeAssert?: boolean;
 };
 
 async function validatePlayersForCompetitionEvent(
@@ -188,7 +191,9 @@ async function validatePlayersForCompetitionEvent(
     throw new AppError(400, "Duplicate player ids in request", "DUPLICATE_PLAYER_IDS");
   }
   const bounds = effectiveEventBounds(catalogEvent);
-  assertTeamSize(ids.length, bounds);
+  if (!opts.skipBatchTeamSizeAssert) {
+    assertTeamSize(ids.length, bounds);
+  }
   const team = isTeamEvent(catalogEvent);
   if (!team && ids.length !== 1) {
     throw new AppError(400, "This event accepts a single player only", "SINGLE_PLAYER_EVENT");
@@ -435,7 +440,7 @@ export async function listForCurrentUser(req: Request, res: Response, next: Next
           };
     const { items, total } = await competitionRepository.findManyForAuthenticatedUserPaginated(
       listUser,
-      { skip, take: q.pageSize, nameContains: q.name }
+      { skip, take: q.pageSize, nameContains: q.name, sessionYear: q.session }
     );
     const totalPages = total === 0 ? 0 : Math.ceil(total / q.pageSize);
     res.json({
@@ -445,6 +450,16 @@ export async function listForCurrentUser(req: Request, res: Response, next: Next
       total,
       totalPages,
     });
+  } catch (e) {
+    next(e);
+  }
+}
+
+/** Distinct competition season years (`createdAt` UTC) present in the database. */
+export async function listCompetitionSessions(req: Request, res: Response, next: NextFunction) {
+  try {
+    const years = await competitionRepository.findDistinctCompetitionSessionYears();
+    res.json({ years });
   } catch (e) {
     next(e);
   }
@@ -751,9 +766,42 @@ export async function createParticipation(req: Request, res: Response, next: Nex
     }
 
     const playerIds = [...new Set(body.playerUserIds.map((s) => s.trim()).filter(Boolean))];
-    await validatePlayersForCompetitionEvent(comp, comp, actor, catalogEvent, playerIds);
+    const team = isTeamEvent(catalogEvent);
+    const bounds = effectiveEventBounds(catalogEvent);
+    const actorScope = actorPlayerProfileScopeWhere(actor);
 
-    const teamId = isTeamEvent(catalogEvent) ? newParticipationTeamId() : null;
+    let existingCount = 0;
+    let existingTeamId: string | null = null;
+    if (team) {
+      existingCount = await participationRepository.countParticipatedInEvent(comp.id, catalogEvent.id, {
+        playerProfileWhere: actorScope,
+      });
+      const latest = await participationRepository.findLatestParticipatedInEventForScope(
+        comp.id,
+        catalogEvent.id,
+        actorScope
+      );
+      existingTeamId = latest?.teamId ?? null;
+    }
+
+    /** Roster already meets min — allow adding fewer than min in this request (up to max). */
+    const isTeamTopUp = team && existingCount >= bounds.min && existingCount > 0;
+
+    if (isTeamTopUp) {
+      await validatePlayersForCompetitionEvent(comp, comp, actor, catalogEvent, playerIds, {
+        skipBatchTeamSizeAssert: true,
+      });
+      assertTeamSize(existingCount + playerIds.length, bounds);
+    } else {
+      await validatePlayersForCompetitionEvent(comp, comp, actor, catalogEvent, playerIds);
+    }
+
+    const teamId = team
+      ? isTeamTopUp
+        ? existingTeamId ?? newParticipationTeamId()
+        : newParticipationTeamId()
+      : null;
+
     await participationRepository.createManyParticipationRecords(
       playerIds.map((playerUserId) => ({
         competitionId: comp.id,
@@ -787,6 +835,7 @@ export async function createParticipation(req: Request, res: Response, next: Nex
 /**
  * Unregister a player from a competition: deletes all of their participation rows,
  * or only the given `eventId` when provided. Same registrar roles/scope as signup.
+ * Team events: remaining teammates for that team/event must still meet `minPlayers`.
  */
 export async function removeParticipation(req: Request, res: Response, next: NextFunction) {
   try {
@@ -794,7 +843,7 @@ export async function removeParticipation(req: Request, res: Response, next: Nex
     const actor = req.dbUser!;
     const ctx = await competitionRepository.findByIdForParticipationContext(req.params.id);
     if (!ctx) throw new AppError(404, "Competition not found");
-    const { comp } = ctx;
+    const { comp, catalogEvents } = ctx;
     if (comp.isClosed) {
       throw new AppError(400, "Competition is closed", "COMPETITION_CLOSED");
     }
@@ -820,6 +869,25 @@ export async function removeParticipation(req: Request, res: Response, next: Nex
           "NOT_IN_EVENT"
         );
       }
+
+      const catalogEvent = catalogEvents.find((e) => e.id === body.eventId);
+      if (catalogEvent && isTeamEvent(catalogEvent)) {
+        const row = await participationRepository.findExistingParticipationForEvent(
+          comp.id,
+          body.playerUserId,
+          body.eventId
+        );
+        const bounds = effectiveEventBounds(catalogEvent);
+        const count =
+          row?.teamId != null
+            ? await participationRepository.countParticipatedInEvent(comp.id, body.eventId, {
+                teamId: row.teamId,
+              })
+            : await participationRepository.countParticipatedInEvent(comp.id, body.eventId, {
+                playerProfileWhere: actorPlayerProfileScopeWhere(actor),
+              });
+        assertTeamSize(count - 1, bounds);
+      }
     }
 
     const result = await participationRepository.deleteParticipationsForPlayer(
@@ -832,6 +900,91 @@ export async function removeParticipation(req: Request, res: Response, next: Nex
       unregisteredCount: result.count,
       playerUserId: body.playerUserId,
       eventId: body.eventId ?? null,
+    });
+  } catch (e) {
+    next(e);
+  }
+}
+
+/**
+ * Replace one registered player with an eligible player for the same event.
+ * Keeps team size unchanged (min/max stay satisfied). Same registrar roles/scope as signup.
+ */
+export async function replaceParticipation(req: Request, res: Response, next: NextFunction) {
+  try {
+    const body = competitionReplaceParticipationBodySchema.parse(req.body);
+    const actor = req.dbUser!;
+    const ctx = await competitionRepository.findByIdForParticipationContext(req.params.id);
+    if (!ctx) throw new AppError(404, "Competition not found");
+    const { comp, catalogEvents } = ctx;
+    if (comp.isClosed) {
+      throw new AppError(400, "Competition is closed", "COMPETITION_CLOSED");
+    }
+
+    const removeId = body.removePlayerUserId.trim();
+    const addId = body.addPlayerUserId.trim();
+    if (!removeId || !addId) {
+      throw new AppError(400, "Both players are required", "INVALID_REPLACE");
+    }
+    if (removeId === addId) {
+      throw new AppError(400, "Replacement player must be different", "SAME_PLAYER");
+    }
+
+    const catalogEvent = catalogEvents.find((e) => e.id === body.eventId);
+    if (!catalogEvent) {
+      throw new AppError(400, "Unknown or inactive event", "UNKNOWN_EVENT");
+    }
+
+    const removeProfile = await playerRepository.findProfileByUserId(removeId);
+    if (!removeProfile) throw new AppError(404, "Player profile not found", "PLAYER_NOT_FOUND");
+    assertRegistrarCanRecordParticipation(actor, comp, removeProfile);
+
+    const removeRow = await participationRepository.findExistingParticipationForEvent(
+      comp.id,
+      removeId,
+      catalogEvent.id
+    );
+    if (!removeRow) {
+      throw new AppError(
+        404,
+        "Player is not registered for this event in the competition",
+        "NOT_IN_EVENT"
+      );
+    }
+
+    await validatePlayersForCompetitionEvent(comp, comp, actor, catalogEvent, [addId], {
+      skipBatchTeamSizeAssert: true,
+    });
+
+    const teamId = isTeamEvent(catalogEvent)
+      ? removeRow.teamId ?? newParticipationTeamId()
+      : null;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.participationRecord.deleteMany({
+        where: {
+          competitionId: comp.id,
+          playerUserId: removeId,
+          eventId: catalogEvent.id,
+        },
+      });
+      await tx.participationRecord.create({
+        data: {
+          competitionId: comp.id,
+          playerUserId: addId,
+          level: comp.level,
+          participated: true,
+          eventId: catalogEvent.id,
+          teamId,
+        },
+      });
+    });
+
+    res.status(200).json({
+      eventId: catalogEvent.id,
+      removedPlayerUserId: removeId,
+      addedPlayerUserId: addId,
+      teamId,
     });
   } catch (e) {
     next(e);
@@ -996,6 +1149,7 @@ export async function listPlayersNotParticipated(req: Request, res: Response, ne
   }
 }
 
+/** `GET /competitions/:id/participants` — optional `eventId` filters to that catalog event (used with eligible-players side-by-side). */
 export async function listParticipants(req: Request, res: Response, next: NextFunction) {
   try {
     const actor = req.dbUser!;
@@ -1031,7 +1185,7 @@ export async function listParticipants(req: Request, res: Response, next: NextFu
         skip,
         take: q.pageSize,
       },
-      { playerProfileWhere }
+      { playerProfileWhere, eventId: q.eventId }
     );
     const totalPages = total === 0 ? 0 : Math.ceil(total / q.pageSize);
 

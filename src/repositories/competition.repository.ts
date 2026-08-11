@@ -14,6 +14,23 @@ function withNameContains(
   return { AND: [where, nameFilter] };
 }
 
+/** Filter competitions whose `createdAt` falls in the UTC calendar year `sessionYear`. */
+function withSessionYear(
+  where: Prisma.CompetitionWhereInput,
+  sessionYear?: number
+): Prisma.CompetitionWhereInput {
+  if (sessionYear == null || !Number.isFinite(sessionYear)) return where;
+  const year = Math.trunc(sessionYear);
+  const sessionFilter: Prisma.CompetitionWhereInput = {
+    createdAt: {
+      gte: new Date(Date.UTC(year, 0, 1)),
+      lt: new Date(Date.UTC(year + 1, 0, 1)),
+    },
+  };
+  if (Object.keys(where).length === 0) return sessionFilter;
+  return { AND: [where, sessionFilter] };
+}
+
 /** Competitions whose results the caller may list (hierarchy-scoped). Returns null when not allowed. */
 export function competitionResultsVisibilityWhere(user: {
   role: Role;
@@ -25,7 +42,7 @@ export function competitionResultsVisibilityWhere(user: {
   if (user.role === "STATE_ADMIN") {
     if (!user.stateId) return null;
     return {
-      level: { in: ["NATIONAL", "STATE"] },
+      level: { in: ["NATIONAL", "STATE", "DISTRICT"] },
       OR: [
         { states: { some: { stateId: user.stateId } } },
         { districts: { some: { district: { stateId: user.stateId } } } },
@@ -183,8 +200,9 @@ export function findMany(filters?: { nameContains?: string }) {
 
 /**
  * National — comps you created, by lower admins, or legacy (no creator).
- * State — non-national comps whose selected states include this admin's state, or whose
- * selected districts fall in this state (e.g. national admin chose states A+B → only A/B state admins).
+ * State — national/state/district comps whose selected states include this admin's state, or whose
+ * selected districts fall in this state (lower-hierarchy district comps are included for visibility;
+ * manage/participant actions stay role-gated on the client and in write APIs).
  * District — selected district matches, or state-only scope (no districts) with this admin's state.
  * Training center — `DISTRICT`-level competitions that list this TC's district (`districtId` from user or linked TC).
  * Player — distinct competitions where they have at least one `participated` participation record.
@@ -197,12 +215,12 @@ export async function findManyForAuthenticatedUserPaginated(
     stateId: string | null;
     districtId: string | null;
   },
-  pagination: { skip: number; take: number; nameContains?: string; openOnly?: boolean }
+  pagination: { skip: number; take: number; nameContains?: string; openOnly?: boolean; sessionYear?: number }
 ) {
-  const { skip, take, nameContains, openOnly } = pagination;
+  const { skip, take, nameContains, openOnly, sessionYear } = pagination;
 
   if (user.role === "NATIONAL_ADMIN") {
-    const base = withNameContains(adminCompetitionCreatorWhere(user), nameContains);
+    const base = withSessionYear(withNameContains(adminCompetitionCreatorWhere(user), nameContains), sessionYear);
     const where = openOnly ? { AND: [base, { isClosed: false }] } : base;
     const [total, items] = await Promise.all([
       prisma.competition.count({ where }),
@@ -221,7 +239,7 @@ export async function findManyForAuthenticatedUserPaginated(
 
     if (!user.stateId) return { items: [], total: 0 };
     const geo: Prisma.CompetitionWhereInput = {
-      level: { in: ["NATIONAL", "STATE"] },
+      level: { in: ["NATIONAL", "STATE", "DISTRICT"] },
       OR: [
         { states: { some: { stateId: user.stateId } } },
         { districts: { some: { district: { stateId: user.stateId } } } },
@@ -230,7 +248,7 @@ export async function findManyForAuthenticatedUserPaginated(
         },
       ],
     };
-    const base = withNameContains(geo, nameContains);
+    const base = withSessionYear(withNameContains(geo, nameContains), sessionYear);
     const where = openOnly ? { AND: [base, { isClosed: false }] } : base;
     const [total, items] = await Promise.all([
       prisma.competition.count({ where }),
@@ -265,7 +283,7 @@ export async function findManyForAuthenticatedUserPaginated(
       level: { in: ["STATE", "DISTRICT"] },
       OR: or,
     };
-    const base = withNameContains(geo, nameContains);
+    const base = withSessionYear(withNameContains(geo, nameContains), sessionYear);
     const where = openOnly ? { AND: [base, { isClosed: false }] } : base;
     const [total, items] = await Promise.all([
       prisma.competition.count({ where }),
@@ -285,7 +303,7 @@ export async function findManyForAuthenticatedUserPaginated(
       level: "DISTRICT",
       districts: { some: { districtId: user.districtId } },
     };
-    const base = withNameContains(geo, nameContains);
+    const base = withSessionYear(withNameContains(geo, nameContains), sessionYear);
     const where = openOnly ? { AND: [base, { isClosed: false }] } : base;
     const [total, items] = await Promise.all([
       prisma.competition.count({ where }),
@@ -307,7 +325,7 @@ export async function findManyForAuthenticatedUserPaginated(
     });
     const idList = grouped.map((g) => g.competitionId);
     if (idList.length === 0) return { items: [], total: 0 };
-    const base = withNameContains({ id: { in: idList } }, nameContains);
+    const base = withSessionYear(withNameContains({ id: { in: idList } }, nameContains), sessionYear);
     const where = openOnly ? { AND: [base, { isClosed: false }] } : base;
     const [total, items] = await Promise.all([
       prisma.competition.count({ where }),
@@ -328,7 +346,7 @@ export async function findManyForAuthenticatedUserPaginated(
   });
   const idList = grouped.map((g) => g.competitionId);
   if (idList.length === 0) return { items: [], total: 0 };
-  const base = withNameContains({ id: { in: idList } }, nameContains);
+  const base = withSessionYear(withNameContains({ id: { in: idList } }, nameContains), sessionYear);
   const where = openOnly ? { AND: [base, { isClosed: false }] } : base;
   const [total, items] = await Promise.all([
     prisma.competition.count({ where }),
@@ -341,6 +359,18 @@ export async function findManyForAuthenticatedUserPaginated(
     }),
   ]);
   return { items, total };
+}
+
+/** Distinct UTC calendar years that have at least one competition (`createdAt`). Newest first. */
+export async function findDistinctCompetitionSessionYears(): Promise<number[]> {
+  const rows = await prisma.$queryRaw<Array<{ year: number | bigint }>>`
+    SELECT DISTINCT EXTRACT(YEAR FROM ("createdAt" AT TIME ZONE 'UTC'))::int AS year
+    FROM "Competition"
+    ORDER BY year DESC
+  `;
+  return rows
+    .map((r) => (typeof r.year === "bigint" ? Number(r.year) : r.year))
+    .filter((y) => Number.isFinite(y));
 }
 
 /** Same visibility as `findManyForAuthenticatedUserPaginated`; returns total count only (for dashboard). */

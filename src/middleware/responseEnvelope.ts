@@ -43,6 +43,10 @@ function messageForKnownRoute(req: Request): string | null {
 
   if (method !== "POST") return null;
 
+  if (/\/competitions\/[^/]+\/participations\/replace\/?$/.test(path)) {
+    return "Player replaced successfully";
+  }
+
   if (/\/auth\/login\/?$/.test(path)) return "Signed in successfully";
   if (/\/auth\/register\/player\/?$/.test(path)) return "Player registered successfully";
   if (/\/auth\/register\/coach\/?$/.test(path)) return "Coach registration submitted successfully";

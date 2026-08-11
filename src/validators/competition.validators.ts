@@ -11,11 +11,12 @@ export const competitionsListQuerySchema = z.object({
   name: optionalNameSearch,
 });
 
-/** Query for `GET /competitions/me`. */
+/** Query for `GET /competitions/me`. `session` = UTC calendar year of `createdAt` (competition season). */
 export const competitionsMeQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
   name: optionalNameSearch,
+  session: z.coerce.number().int().min(2000).max(2100).optional(),
 });
 
 /** Body for `POST /competitions/:id/participations` — catalog `Event.id`; multiple ids for team events. */
@@ -30,16 +31,30 @@ export const competitionUnregisterParticipationBodySchema = z.object({
   eventId: z.string().min(1).optional(),
 });
 
+/** Body for `POST /competitions/:id/participations/replace` — swap one team (or event) player for another. */
+export const competitionReplaceParticipationBodySchema = z.object({
+  eventId: z.string().min(1),
+  removePlayerUserId: z.string().min(1),
+  addPlayerUserId: z.string().min(1),
+});
+
 /** Body for `POST /competitions/:id/participations/bulk` — multiple event signups in one request. */
 export const competitionParticipationBulkBodySchema = z.object({
   items: z.array(competitionParticipationBodySchema).min(1).max(30),
 });
 
-/** Query for paginated competition participation lists. */
+const optionalEventId = z.preprocess((v) => {
+  if (v === undefined || v === null) return undefined;
+  const s = String(v).trim();
+  return s.length > 0 ? s : undefined;
+}, z.string().min(1).optional());
+
+/** Query for paginated competition participation lists (`eventId` scopes registered rows to one catalog event). */
 export const competitionParticipationListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  pageSize: z.coerce.number().int().min(1).max(200).default(20),
   search: optionalNameSearch,
+  eventId: optionalEventId,
 });
 
 const requiredDateString = z

@@ -61,10 +61,18 @@ export function effectiveEventBounds(event: EventLike): { min: number; max: numb
 
 export function assertTeamSize(playerCount: number, bounds: { min: number; max: number }): void {
   if (playerCount < bounds.min) {
-    throw new AppError(400, `At least ${bounds.min} players required for this event`, "TEAM_SIZE_MIN");
+    throw new AppError(
+      400,
+      `At least ${bounds.min} players required for this event (would be ${playerCount})`,
+      "TEAM_SIZE_MIN"
+    );
   }
   if (playerCount > bounds.max) {
-    throw new AppError(400, `At most ${bounds.max} players allowed for this event`, "TEAM_SIZE_MAX");
+    throw new AppError(
+      400,
+      `At most ${bounds.max} players allowed for this event (would be ${playerCount})`,
+      "TEAM_SIZE_MAX"
+    );
   }
 }
 

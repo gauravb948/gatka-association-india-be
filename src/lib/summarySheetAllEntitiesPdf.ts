@@ -71,10 +71,100 @@ async function fetchImageBuffer(url: string): Promise<Buffer | null> {
 
 type PdfDoc = InstanceType<typeof PDFDocument>;
 
+type EntityHeaderArgs = {
+  associationTitle: string;
+  competition: SummarySheetPdfCompetition;
+  scopeLabel: string;
+  showAffiliation: boolean;
+  logoBuf: Buffer | null;
+};
+
+/** Active header redrawn on every `addPage` / overflow while rendering an entity. */
+let activeEntityHeader: EntityHeaderArgs | null = null;
+
+function drawEntityHeader(doc: PdfDoc, args: EntityHeaderArgs) {
+  const { associationTitle, competition, scopeLabel, showAffiliation, logoBuf } = args;
+  const pageWidth = doc.page.width;
+  const rightX = pageWidth - PAGE_MARGIN - LOGO_SIZE;
+  const y0 = PAGE_MARGIN;
+
+  if (logoBuf) {
+    try {
+      doc.image(logoBuf, PAGE_MARGIN, y0, {
+        fit: [LOGO_SIZE, LOGO_SIZE],
+      });
+      doc.image(logoBuf, rightX, y0, {
+        fit: [LOGO_SIZE, LOGO_SIZE],
+      });
+    } catch {
+      // ignore logo render errors
+    }
+  }
+
+  // Center titles on the full page (same visual center as FE dual-logo header).
+  let y = y0 + 2;
+
+  y = drawCenteredHeading(doc, associationTitle, y, {
+    font: "Times-Bold",
+    size: 16,
+    gapAfter: 2,
+  });
+
+  if (showAffiliation) {
+    y = drawCenteredHeading(doc, "(Affiliated to Gatka Federation of India)", y, {
+      font: "Times-Roman",
+      size: 9,
+      gapAfter: 6,
+    });
+  } else {
+    y += 4;
+  }
+
+  y = drawCenteredHeading(doc, competition.name, y, {
+    font: "Times-Bold",
+    size: 11,
+    gapAfter: 2,
+  });
+
+  if (competition.venue?.trim()) {
+    y = drawCenteredHeading(doc, competition.venue.trim(), y, {
+      font: "Times-Roman",
+      size: 9,
+      gapAfter: 2,
+    });
+  }
+
+  const dateRange = formatPrintDateRange(competition.startDate, competition.endDate);
+  if (dateRange) {
+    y = drawCenteredHeading(doc, dateRange, y, {
+      font: "Times-Roman",
+      size: 9,
+      gapAfter: 6,
+    });
+  }
+
+  if (scopeLabel) {
+    y = drawCenteredHeading(doc, scopeLabel, y, {
+      font: "Times-Bold",
+      size: 11,
+      gapAfter: 4,
+    });
+  }
+
+  doc.y = Math.max(y, y0 + LOGO_SIZE) + 12;
+}
+
+function addPageWithHeader(doc: PdfDoc) {
+  doc.addPage();
+  if (activeEntityHeader) {
+    drawEntityHeader(doc, activeEntityHeader);
+  }
+}
+
 function ensureSpace(doc: PdfDoc, needed: number) {
   const bottom = doc.page.height - PAGE_MARGIN;
   if (doc.y + needed > bottom) {
-    doc.addPage();
+    addPageWithHeader(doc);
   }
 }
 
@@ -160,6 +250,7 @@ function drawParticipantSection(
   rows: CompetitionEventGroupParticipantRow[],
   photoCache: Map<string, Buffer | null>
 ) {
+  if (rows.length === 0) return;
   ensureSpace(doc, 60);
   const sectionY = doc.y;
   doc.font("Helvetica-Bold").fontSize(11).fillColor("#000000");
@@ -188,15 +279,6 @@ function drawParticipantSection(
     },
   ];
   drawTableHeader(doc, cols);
-
-  if (rows.length === 0) {
-    doc
-      .font("Helvetica")
-      .fontSize(8)
-      .text("No participants in this event group.", PAGE_MARGIN, doc.y, { lineBreak: false });
-    doc.y += 14;
-    return;
-  }
 
   for (const row of rows) {
     ensureSpace(doc, 36);
@@ -295,87 +377,6 @@ function drawCenteredHeading(
   return y + h + (opts.gapAfter ?? 2);
 }
 
-function drawEntityHeader(
-  doc: PdfDoc,
-  args: {
-    associationTitle: string;
-    competition: SummarySheetPdfCompetition;
-    scopeLabel: string;
-    showAffiliation: boolean;
-    logoBuf: Buffer | null;
-  }
-) {
-  const { associationTitle, competition, scopeLabel, showAffiliation, logoBuf } = args;
-  const pageWidth = doc.page.width;
-  const rightX = pageWidth - PAGE_MARGIN - LOGO_SIZE;
-  const y0 = PAGE_MARGIN;
-
-  if (logoBuf) {
-    try {
-      doc.image(logoBuf, PAGE_MARGIN, y0, {
-        fit: [LOGO_SIZE, LOGO_SIZE],
-      });
-      doc.image(logoBuf, rightX, y0, {
-        fit: [LOGO_SIZE, LOGO_SIZE],
-      });
-    } catch {
-      // ignore logo render errors
-    }
-  }
-
-  // Center titles on the full page (same visual center as FE dual-logo header).
-  let y = y0 + 2;
-
-  y = drawCenteredHeading(doc, associationTitle, y, {
-    font: "Times-Bold",
-    size: 16,
-    gapAfter: 2,
-  });
-
-  if (showAffiliation) {
-    y = drawCenteredHeading(doc, "(Affiliated to Gatka Federation of India)", y, {
-      font: "Times-Roman",
-      size: 9,
-      gapAfter: 6,
-    });
-  } else {
-    y += 4;
-  }
-
-  y = drawCenteredHeading(doc, competition.name, y, {
-    font: "Times-Bold",
-    size: 11,
-    gapAfter: 2,
-  });
-
-  if (competition.venue?.trim()) {
-    y = drawCenteredHeading(doc, competition.venue.trim(), y, {
-      font: "Times-Roman",
-      size: 9,
-      gapAfter: 2,
-    });
-  }
-
-  const dateRange = formatPrintDateRange(competition.startDate, competition.endDate);
-  if (dateRange) {
-    y = drawCenteredHeading(doc, dateRange, y, {
-      font: "Times-Roman",
-      size: 9,
-      gapAfter: 6,
-    });
-  }
-
-  if (scopeLabel) {
-    y = drawCenteredHeading(doc, scopeLabel, y, {
-      font: "Times-Bold",
-      size: 11,
-      gapAfter: 4,
-    });
-  }
-
-  doc.y = Math.max(y, y0 + LOGO_SIZE) + 12;
-}
-
 function drawTotals(doc: PdfDoc, participants: CompetitionEventGroupParticipantsReport) {
   const width = doc.page.width - PAGE_MARGIN * 2;
   let y = doc.y;
@@ -421,8 +422,11 @@ function drawEntityBody(
     }
   }
 
-  const participantEntries = Object.entries(participants?.groups ?? {});
+  const participantEntries = Object.entries(participants?.groups ?? {}).filter(
+    ([, rows]) => Array.isArray(rows) && rows.length > 0
+  );
   if (participantEntries.length > 0) {
+    addPageWithHeader(doc);
     drawMainSectionHeading(doc, "Participants List");
     for (const [groupLabel, rows] of participantEntries) {
       drawParticipantSection(doc, groupLabel, rows, photoCache);
@@ -466,15 +470,17 @@ export async function streamSummarySheetAllEntitiesPdf(
       ? `${bundle.entity.name} (${genderLabel})`
       : bundle.entity.name;
 
-    drawEntityHeader(doc, {
+    activeEntityHeader = {
       associationTitle,
       competition,
       scopeLabel,
       showAffiliation,
       logoBuf,
-    });
+    };
+    drawEntityHeader(doc, activeEntityHeader);
     drawEntityBody(doc, bundle.registration, bundle.participants, photoCache);
   }
 
+  activeEntityHeader = null;
   doc.end();
 }

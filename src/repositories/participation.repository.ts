@@ -291,6 +291,51 @@ export function findExistingParticipationForEvent(
   });
 }
 
+/** Count participated rows for an event, optionally limited to one `teamId` (or null-team rows). */
+export function countParticipatedInEvent(
+  competitionId: string,
+  eventId: string,
+  opts?: { teamId?: string | null; playerProfileWhere?: Prisma.PlayerProfileWhereInput }
+) {
+  const teamFilter =
+    opts && "teamId" in opts
+      ? opts.teamId == null
+        ? { teamId: null }
+        : { teamId: opts.teamId }
+      : {};
+  return prisma.participationRecord.count({
+    where: {
+      competitionId,
+      eventId,
+      participated: true,
+      ...teamFilter,
+      ...(opts?.playerProfileWhere && Object.keys(opts.playerProfileWhere).length > 0
+        ? { playerUser: { playerProfile: opts.playerProfileWhere } }
+        : {}),
+    },
+  });
+}
+
+/** Latest participated row for an event in a registrar profile scope (used to reuse `teamId` on top-up). */
+export function findLatestParticipatedInEventForScope(
+  competitionId: string,
+  eventId: string,
+  playerProfileWhere?: Prisma.PlayerProfileWhereInput
+) {
+  return prisma.participationRecord.findFirst({
+    where: {
+      competitionId,
+      eventId,
+      participated: true,
+      ...(playerProfileWhere && Object.keys(playerProfileWhere).length > 0
+        ? { playerUser: { playerProfile: playerProfileWhere } }
+        : {}),
+    },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, teamId: true },
+  });
+}
+
 export function findParticipationsWithEventsForPlayer(competitionId: string, playerUserId: string) {
   return prisma.participationRecord.findMany({
     where: { competitionId, playerUserId, participated: true },
@@ -425,14 +470,16 @@ const participationListInclude = {
   },
 } satisfies Prisma.ParticipationRecordInclude;
 
+/** Paginated `participated` rows for a competition; optional `eventId` scopes to one catalog event. */
 export async function findManyByCompetitionPaginated(
   competitionId: string,
   pagination: { skip: number; take: number },
-  opts?: { playerProfileWhere?: Prisma.PlayerProfileWhereInput }
+  opts?: { playerProfileWhere?: Prisma.PlayerProfileWhereInput; eventId?: string }
 ) {
   const where: Prisma.ParticipationRecordWhereInput = {
     competitionId,
     participated: true,
+    ...(opts?.eventId ? { eventId: opts.eventId } : {}),
     ...(opts?.playerProfileWhere && Object.keys(opts.playerProfileWhere).length > 0
       ? { playerUser: { playerProfile: opts.playerProfileWhere } }
       : {}),

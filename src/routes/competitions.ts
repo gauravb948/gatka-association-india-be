@@ -10,6 +10,11 @@ competitionsRouter.get(
   requireAuth,
   competitionsController.listForCurrentUser
 );
+competitionsRouter.get(
+  "/me/sessions",
+  requireAuth,
+  competitionsController.listCompetitionSessions
+);
 competitionsRouter.get("/", competitionsController.list);
 competitionsRouter.get(
   "/:id/event-groups",
@@ -63,6 +68,12 @@ competitionsRouter.post(
   requireAuth,
   requireRoles("TRAINING_CENTER", "DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),
   competitionsController.createParticipationBulk
+);
+competitionsRouter.post(
+  "/:id/participations/replace",
+  requireAuth,
+  requireRoles("TRAINING_CENTER", "DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),
+  competitionsController.replaceParticipation
 );
 competitionsRouter.post(
   "/:id/participations",
