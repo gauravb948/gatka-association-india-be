@@ -262,26 +262,29 @@ function drawParticipantSection(
   doc.y = sectionY + 16;
 
   const contentWidth = doc.page.width - PAGE_MARGIN * 2;
-  const photoW = 28;
+  const photoW = 48;
+  const photoColW = photoW + 6;
+  const textStart = PAGE_MARGIN + photoColW;
+  const textWidth = contentWidth - photoColW;
   const cols: Array<{ label: string; x: number; w: number; align?: "left" | "center" | "right" }> = [
-    { label: "Photo", x: PAGE_MARGIN, w: photoW + 4, align: "left" },
-    { label: "Name", x: PAGE_MARGIN + 34, w: contentWidth * 0.16, align: "left" },
-    { label: "Father", x: PAGE_MARGIN + 34 + contentWidth * 0.16, w: contentWidth * 0.12, align: "left" },
-    { label: "Mother", x: PAGE_MARGIN + 34 + contentWidth * 0.28, w: contentWidth * 0.12, align: "left" },
-    { label: "DOB", x: PAGE_MARGIN + 34 + contentWidth * 0.4, w: contentWidth * 0.1, align: "left" },
-    { label: "Age", x: PAGE_MARGIN + 34 + contentWidth * 0.5, w: contentWidth * 0.06, align: "center" },
-    { label: "Aadhar", x: PAGE_MARGIN + 34 + contentWidth * 0.56, w: contentWidth * 0.12, align: "left" },
+    { label: "Photo", x: PAGE_MARGIN, w: photoColW, align: "left" },
+    { label: "Name", x: textStart, w: textWidth * 0.16, align: "left" },
+    { label: "Father", x: textStart + textWidth * 0.16, w: textWidth * 0.12, align: "left" },
+    { label: "Mother", x: textStart + textWidth * 0.28, w: textWidth * 0.12, align: "left" },
+    { label: "DOB", x: textStart + textWidth * 0.4, w: textWidth * 0.1, align: "left" },
+    { label: "Age", x: textStart + textWidth * 0.5, w: textWidth * 0.06, align: "center" },
+    { label: "Aadhar", x: textStart + textWidth * 0.56, w: textWidth * 0.12, align: "left" },
     {
       label: "Participating in",
-      x: PAGE_MARGIN + 34 + contentWidth * 0.68,
-      w: contentWidth * 0.28,
+      x: textStart + textWidth * 0.68,
+      w: textWidth * 0.28,
       align: "left",
     },
   ];
   drawTableHeader(doc, cols);
 
   for (const row of rows) {
-    ensureSpace(doc, 36);
+    ensureSpace(doc, photoW + 12);
     const y = doc.y;
     const photoUrl = row.photoUrl?.trim() || "";
     const photoBuf = photoUrl ? photoCache.get(photoUrl) ?? null : null;
@@ -291,7 +294,7 @@ function drawParticipantSection(
         doc.image(photoBuf, cols[0]!.x, y, { fit: [photoW, photoW] });
       } catch {
         const initial = (row.name.trim().charAt(0) || "?").toUpperCase();
-        doc.font("Helvetica").fontSize(10).text(initial, cols[0]!.x, y + 8, {
+        doc.font("Helvetica").fontSize(12).text(initial, cols[0]!.x, y + 14, {
           width: photoW,
           align: "center",
           lineBreak: false,
@@ -299,7 +302,7 @@ function drawParticipantSection(
       }
     } else {
       const initial = (row.name.trim().charAt(0) || "?").toUpperCase();
-      doc.font("Helvetica").fontSize(10).text(initial, cols[0]!.x, y + 8, {
+      doc.font("Helvetica").fontSize(12).text(initial, cols[0]!.x, y + 14, {
         width: photoW,
         align: "center",
         lineBreak: false,

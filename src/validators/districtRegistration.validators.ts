@@ -1,11 +1,12 @@
 import { z } from "zod";
 import { EntityStatus } from "@prisma/client";
+import { capsString } from "../lib/storedCaps.js";
 
 export const districtRegistrationCreateSchema = z.object({
   stateId: z.string().min(1),
   districtId: z.string().min(1),
-  firstName: z.string().min(1).max(80),
-  lastName: z.string().min(1).max(80),
+  firstName: capsString(80),
+  lastName: capsString(80),
   email: z.string().email(),
   password: z.string().min(8).max(128),
   mobileNo: z.string().min(10).max(15),

@@ -167,7 +167,25 @@ export async function findParticipationsForCompetitionStatsReport(
     select: {
       competitionId: true,
       playerUserId: true,
-      competition: { select: { id: true, name: true, createdAt: true } },
+      competition: {
+        select: {
+          id: true,
+          name: true,
+          level: true,
+          createdAt: true,
+          states: { select: { state: { select: { name: true } } } },
+          districts: {
+            select: {
+              district: {
+                select: {
+                  name: true,
+                  state: { select: { name: true } },
+                },
+              },
+            },
+          },
+        },
+      },
       event: {
         select: {
           eventGroup: {

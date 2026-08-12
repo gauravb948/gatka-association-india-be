@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { MaritalStatus, PlayingHand, TShirtSize } from "@prisma/client";
+import { optionalCapsString, optionalNullableCapsString } from "../lib/storedCaps.js";
 
 export const playerRenewalPaymentSchema = z.object({
   stateId: z.string(),
@@ -16,30 +17,13 @@ export const playerDistrictBlacklistSchema = z.object({
   blacklistRemarks: z.string().optional(),
 });
 
-const optionalTrimmed = (max: number) =>
-  z
-    .string()
-    .min(1)
-    .max(max)
-    .transform((s) => s.trim())
-    .optional();
-
-const optionalNullableTrimmed = (max: number) =>
-  z
-    .string()
-    .min(1)
-    .max(max)
-    .transform((s) => s.trim())
-    .nullable()
-    .optional();
-
 /** State/national admin update of a player's profile (and optional account phone). */
 export const adminUpdatePlayerProfileSchema = z
   .object({
     phone: z.string().min(7).max(25).nullable().optional(),
-    fullName: optionalTrimmed(200),
-    fatherName: optionalNullableTrimmed(160),
-    motherName: optionalNullableTrimmed(160),
+    fullName: optionalCapsString(200),
+    fatherName: optionalNullableCapsString(160),
+    motherName: optionalNullableCapsString(160),
     aadharNumber: z
       .string()
       .min(8)

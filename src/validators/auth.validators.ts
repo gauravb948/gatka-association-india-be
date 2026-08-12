@@ -6,6 +6,7 @@ import {
   PlayingHand,
   TShirtSize,
 } from "@prisma/client";
+import { capsString } from "../lib/storedCaps.js";
 
 /** Physical persons only; OPEN is reserved for competition `genders`. */
 const personGenderSchema = z.enum(["MALE", "FEMALE", "BOYS", "GIRLS"]);
@@ -16,9 +17,9 @@ export const loginSchema = z.object({
 });
 
 export const registerPlayerSchema = z.object({
-  fullName: z.string().min(1).max(200),
-  fatherName: z.string().min(1).max(160),
-  motherName: z.string().min(1).max(160),
+  fullName: capsString(200),
+  fatherName: capsString(160),
+  motherName: capsString(160),
   aadharNumber: z
     .string()
     .min(8)
@@ -48,15 +49,15 @@ export const registerPlayerSchema = z.object({
 });
 
 export const registerCoachSchema = z.object({
-  fullName: z.string().min(1).max(200),
-  fatherName: z.string().min(1).max(160),
+  fullName: capsString(200),
+  fatherName: capsString(160),
   aadharNumber: z
     .string()
     .min(8)
     .max(20)
     .transform((s) => s.replace(/\s/g, "")),
   address: z.string().min(3).max(1000),
-  education: z.string().min(1).max(2000),
+  education: capsString(2000),
   stateId: z.string().min(1),
   districtId: z.string().min(1),
   email: z.string().email(),
@@ -74,16 +75,16 @@ export const registerCoachSchema = z.object({
 });
 
 export const registerRefereeSchema = z.object({
-  fullName: z.string().min(1).max(200),
-  fatherName: z.string().min(1).max(160),
+  fullName: capsString(200),
+  fatherName: capsString(160),
   aadharNumber: z
     .string()
     .min(8)
     .max(20)
     .transform((s) => s.replace(/\s/g, "")),
   address: z.string().min(3).max(1000),
-  education: z.string().min(1).max(2000),
-  appliedFor: z.string().min(1).max(160),
+  education: capsString(2000),
+  appliedFor: capsString(160),
   experienceInGatka: z.nativeEnum(GatkaExperience),
   email: z.string().email(),
   password: z.string().min(8),
@@ -104,9 +105,9 @@ export const registerRefereeSchema = z.object({
 
 export const registerVolunteerSchema = z
   .object({
-    fullName: z.string().min(1).max(200),
-    fatherName: z.string().min(1).max(160),
-    motherName: z.string().min(1).max(160),
+    fullName: capsString(200),
+    fatherName: capsString(160),
+    motherName: capsString(160),
     aadharNumber: z
       .string()
       .min(8)
@@ -128,7 +129,7 @@ export const registerVolunteerSchema = z
     hasDisability: z.boolean(),
     disabilityDetails: z.preprocess(
       (v) => (v === "" || v === null || v === undefined ? undefined : v),
-      z.string().min(1).max(1000).optional()
+      capsString(1000).optional()
     ),
     photoUrl: z.string().url(),
     aadharFrontUrl: z.string().url(),
@@ -150,11 +151,11 @@ export const registerTrainingCenterSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
   phone: z.string().min(7).max(20),
-  name: z.string().min(1).max(160),
+  name: capsString(160),
   address: z.string().min(3).max(1000),
   stateId: z.string().min(1),
   districtId: z.string().min(1),
-  headName: z.string().min(1).max(160),
+  headName: capsString(160),
   headAadharNumber: z
     .string()
     .min(8)

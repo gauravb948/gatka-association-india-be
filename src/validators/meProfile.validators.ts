@@ -6,12 +6,16 @@ import {
   PlayingHand,
   TShirtSize,
 } from "@prisma/client";
+import {
+  optionalCapsString,
+  optionalNullableCapsString,
+} from "../lib/storedCaps.js";
 
 export const playerProfileSelfSchema = z
   .object({
-    fullName: z.string().min(1).max(200).transform((s) => s.trim()).optional(),
-    fatherName: z.string().min(1).max(160).transform((s) => s.trim()).nullable().optional(),
-    motherName: z.string().min(1).max(160).transform((s) => s.trim()).nullable().optional(),
+    fullName: optionalCapsString(200),
+    fatherName: optionalNullableCapsString(160),
+    motherName: optionalNullableCapsString(160),
     whatsappNo: z.string().min(7).max(25).optional(),
     address: z.string().min(3).max(1000).optional(),
     maritalStatus: z.nativeEnum(MaritalStatus).optional(),
@@ -25,10 +29,10 @@ export const playerProfileSelfSchema = z
 
 export const coachProfileSelfSchema = z
   .object({
-    fullName: z.string().min(1).max(200).transform((s) => s.trim()).optional(),
-    fatherName: z.string().min(1).max(160).transform((s) => s.trim()).nullable().optional(),
+    fullName: optionalCapsString(200),
+    fatherName: optionalNullableCapsString(160),
     address: z.string().min(3).max(1000).optional(),
-    education: z.string().min(1).max(2000).optional(),
+    education: optionalCapsString(2000),
     appliedFor: z.nativeEnum(CoachAppliedFor).optional(),
     experienceInGatka: z.nativeEnum(GatkaExperience).optional(),
     photoUrl: z.string().url().optional(),
@@ -39,12 +43,12 @@ export const coachProfileSelfSchema = z
 
 export const refereeProfileSelfSchema = z
   .object({
-    fullName: z.string().min(1).max(200).transform((s) => s.trim()).optional(),
-    fatherName: z.string().min(1).max(160).transform((s) => s.trim()).nullable().optional(),
+    fullName: optionalCapsString(200),
+    fatherName: optionalNullableCapsString(160),
     alternatePhone: z.string().min(7).max(25).optional(),
     address: z.string().min(3).max(1000).optional(),
-    appliedFor: z.string().min(1).max(160).optional(),
-    education: z.string().min(1).max(2000).optional(),
+    appliedFor: optionalCapsString(160),
+    education: optionalCapsString(2000),
     experienceInGatka: z.nativeEnum(GatkaExperience).optional(),
     photoUrl: z.string().url().optional(),
     aadharFrontUrl: z.string().url().optional(),
@@ -54,15 +58,15 @@ export const refereeProfileSelfSchema = z
 
 export const volunteerProfileSelfSchema = z
   .object({
-    fullName: z.string().min(1).max(200).transform((s) => s.trim()).optional(),
-    fatherName: z.string().min(1).max(160).transform((s) => s.trim()).nullable().optional(),
-    motherName: z.string().min(1).max(160).transform((s) => s.trim()).nullable().optional(),
+    fullName: optionalCapsString(200),
+    fatherName: optionalNullableCapsString(160),
+    motherName: optionalNullableCapsString(160),
     alternatePhone: z.string().min(7).max(25).optional(),
     address: z.string().min(3).max(1000).optional(),
     maritalStatus: z.nativeEnum(MaritalStatus).optional(),
     tShirtSize: z.nativeEnum(TShirtSize).optional(),
     hasDisability: z.boolean().optional(),
-    disabilityDetails: z.string().min(1).max(1000).nullable().optional(),
+    disabilityDetails: optionalNullableCapsString(1000),
     photoUrl: z.string().url().optional(),
     aadharFrontUrl: z.string().url().optional(),
     aadharBackUrl: z.string().url().optional(),
@@ -71,9 +75,9 @@ export const volunteerProfileSelfSchema = z
 
 export const trainingCenterOrgSelfSchema = z
   .object({
-    name: z.string().min(1).max(160).optional(),
+    name: optionalCapsString(160),
     address: z.string().min(3).max(1000).optional(),
-    headName: z.string().min(1).max(160).optional(),
+    headName: optionalCapsString(160),
     registrarNumber: z.string().min(2).max(60).nullable().optional(),
     headAadharNumber: z
       .string()
@@ -90,11 +94,11 @@ export const trainingCenterOrgSelfSchema = z
 
 export const stateRegistrationSelfSchema = z
   .object({
-    firstName: z.string().min(1).max(80).optional(),
-    lastName: z.string().min(1).max(80).optional(),
+    firstName: optionalCapsString(80),
+    lastName: optionalCapsString(80),
     mobileNo: z.string().min(10).max(15).optional(),
     address: z.string().min(1).optional(),
-    associationName: z.string().min(1).max(200).optional(),
+    associationName: optionalCapsString(200),
     associationOfficeAddress: z.string().min(1).optional(),
     associationOfficialContactNumber: z.string().min(10).max(15).optional(),
     associationRegisterNumber: z.string().min(1).max(80).optional(),
@@ -108,8 +112,8 @@ export const stateRegistrationSelfSchema = z
 
 export const districtRegistrationSelfSchema = z
   .object({
-    firstName: z.string().min(1).max(80).optional(),
-    lastName: z.string().min(1).max(80).optional(),
+    firstName: optionalCapsString(80),
+    lastName: optionalCapsString(80),
     mobileNo: z.string().min(10).max(15).optional(),
     address: z.string().min(1).optional(),
     passportPhotoUrl: z.string().url().nullable().optional(),

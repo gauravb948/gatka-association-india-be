@@ -1,4 +1,4 @@
-import type { AgeBandType, Gender } from "@prisma/client";
+import type { AgeBandType, CompetitionLevel, Gender } from "@prisma/client";
 
 const JUNIOR_BANDS = new Set<AgeBandType>(["SUB_JUNIOR", "JUNIOR"]);
 const SENIOR_BANDS = new Set<AgeBandType>(["SENIOR", "VETERAN", "OPEN"]);
@@ -34,6 +34,8 @@ export function genderBucketForRegistration(
 export type CompetitionRegistrationStatRow = {
   competitionId: string;
   competition: string;
+  /** State name(s) for STATE comps, district name(s) for DISTRICT comps, "National" for NATIONAL. */
+  region: string;
   total: number;
   men: number;
   women: number;
@@ -44,7 +46,14 @@ export type CompetitionRegistrationStatRow = {
 export type RegistrationStatSource = {
   competitionId: string;
   playerUserId: string;
-  competition: { id: string; name: string; createdAt: Date };
+  competition: {
+    id: string;
+    name: string;
+    level: CompetitionLevel;
+    createdAt: Date;
+    states: Array<{ state: { name: string } }>;
+    districts: Array<{ district: { name: string; state: { name: string } } }>;
+  };
   event: {
     eventGroup: {
       ageCategory: { bandType: AgeBandType | null };
@@ -55,6 +64,35 @@ export type RegistrationStatSource = {
   };
 };
 
+function uniqueJoined(names: string[]): string {
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  for (const raw of names) {
+    const name = raw.trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    ordered.push(name);
+  }
+  return ordered.join(", ");
+}
+
+/** Common region label: district for DISTRICT, state for STATE, National for NATIONAL. */
+export function regionLabelForCompetition(comp: RegistrationStatSource["competition"]): string {
+  if (comp.level === "DISTRICT") {
+    const districts = uniqueJoined(comp.districts.map((d) => d.district.name));
+    return districts || "—";
+  }
+  if (comp.level === "STATE") {
+    const fromStates = uniqueJoined(comp.states.map((s) => s.state.name));
+    if (fromStates) return fromStates;
+    const fromDistrictStates = uniqueJoined(comp.districts.map((d) => d.district.state.name));
+    return fromDistrictStates || "—";
+  }
+  return "National";
+}
+
 export function buildCompetitionRegistrationStats(
   rows: RegistrationStatSource[]
 ): CompetitionRegistrationStatRow[] {
@@ -62,6 +100,7 @@ export function buildCompetitionRegistrationStats(
     string,
     {
       competition: string;
+      region: string;
       createdAt: Date;
       total: Set<string>;
       men: Set<string>;
@@ -85,6 +124,7 @@ export function buildCompetitionRegistrationStats(
     if (!group) {
       group = {
         competition: row.competition.name,
+        region: regionLabelForCompetition(row.competition),
         createdAt: row.competition.createdAt,
         total: new Set(),
         men: new Set(),
@@ -103,6 +143,7 @@ export function buildCompetitionRegistrationStats(
     .map(([competitionId, g]) => ({
       competitionId,
       competition: g.competition,
+      region: g.region,
       total: g.total.size,
       men: g.men.size,
       women: g.women.size,

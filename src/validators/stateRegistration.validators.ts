@@ -1,17 +1,18 @@
 import { z } from "zod";
 import { EntityStatus } from "@prisma/client";
+import { capsString } from "../lib/storedCaps.js";
 
 const optionalDocUrl = z.string().url().nullable().optional();
 
 export const stateRegistrationCreateSchema = z.object({
   stateId: z.string().min(1),
-  firstName: z.string().min(1).max(80),
-  lastName: z.string().min(1).max(80),
+  firstName: capsString(80),
+  lastName: capsString(80),
   /** User resident address */
   address: z.string().min(1),
   /** User contact number */
   mobileNo: z.string().min(10).max(15),
-  associationName: z.string().min(1).max(200),
+  associationName: capsString(200),
   associationOfficeAddress: z.string().min(1),
   /** Association email id (login email for the linked User) */
   email: z.string().email(),
