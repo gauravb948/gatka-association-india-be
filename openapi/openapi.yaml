@@ -4017,12 +4017,20 @@ paths:
   /competitions:
     get:
       summary: List competitions
+      description: >
+        Public listing of all competitions. Use `level` to load District, State, or National
+        tabs (`DISTRICT`, `STATE`, `NATIONAL`). Omit `level` to return every level.
       parameters:
         - name: name
           in: query
           required: false
           description: Case-insensitive substring match on competition name
           schema: { type: string }
+        - name: level
+          in: query
+          required: false
+          description: Filter competitions by level (NATIONAL, STATE, or DISTRICT)
+          schema: { type: string, enum: [NATIONAL, STATE, DISTRICT] }
       responses:
         "200":
           description: OK
@@ -4052,16 +4060,17 @@ paths:
       security: [{ bearerAuth: [] }]
       summary: List competitions for the current user (paginated)
       description: >
+        Every authenticated role can list district, state, and national competitions. Pass `level`
+        (`DISTRICT`, `STATE`, or `NATIONAL`) to load one tab; omit it to return every level.
         National admins see competitions they created, those created by state/district admins,
         and legacy rows with no recorded creator.
-        State admins see non-national competitions where their state appears in the competition's
-        selected states, or where at least one selected district lies in their state (so a national
-        admin limiting a competition to states A and B only surfaces it to state admins A and B).
-        District admins see non-national competitions that list their district, or with no districts
-        selected but their state in the selected states (state-wide scope).         Legacy competitions
-        with no state/district rows remain visible to state and district admins.
-        Training centers see district-level competitions that include their district in the
-        competition's selected districts.
+        State admins see competitions where their state appears in the competition's selected states,
+        or where at least one selected district lies in their state.
+        District admins see competitions that list their district, or that include their state in the
+        selected states. Legacy competitions with no state/district rows remain visible to state and
+        district admins.
+        Training centers see competitions that include their district, or that include their state
+        in the selected states (so state and national tabs are populated).
         Players see distinct competitions where they have at least one participation record
         (`participated: true`). Other authenticated users see distinct competitions where they
         have at least one tournament registration as the player. Items include `createdBy` when available.
@@ -4079,6 +4088,16 @@ paths:
           required: false
           description: Case-insensitive substring match on competition name
           schema: { type: string }
+        - name: session
+          in: query
+          required: false
+          description: UTC calendar year of competition `createdAt` (competition season)
+          schema: { type: integer, minimum: 2000, maximum: 2100 }
+        - name: level
+          in: query
+          required: false
+          description: Filter competitions by level (NATIONAL, STATE, or DISTRICT)
+          schema: { type: string, enum: [NATIONAL, STATE, DISTRICT] }
       responses:
         "200":
           description: OK
@@ -4458,6 +4477,11 @@ paths:
           required: false
           description: Case-insensitive substring match on camp name
           schema: { type: string }
+        - name: level
+          in: query
+          required: false
+          description: Filter camps by level (NATIONAL, STATE, or DISTRICT)
+          schema: { type: string, enum: [NATIONAL, STATE, DISTRICT] }
       responses:
         "200":
           description: OK

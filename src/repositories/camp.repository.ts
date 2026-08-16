@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import type { CampLevel, Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 
 const campListInclude = {
@@ -23,10 +23,15 @@ export async function findManyPaginated(params: {
   skip: number;
   take: number;
   nameContains?: string;
+  level?: CampLevel;
 }) {
-  const where: Prisma.CampWhereInput = params.nameContains
-    ? { name: { contains: params.nameContains, mode: "insensitive" } }
-    : {};
+  const where: Prisma.CampWhereInput = {};
+  if (params.nameContains) {
+    where.name = { contains: params.nameContains, mode: "insensitive" };
+  }
+  if (params.level) {
+    where.level = params.level;
+  }
   const [total, items] = await Promise.all([
     prisma.camp.count({ where }),
     prisma.camp.findMany({

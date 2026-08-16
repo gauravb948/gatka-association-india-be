@@ -173,6 +173,7 @@ export async function list(req: Request, res: Response, next: NextFunction) {
       skip,
       take: q.pageSize,
       nameContains: q.name,
+      level: q.level,
     });
     const totalPages = total === 0 ? 0 : Math.ceil(total / q.pageSize);
     res.json({

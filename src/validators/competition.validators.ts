@@ -6,9 +6,12 @@ const optionalNameSearch = z.preprocess((v) => {
   return s.length > 0 ? s : undefined;
 }, z.string().optional());
 
+const competitionLevelQuery = z.enum(["NATIONAL", "STATE", "DISTRICT"]).optional();
+
 /** Query for `GET /competitions` (optional filters). */
 export const competitionsListQuerySchema = z.object({
   name: optionalNameSearch,
+  level: competitionLevelQuery,
 });
 
 /** Query for `GET /competitions/me`. `session` = UTC calendar year of `createdAt` (competition season). */
@@ -17,6 +20,7 @@ export const competitionsMeQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
   name: optionalNameSearch,
   session: z.coerce.number().int().min(2000).max(2100).optional(),
+  level: competitionLevelQuery,
 });
 
 /**

@@ -388,7 +388,7 @@ async function validateCompetitionGeographyInput(stateIds: string[], districtIds
 export async function list(req: Request, res: Response, next: NextFunction) {
   try {
     const q = competitionsListQuerySchema.parse(req.query);
-    const rows = await competitionRepository.findMany({ nameContains: q.name });
+    const rows = await competitionRepository.findMany({ nameContains: q.name, level: q.level });
     res.json(rows);
   } catch (e) {
     next(e);
@@ -441,7 +441,7 @@ export async function listForCurrentUser(req: Request, res: Response, next: Next
           };
     const { items, total } = await competitionRepository.findManyForAuthenticatedUserPaginated(
       listUser,
-      { skip, take: q.pageSize, nameContains: q.name, sessionYear: q.session }
+      { skip, take: q.pageSize, nameContains: q.name, sessionYear: q.session, level: q.level }
     );
     const totalPages = total === 0 ? 0 : Math.ceil(total / q.pageSize);
     res.json({
