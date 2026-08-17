@@ -31,7 +31,83 @@ function withSessionYear(
   return { AND: [where, sessionFilter] };
 }
 
-/** Filter competitions by district / state / national level (listing tabs). */
+const emptyGeography: Prisma.CompetitionWhereInput = {
+  AND: [{ states: { none: {} } }, { districts: { none: {} } }],
+};
+
+function orWhere(parts: Prisma.CompetitionWhereInput[]): Prisma.CompetitionWhereInput {
+  if (parts.length === 0) return { id: { in: [] } };
+  if (parts.length === 1) return parts[0]!;
+  return { OR: parts };
+}
+
+function andLevel(
+  level: CompetitionLevel,
+  geo: Prisma.CompetitionWhereInput
+): Prisma.CompetitionWhereInput {
+  return { AND: [{ level }, geo] };
+}
+
+function combineLevelGeo(
+  level: CompetitionLevel | undefined,
+  byLevel: Record<CompetitionLevel, Prisma.CompetitionWhereInput>
+): Prisma.CompetitionWhereInput {
+  if (level) return byLevel[level];
+  return {
+    OR: [
+      andLevel("DISTRICT", byLevel.DISTRICT),
+      andLevel("STATE", byLevel.STATE),
+      andLevel("NATIONAL", byLevel.NATIONAL),
+    ],
+  };
+}
+
+/**
+ * List visibility by competition level so sibling units cannot see each other.
+ * District tab — only this district (Ludhiana cannot see Sangrur).
+ * State tab — state-level comps for this state (Punjab).
+ * National tab — national comps that include this state, or unrestricted national.
+ */
+function hierarchyListVisibilityWhere(
+  user: {
+    role: Role;
+    stateId: string | null;
+    districtId: string | null;
+  },
+  level?: CompetitionLevel
+): Prisma.CompetitionWhereInput | null {
+  if (user.role === "STATE_ADMIN") {
+    if (!user.stateId) return null;
+    const inStateDistricts: Prisma.CompetitionWhereInput = {
+      districts: { some: { district: { stateId: user.stateId } } },
+    };
+    const inState: Prisma.CompetitionWhereInput = {
+      states: { some: { stateId: user.stateId } },
+    };
+    return combineLevelGeo(level, {
+      DISTRICT: inStateDistricts,
+      STATE: orWhere([inState, inStateDistricts]),
+      NATIONAL: orWhere([emptyGeography, inState, inStateDistricts]),
+    });
+  }
+
+  if (user.role === "DISTRICT_ADMIN" || user.role === "TRAINING_CENTER") {
+    if (!user.districtId) return null;
+    const ownDistrict: Prisma.CompetitionWhereInput = {
+      districts: { some: { districtId: user.districtId } },
+    };
+    const ownState: Prisma.CompetitionWhereInput[] = [ownDistrict];
+    if (user.stateId) ownState.unshift({ states: { some: { stateId: user.stateId } } });
+    return combineLevelGeo(level, {
+      DISTRICT: ownDistrict,
+      STATE: orWhere(ownState),
+      NATIONAL: orWhere([emptyGeography, ...ownState]),
+    });
+  }
+
+  return {};
+}
+
 function withLevel(
   where: Prisma.CompetitionWhereInput,
   level?: CompetitionLevel
@@ -242,14 +318,14 @@ async function findPaginatedForMe(where: Prisma.CompetitionWhereInput, skip: num
 }
 
 /**
- * Every authenticated role can list DISTRICT, STATE, and NATIONAL competitions (optional `level` tab filter).
+ * Authenticated competition list (optional `level` tab filter).
+ * Geography is applied per level so sibling units cannot see each other
+ * (Ludhiana district admin cannot list Sangrur district competitions).
  * National — comps you created, by lower admins, or legacy (no creator).
- * State — comps whose selected states include this admin's state, or whose selected districts fall in this state
- * (manage/participant actions stay role-gated on the client and in write APIs).
- * District — selected district matches, selected states include this admin's state, or legacy empty geography.
- * Training center — comps that list this TC's district, selected states include this TC's state, or legacy empty geography.
- * Player — distinct competitions where they have at least one `participated` participation record.
- * Other roles — distinct competitions where they have at least one tournament registration as the player.
+ * State — district comps in this state; state/national comps scoped to this state.
+ * District / training center — own district comps; state/national comps for this state.
+ * Player — competitions with a `participated` record.
+ * Other roles — competitions with a tournament registration as the player.
  */
 export async function findManyForAuthenticatedUserPaginated(
   user: {
@@ -274,45 +350,14 @@ export async function findManyForAuthenticatedUserPaginated(
     return findPaginatedForMe(withListFilters(adminCompetitionCreatorWhere(user), filters), skip, take);
   }
 
-  if (user.role === "STATE_ADMIN") {
-    if (!user.stateId) return { items: [], total: 0 };
-    const geo: Prisma.CompetitionWhereInput = {
-      OR: [
-        { states: { some: { stateId: user.stateId } } },
-        { districts: { some: { district: { stateId: user.stateId } } } },
-        {
-          AND: [{ states: { none: {} } }, { districts: { none: {} } }],
-        },
-      ],
-    };
-    return findPaginatedForMe(withListFilters(geo, filters), skip, take);
-  }
-
-  if (user.role === "DISTRICT_ADMIN") {
-    if (!user.districtId) return { items: [], total: 0 };
-    const or: Prisma.CompetitionWhereInput[] = [
-      { districts: { some: { districtId: user.districtId } } },
-    ];
-    if (user.stateId) {
-      or.push({ states: { some: { stateId: user.stateId } } });
-    }
-    or.push({
-      AND: [{ states: { none: {} } }, { districts: { none: {} } }],
-    });
-    return findPaginatedForMe(withListFilters({ OR: or }, filters), skip, take);
-  }
-
-  if (user.role === "TRAINING_CENTER" && user.districtId) {
-    const or: Prisma.CompetitionWhereInput[] = [
-      { districts: { some: { districtId: user.districtId } } },
-    ];
-    if (user.stateId) {
-      or.push({ states: { some: { stateId: user.stateId } } });
-    }
-    or.push({
-      AND: [{ states: { none: {} } }, { districts: { none: {} } }],
-    });
-    return findPaginatedForMe(withListFilters({ OR: or }, filters), skip, take);
+  if (
+    user.role === "STATE_ADMIN" ||
+    user.role === "DISTRICT_ADMIN" ||
+    user.role === "TRAINING_CENTER"
+  ) {
+    const vis = hierarchyListVisibilityWhere(user, level);
+    if (!vis) return { items: [], total: 0 };
+    return findPaginatedForMe(withListFilters(vis, filters), skip, take);
   }
 
   if (user.role === "PLAYER") {
@@ -583,11 +628,46 @@ export function findByIdBasic(id: string) {
   return prisma.competition.findUnique({ where: { id } });
 }
 
-export function deleteCompetition(id: string) {
+type CompetitionParticipantDeleteCounts = {
+  participations: number;
+  tournamentRegistrations: number;
+  attendance: number;
+  results: number;
+  aggregateStandings: number;
+};
+
+async function deleteCompetitionParticipantRows(
+  tx: Prisma.TransactionClient,
+  competitionId: string
+): Promise<CompetitionParticipantDeleteCounts> {
+  const [participations, tournamentRegistrations, attendance, results, aggregateStandings] =
+    await Promise.all([
+      tx.participationRecord.deleteMany({ where: { competitionId } }),
+      tx.tournamentRegistration.deleteMany({ where: { competitionId } }),
+      tx.attendance.deleteMany({ where: { competitionId } }),
+      tx.competitionResult.deleteMany({ where: { competitionId } }),
+      tx.competitionAggregateStanding.deleteMany({ where: { competitionId } }),
+    ]);
+  return {
+    participations: participations.count,
+    tournamentRegistrations: tournamentRegistrations.count,
+    attendance: attendance.count,
+    results: results.count,
+    aggregateStandings: aggregateStandings.count,
+  };
+}
+
+/** Remove all participant-related rows; keeps the competition. */
+export function deleteCompetitionParticipants(id: string) {
+  return prisma.$transaction((tx) => deleteCompetitionParticipantRows(tx, id));
+}
+
+/** Hard-delete a competition and all participant-related rows in one transaction. */
+export async function deleteCompetition(id: string) {
   return prisma.$transaction(async (tx) => {
-    await tx.participationRecord.deleteMany({ where: { competitionId: id } });
-    await tx.attendance.deleteMany({ where: { competitionId: id } });
+    const counts = await deleteCompetitionParticipantRows(tx, id);
     await tx.competition.delete({ where: { id } });
+    return counts;
   });
 }
 

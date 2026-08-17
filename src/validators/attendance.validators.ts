@@ -1,15 +1,39 @@
 import { z } from "zod";
 
-export const attendanceMarkSchema = z.object({
-  userId: z.string(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  present: z.boolean().optional(),
-  type: z.enum(["TOURNAMENT", "CAMP", "TC_DAILY"]),
-  competitionId: z.string().optional(),
-  campId: z.string().optional(),
-  trainingCenterId: z.string().optional(),
-  notes: z.string().optional(),
-});
+export const attendanceMarkSchema = z
+  .object({
+    userId: z.string(),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    present: z.boolean().optional(),
+    type: z.enum(["TOURNAMENT", "CAMP", "TC_DAILY"]),
+    competitionId: z.string().optional(),
+    campId: z.string().optional(),
+    trainingCenterId: z.string().optional(),
+    notes: z.string().optional(),
+  })
+  .superRefine((body, ctx) => {
+    if (body.type === "TOURNAMENT" && !body.competitionId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "competitionId is required for tournament attendance",
+        path: ["competitionId"],
+      });
+    }
+    if (body.type === "CAMP" && !body.campId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "campId is required for camp attendance",
+        path: ["campId"],
+      });
+    }
+    if (body.type === "TC_DAILY" && !body.trainingCenterId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "trainingCenterId is required for training center daily attendance",
+        path: ["trainingCenterId"],
+      });
+    }
+  });
 
 const MAX_BULK = 500;
 

@@ -95,7 +95,11 @@ export async function reportTrainingCenterDay(
  */
 export async function reportCompetition(
   competitionId: string,
-  opts: { eventId?: string; dateYmd?: string }
+  opts: {
+    eventId?: string;
+    dateYmd?: string;
+    playerProfileWhere?: Prisma.PlayerProfileWhereInput;
+  }
 ): Promise<{
   competitionId: string;
   eventId: string | null;
@@ -103,7 +107,7 @@ export async function reportCompetition(
   present: (AttendanceUserRow & { participations: { id: string; eventId: string | null; eventName: string | null }[] })[];
   absent: (AttendanceUserRow & { participations: { id: string; eventId: string | null; eventName: string | null }[] })[];
 }> {
-  const { eventId, dateYmd } = opts;
+  const { eventId, dateYmd, playerProfileWhere } = opts;
   const date = dateYmd ? parseDayUtc(dateYmd) : null;
 
   let playerIds: string[];
@@ -127,8 +131,15 @@ export async function reportCompetition(
     };
   }
 
+  const scopedProfile =
+    playerProfileWhere && Object.keys(playerProfileWhere).length > 0
+      ? playerProfileWhere
+      : undefined;
   const users = await prisma.user.findMany({
-    where: { id: { in: playerIds } },
+    where: {
+      id: { in: playerIds },
+      ...(scopedProfile ? { playerProfile: scopedProfile } : {}),
+    },
     orderBy: { id: "asc" },
     select: userReportSelect,
   });

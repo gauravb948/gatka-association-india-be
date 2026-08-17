@@ -4152,14 +4152,39 @@ paths:
           description: Name taken
     delete:
       security: [{ bearerAuth: [] }]
-      summary: Delete competition (same-level admin only)
+      summary: Delete competition and its participants (same-level admin only)
       description: >
-        Permanently deletes the competition and related participation/attendance rows.
+        Permanently deletes the competition together with all participant-related rows:
+        participation records, tournament registrations, attendance, event results, and
+        aggregate standings. Geographic scope rows (states, districts, age categories) are
+        removed with the competition.
         Only the admin role matching the competition level may delete (national → national admin,
         state → state admin, district → district admin), within geographic scope.
       responses:
-        "204":
-          description: Deleted
+        "200":
+          description: Competition and related participant rows deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - id
+                  - name
+                  - participations
+                  - tournamentRegistrations
+                  - attendance
+                  - results
+                  - aggregateStandings
+                properties:
+                  id: { type: string }
+                  name: { type: string }
+                  participations: { type: integer, description: Participation rows removed }
+                  tournamentRegistrations:
+                    { type: integer, description: Tournament registration rows removed }
+                  attendance: { type: integer, description: Attendance rows removed }
+                  results: { type: integer, description: Competition result rows removed }
+                  aggregateStandings:
+                    { type: integer, description: Aggregate standing rows removed }
         "403":
           description: Outside admin scope or wrong hierarchy level
         "404":
@@ -4452,6 +4477,50 @@ paths:
       responses:
         "200":
           description: OK (envelope with paginated items)
+    delete:
+      security: [{ bearerAuth: [] }]
+      summary: Remove all participants from a competition (same-level admin only)
+      description: >
+        Deletes every participant-related row for this competition and keeps the competition:
+        participation records, tournament registrations, attendance, event results, and
+        aggregate standings. Player accounts are not deleted.
+        Only the admin role matching the competition level may call this (national → national admin,
+        state → state admin, district → district admin), within geographic scope.
+        To unregister a single player, use `DELETE /competitions/{id}/participations`.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Participants removed; competition kept
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - id
+                  - name
+                  - participations
+                  - tournamentRegistrations
+                  - attendance
+                  - results
+                  - aggregateStandings
+                properties:
+                  id: { type: string }
+                  name: { type: string }
+                  participations: { type: integer, description: Participation rows removed }
+                  tournamentRegistrations:
+                    { type: integer, description: Tournament registration rows removed }
+                  attendance: { type: integer, description: Attendance rows removed }
+                  results: { type: integer, description: Competition result rows removed }
+                  aggregateStandings:
+                    { type: integer, description: Aggregate standing rows removed }
+        "403":
+          description: Outside admin scope or wrong hierarchy level
+        "404":
+          description: Competition not found
   /tournament-registrations:
     post:
       security: [{ bearerAuth: [] }]

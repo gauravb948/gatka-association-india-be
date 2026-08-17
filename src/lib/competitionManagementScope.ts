@@ -96,37 +96,23 @@ export async function assertCanManageCompetition(user: DbUser, comp: Competition
 }
 
 /**
- * View participants: same-level admin and all upper hierarchy admins in scope.
- * Training centers may view district-level competitions in their district.
+ * View participants: same-level admin (own unit), upper admins overseeing lower comps
+ * in their geography, and lower-hierarchy users viewing higher-level comps they overlap
+ * (e.g. a Ludhiana TC viewing Punjab/national — participants are filtered to that TC).
  */
 export async function assertCanViewCompetitionParticipants(user: DbUser, comp: CompetitionGeo) {
-  if (user.role === "TRAINING_CENTER") {
-    if (comp.level !== "DISTRICT") {
-      throw new AppError(
-        403,
-        "Training centers may only view participants for district-level competitions",
-        "FORBIDDEN_SCOPE"
-      );
-    }
-    await assertCompetitionWithinActorGeography(user, comp);
-    return;
-  }
-
   const adminLevel = ADMIN_LEVEL[user.role];
   if (adminLevel === undefined) {
     throw new AppError(403, "Forbidden", "FORBIDDEN_ROLE");
   }
 
   const compLevel = COMPETITION_LEVEL_RANK[comp.level];
-  if (adminLevel < compLevel) {
-    throw new AppError(
-      403,
-      "You cannot view participants for this competition at your access level",
-      "FORBIDDEN_SCOPE"
-    );
+  if (adminLevel === compLevel) {
+    await assertCompetitionWithinActorGeography(user, comp);
+    return;
   }
 
-  await assertCompetitionWithinActorGeography(user, comp);
+  await assertCompetitionOverlapsActorGeography(user, comp);
 }
 
 /**
@@ -158,9 +144,7 @@ async function assertCompetitionOverlapsActorGeography(user: DbUser, comp: Compe
     if (!user.districtId) throw new AppError(403, "Forbidden", "FORBIDDEN_SCOPE");
     if (unrestricted) return;
     if (comp.districts.some((d) => d.districtId === user.districtId)) return;
-    if (comp.districts.length === 0 && user.stateId) {
-      if (comp.states.some((s) => s.stateId === user.stateId)) return;
-    }
+    if (user.stateId && comp.states.some((s) => s.stateId === user.stateId)) return;
     throw new AppError(403, "Forbidden", "FORBIDDEN_SCOPE");
   }
 
@@ -170,9 +154,7 @@ async function assertCompetitionOverlapsActorGeography(user: DbUser, comp: Compe
     if (!districtId) throw new AppError(403, "Forbidden", "FORBIDDEN_SCOPE");
     if (unrestricted) return;
     if (comp.districts.some((d) => d.districtId === districtId)) return;
-    if (comp.districts.length === 0 && stateId) {
-      if (comp.states.some((s) => s.stateId === stateId)) return;
-    }
+    if (stateId && comp.states.some((s) => s.stateId === stateId)) return;
     throw new AppError(403, "Forbidden", "FORBIDDEN_SCOPE");
   }
 

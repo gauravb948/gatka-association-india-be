@@ -56,6 +56,12 @@ competitionsRouter.delete(
   requireRoles("DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),
   competitionsController.remove
 );
+competitionsRouter.delete(
+  "/:id/participants",
+  requireAuth,
+  requireRoles("DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),
+  competitionsController.removeAllParticipants
+);
 competitionsRouter.post(
   "/:id/close",
   requireAuth,

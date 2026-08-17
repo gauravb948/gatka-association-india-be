@@ -660,8 +660,29 @@ export async function remove(req: Request, res: Response, next: NextFunction) {
     const comp = await competitionRepository.findByIdForPlayerEligibility(req.params.id);
     if (!comp) throw new AppError(404, "Competition not found");
     await assertCanManageCompetition(req.dbUser!, comp);
-    await competitionRepository.deleteCompetition(comp.id);
-    res.status(204).send();
+    const deleted = await competitionRepository.deleteCompetition(comp.id);
+    res.json({
+      id: comp.id,
+      name: comp.name,
+      ...deleted,
+    });
+  } catch (e) {
+    next(e);
+  }
+}
+
+/** Remove all participants from a competition; the competition itself is kept. */
+export async function removeAllParticipants(req: Request, res: Response, next: NextFunction) {
+  try {
+    const comp = await competitionRepository.findByIdForPlayerEligibility(req.params.id);
+    if (!comp) throw new AppError(404, "Competition not found");
+    await assertCanManageCompetition(req.dbUser!, comp);
+    const deleted = await competitionRepository.deleteCompetitionParticipants(comp.id);
+    res.json({
+      id: comp.id,
+      name: comp.name,
+      ...deleted,
+    });
   } catch (e) {
     next(e);
   }
