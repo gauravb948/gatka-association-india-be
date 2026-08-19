@@ -28,6 +28,14 @@ export function playerProfileWhereCompetitionEnabledScope(
 ): Prisma.PlayerProfileWhereInput {
   const districtIds = comp.districts.map((d) => d.districtId);
   const stateIds = comp.states.map((s) => s.stateId);
+  const stateFirst = comp.level === "STATE" || comp.level === "NATIONAL";
+  if (stateFirst && stateIds.length > 0) {
+    return {
+      stateId: { in: stateIds },
+      state: { isEnabled: true },
+      district: { isEnabled: true },
+    };
+  }
   if (districtIds.length > 0) {
     return {
       districtId: { in: districtIds },

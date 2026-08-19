@@ -8,15 +8,30 @@ import { AppError } from "./errors.js";
 import { fitsAgeCategory } from "./age.js";
 
 export type CompetitionGeography = {
+  level?: CompetitionLevel | "DISTRICT" | "STATE" | "NATIONAL";
   states: { stateId: string }[];
   districts: { districtId: string }[];
 };
 
-/** If the competition lists districts, the player must be in one of them; else if it lists states, the player must be in one of those states; else no geographic restriction. */
+/**
+ * DISTRICT comps: listed districts first, else states.
+ * STATE / NATIONAL comps: listed states first (districts on the create form must not hide
+ * other districts in those states), else districts.
+ */
 export function playerMatchesCompetitionGeography(
   comp: CompetitionGeography,
   profile: { stateId: string; districtId: string }
 ): boolean {
+  const stateFirst = comp.level === "STATE" || comp.level === "NATIONAL";
+  if (stateFirst) {
+    if (comp.states.length > 0) {
+      return comp.states.some((s) => s.stateId === profile.stateId);
+    }
+    if (comp.districts.length > 0) {
+      return comp.districts.some((d) => d.districtId === profile.districtId);
+    }
+    return true;
+  }
   if (comp.districts.length > 0) {
     return comp.districts.some((d) => d.districtId === profile.districtId);
   }

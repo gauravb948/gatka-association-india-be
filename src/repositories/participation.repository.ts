@@ -523,12 +523,15 @@ export async function hasCompletedCompetitionAtLevel(
 ): Promise<boolean> {
   const start = new Date(Date.UTC(year, 0, 1));
   const end = new Date(Date.UTC(year + 1, 0, 1));
+  const inYear = { gte: start, lt: end };
   const rows = await prisma.participationRecord.findMany({
     where: {
       playerUserId,
       participated: true,
-      level,
-      competition: { createdAt: { gte: start, lt: end } },
+      competition: {
+        level,
+        OR: [{ createdAt: inYear }, { startDate: inYear }],
+      },
     },
     select: { competitionId: true },
     distinct: ["competitionId"],
