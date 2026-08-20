@@ -4,6 +4,7 @@ import * as playerRepository from "../repositories/player.repository.js";
 import * as tournamentRegistrationRepository from "../repositories/tournamentRegistration.repository.js";
 import * as statePaymentRepository from "../repositories/statePayment.repository.js";
 import * as paymentRepository from "../repositories/payment.repository.js";
+import * as participationRepository from "../repositories/participation.repository.js";
 import { AppError } from "../lib/errors.js";
 import {
   assertParticipationPrerequisite,
@@ -12,6 +13,17 @@ import {
   assertPlayerInCompetitionGeography,
   playerGenderMatchesCompetition,
 } from "../lib/eligibility.js";
+import {
+  isFariSotiCatalogEventId,
+  isFariSotiEvent,
+  isIndividualSingleSotiEvent,
+  isSingleSotiCatalogEventId,
+  isTeamEvent,
+  orgUnitLabelForCompetitionLevel,
+  playerHasFariSotiParticipation,
+  playerHasSingleSotiParticipation,
+  playerHasTeamEventParticipation,
+} from "../lib/competitionEventParticipation.js";
 import { getRazorpayForState } from "../lib/razorpayClient.js";
 import { prisma } from "../lib/prisma.js";
 import {
@@ -39,11 +51,10 @@ export async function create(req: Request, res: Response, next: NextFunction) {
       throw new AppError(400, "Competition is closed", "COMPETITION_CLOSED");
     }
 
-    const eventOk = await prisma.event.findFirst({
+    const catalogEvent = await prisma.event.findFirst({
       where: { id: body.eventId, isActive: true },
-      select: { id: true },
     });
-    if (!eventOk) {
+    if (!catalogEvent) {
       throw new AppError(400, "Event not in catalog or inactive", "UNKNOWN_EVENT");
     }
 
@@ -61,6 +72,68 @@ export async function create(req: Request, res: Response, next: NextFunction) {
       stateId: profile.stateId,
       districtId: profile.districtId,
     });
+
+    const existing = await participationRepository.findParticipationsWithEventsForPlayer(
+      comp.id,
+      body.playerUserId
+    );
+    if (existing.some((r) => r.eventId === catalogEvent.id)) {
+      throw new AppError(409, "Player already registered for this event", "ALREADY_IN_EVENT");
+    }
+    if (existing.length + 1 > 2) {
+      throw new AppError(
+        400,
+        "Player may participate in at most two events in this competition",
+        "EVENT_CAP"
+      );
+    }
+    const team = isTeamEvent(catalogEvent);
+    if (team && playerHasTeamEventParticipation(existing)) {
+      throw new AppError(
+        400,
+        "Player may participate in at most one team event in this competition",
+        "TEAM_EVENT_CAP"
+      );
+    }
+    const signingUpSingleSoti =
+      isSingleSotiCatalogEventId(catalogEvent.id) || isIndividualSingleSotiEvent(catalogEvent);
+    if (signingUpSingleSoti && playerHasFariSotiParticipation(existing)) {
+      throw new AppError(
+        400,
+        "Cannot join Single Soti after participating in Fari Soti in this competition",
+        "FARI_SOTI_BLOCKS_SINGLE_SOTI"
+      );
+    }
+    const signingUpFariSoti =
+      isFariSotiCatalogEventId(catalogEvent.id) || isFariSotiEvent(catalogEvent);
+    if (signingUpFariSoti && playerHasSingleSotiParticipation(existing)) {
+      throw new AppError(
+        400,
+        "Cannot join Fari Soti after participating in Single Soti in this competition",
+        "SINGLE_SOTI_BLOCKS_FARI_SOTI"
+      );
+    }
+    if (!team) {
+      const conflict = await participationRepository.findOrgUnitConflictForIndividualEvent(
+        comp.id,
+        catalogEvent.id,
+        comp.level,
+        {
+          userId: profile.userId,
+          trainingCenterId: profile.trainingCenterId,
+          districtId: profile.districtId,
+          stateId: profile.stateId,
+        }
+      );
+      if (conflict) {
+        const unit = orgUnitLabelForCompetitionLevel(comp.level);
+        throw new AppError(
+          400,
+          `Only one player from a ${unit} may participate in this individual event`,
+          "ORG_UNIT_INDIVIDUAL_CAP"
+        );
+      }
+    }
 
     if (registrar.role === "TRAINING_CENTER") {
       if (comp.level !== "DISTRICT") {

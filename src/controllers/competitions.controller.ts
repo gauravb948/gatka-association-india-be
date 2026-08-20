@@ -9,7 +9,6 @@ import {
   assertPlayerActiveForTournament,
   assertPlayerInCompetitionGeography,
   playerGenderMatchesCompetition,
-  playerMatchesCompetitionGeography,
 } from "../lib/eligibility.js";
 import {
   assertTeamSize,
@@ -36,7 +35,6 @@ import {
   playerProfileWhereCompetitionEnabledScope,
 } from "../lib/competitionParticipation.js";
 import { fitsAgeCategory } from "../lib/age.js";
-import { FARI_SOTI_EVENT_ID_LIST, SINGLE_SOTI_EVENT_ID_LIST } from "../lib/sotiEventCatalogIds.js";
 import type { DbUser } from "../types/user.js";
 import {
   competitionBodySchema,
@@ -98,56 +96,6 @@ function assertPlayerFitsCompetitionAndEventAge(
       "AGE_MISMATCH_EVENT"
     );
   }
-}
-
-/** Eligible for at least one catalog event (same set for all competitions) — geo, gender, age, hierarchy. */
-async function profileEligibleForSomeCompetitionEvent(
-  profile: {
-    userId: string;
-    gender: import("@prisma/client").Gender;
-    stateId: string;
-    districtId: string;
-    dateOfBirth: Date;
-  },
-  ctx: CompWithCatalog
-): Promise<boolean> {
-  const { comp, catalogEvents } = ctx;
-  try {
-    await assertParticipationPrerequisite(profile.userId, comp.createdAt, comp.level);
-  } catch {
-    return false;
-  }
-  if (!playerGenderMatchesCompetition(profile.gender, comp.genders)) return false;
-  if (
-    !playerMatchesCompetitionGeography(comp, {
-      stateId: profile.stateId,
-      districtId: profile.districtId,
-    })
-  ) {
-    return false;
-  }
-  if (!comp.ageTillDate) {
-    return catalogEvents.some((ev) =>
-      playerGenderMatchesCompetition(profile.gender, [ev.eventGroup.gender])
-    );
-  }
-  const compAgeCats = comp.ageCategories?.map((x) => x.ageCategory) ?? [];
-  for (const ev of catalogEvents) {
-    const eg = ev.eventGroup;
-    if (compAgeCats.length > 0) {
-      const okComp = compAgeCats.some((cat) =>
-        fitsAgeCategory(profile.dateOfBirth, comp.ageTillDate!, cat.ageFrom, cat.ageTo)
-      );
-      if (!okComp) continue;
-    }
-    if (
-      playerFitsEventGroupAge(profile.dateOfBirth, comp.ageTillDate, eg.ageCategory) &&
-      playerGenderMatchesCompetition(profile.gender, [eg.gender])
-    ) {
-      return true;
-    }
-  }
-  return false;
 }
 
 async function playerSaturatedForCompetition(playerUserId: string, ctx: CompWithCatalog): Promise<boolean> {
@@ -315,6 +263,21 @@ async function validatePlayersForCompetitionEvent(
         opts.claimedOrgUnitsByEvent.set(catalogEvent.id, set);
       }
     }
+  }
+}
+
+async function playerMayJoinCompetitionEvent(
+  comp: CompWithCatalog["comp"],
+  catalogEvent: CatalogEventWithGroup,
+  playerUserId: string
+): Promise<boolean> {
+  try {
+    await validatePlayersForCompetitionEvent(comp, comp, null, catalogEvent, [playerUserId], {
+      dryRun: true,
+    });
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -712,34 +675,11 @@ export async function eligiblePlayers(req: Request, res: Response, next: NextFun
       typeof req.query.eventId === "string" && req.query.eventId.length > 0
         ? req.query.eventId
         : undefined;
-
-    let eventForQuery: (typeof catalogEvents)[number] | undefined;
-    let alreadyInThisEvent: Set<string> = new Set();
-    let playerIdsWithFariSotiInComp: Set<string> = new Set();
-    let playerIdsWithSingleSotiInComp: Set<string> = new Set();
-    if (eventId) {
-      eventForQuery = catalogEvents.find((e) => e.id === eventId);
-      if (!eventForQuery) {
-        return res.json([]);
-      }
-      alreadyInThisEvent = await participationRepository.findPlayerUserIdsParticipatedInEvent(
-        comp.id,
-        eventId
-      );
-      if (isSingleSotiCatalogEventId(eventId)) {
-        playerIdsWithFariSotiInComp =
-          await participationRepository.findPlayerUserIdsParticipatedInAnyOfEvents(
-            comp.id,
-            FARI_SOTI_EVENT_ID_LIST
-          );
-      }
-      if (isFariSotiCatalogEventId(eventId) || isFariSotiEvent(eventForQuery)) {
-        playerIdsWithSingleSotiInComp =
-          await participationRepository.findPlayerUserIdsParticipatedInAnyOfEvents(
-            comp.id,
-            SINGLE_SOTI_EVENT_ID_LIST
-          );
-      }
+    const eventForQuery = eventId
+      ? catalogEvents.find((e) => e.id === eventId)
+      : undefined;
+    if (eventId && !eventForQuery) {
+      return res.json([]);
     }
 
     const actorScopeWhere = actorPlayerProfileScopeWhere(actor);
@@ -747,39 +687,11 @@ export async function eligiblePlayers(req: Request, res: Response, next: NextFun
 
     const filtered: typeof players = [];
     for (const p of players) {
-      if (eventId && eventForQuery) {
-        if (alreadyInThisEvent.has(p.userId)) {
-          continue;
+      if (eventForQuery) {
+        if (await playerMayJoinCompetitionEvent(comp, eventForQuery, p.userId)) {
+          filtered.push(p);
         }
-        if (playerIdsWithFariSotiInComp.has(p.userId)) {
-          continue;
-        }
-        if (playerIdsWithSingleSotiInComp.has(p.userId)) {
-          continue;
-        }
-        const ce = eventForQuery;
-        try {
-          await assertParticipationPrerequisite(p.userId, comp.createdAt, comp.level);
-        } catch {
-          continue;
-        }
-        if (!playerGenderMatchesCompetition(p.gender, comp.genders)) continue;
-        if (
-          !playerMatchesCompetitionGeography(comp, {
-            stateId: p.stateId,
-            districtId: p.districtId,
-          })
-        ) {
-          continue;
-        }
-        if (!playerGenderMatchesCompetition(p.gender, [ce.eventGroup.gender])) continue;
-        try {
-          assertPlayerFitsCompetitionAndEventAge(p, comp, ce.eventGroup.ageCategory);
-        } catch {
-          continue;
-        }
-        filtered.push(p);
-      } else if (await profileEligibleForSomeCompetitionEvent(p, ctx)) {
+      } else if (!(await playerSaturatedForCompetition(p.userId, ctx))) {
         filtered.push(p);
       }
     }
@@ -1143,7 +1055,7 @@ export async function listPlayersNotParticipated(req: Request, res: Response, ne
     const actor = req.dbUser!;
     const ctx = await competitionRepository.findByIdForParticipationContext(req.params.id);
     if (!ctx) throw new AppError(404, "Competition not found");
-    const { comp } = ctx;
+    const { comp, catalogEvents } = ctx;
     if (comp.isClosed) {
       throw new AppError(400, "Competition is closed", "COMPETITION_CLOSED");
     }
@@ -1188,11 +1100,28 @@ export async function listPlayersNotParticipated(req: Request, res: Response, ne
       },
     });
 
+    const eventForQuery = q.eventId
+      ? catalogEvents.find((e) => e.id === q.eventId)
+      : undefined;
+    if (q.eventId && !eventForQuery) {
+      return res.json({
+        items: [],
+        page: q.page,
+        pageSize: q.pageSize,
+        total: 0,
+        totalPages: 0,
+      });
+    }
+
     const filtered: typeof candidates = [];
     for (const p of candidates) {
-      if (!(await profileEligibleForSomeCompetitionEvent(p, ctx))) continue;
-      if (await playerSaturatedForCompetition(p.userId, ctx)) continue;
-      filtered.push(p);
+      if (eventForQuery) {
+        if (await playerMayJoinCompetitionEvent(comp, eventForQuery, p.userId)) {
+          filtered.push(p);
+        }
+      } else if (!(await playerSaturatedForCompetition(p.userId, ctx))) {
+        filtered.push(p);
+      }
     }
 
     const total = filtered.length;
