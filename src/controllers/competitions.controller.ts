@@ -107,6 +107,7 @@ async function playerSaturatedForCompetition(playerUserId: string, ctx: CompWith
     try {
       await validatePlayersForCompetitionEvent(comp, comp, null, ev, [playerUserId], {
         dryRun: true,
+        skipBatchTeamSizeAssert: true,
         existingByPlayer: new Map([
           [playerUserId, existing as ParticipationWithEvent[]],
         ]),
@@ -275,6 +276,7 @@ async function playerMayJoinCompetitionEvent(
   try {
     await validatePlayersForCompetitionEvent(comp, comp, null, catalogEvent, [playerUserId], {
       dryRun: true,
+      skipBatchTeamSizeAssert: true,
     });
     return true;
   } catch {
