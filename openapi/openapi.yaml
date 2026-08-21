@@ -4479,13 +4479,18 @@ paths:
           description: OK (envelope with paginated items)
     delete:
       security: [{ bearerAuth: [] }]
-      summary: Remove all participants from a competition (same-level admin only)
+      summary: Remove participants from a competition (scoped by the caller's role)
       description: >
-        Deletes every participant-related row for this competition and keeps the competition:
-        participation records, tournament registrations, attendance, event results, and
-        aggregate standings. Player accounts are not deleted.
-        Only the admin role matching the competition level may call this (national → national admin,
-        state → state admin, district → district admin), within geographic scope.
+        Deletes participant-related rows and keeps the competition: participation records,
+        tournament registrations, attendance, and event results. Player accounts are not deleted.
+        Same-level admin (national → national competition, state → state, district → district),
+        within geographic scope, removes **all** participants and aggregate standings (`scope: all`).
+        The role **one level below** the competition may remove only players in their territory
+        (`scope: territory`): training center → district competition; district admin → state
+        competition; state admin → national competition. Two or more levels below is forbidden
+        (e.g. district admin cannot clear a national competition; training center cannot clear
+        a state competition).
+        Aggregate standings are left unchanged on a territory-scoped delete.
         To unregister a single player, use `DELETE /competitions/{id}/participations`.
       parameters:
         - name: id
@@ -4502,6 +4507,7 @@ paths:
                 required:
                   - id
                   - name
+                  - scope
                   - participations
                   - tournamentRegistrations
                   - attendance
@@ -4510,13 +4516,17 @@ paths:
                 properties:
                   id: { type: string }
                   name: { type: string }
+                  scope:
+                    type: string
+                    enum: [all, territory]
+                    description: all = entire competition; territory = caller's unit only
                   participations: { type: integer, description: Participation rows removed }
                   tournamentRegistrations:
                     { type: integer, description: Tournament registration rows removed }
                   attendance: { type: integer, description: Attendance rows removed }
                   results: { type: integer, description: Competition result rows removed }
                   aggregateStandings:
-                    { type: integer, description: Aggregate standing rows removed }
+                    { type: integer, description: Aggregate standing rows removed (0 when scope is territory) }
         "403":
           description: Outside admin scope or wrong hierarchy level
         "404":

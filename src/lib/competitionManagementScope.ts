@@ -79,6 +79,39 @@ async function assertCompetitionWithinActorGeography(user: DbUser, comp: Competi
 }
 
 /**
+ * Clear participants: same-level admin (within geography) may remove everyone.
+ * The role one step below the competition may remove only their territory
+ * (training center → district, district admin → state, state admin → national).
+ */
+export async function assertCanClearCompetitionParticipants(
+  user: DbUser,
+  comp: CompetitionGeo
+): Promise<"all" | "territory"> {
+  const adminLevel = ADMIN_LEVEL[user.role];
+  if (adminLevel === undefined) {
+    throw new AppError(403, "Forbidden", "FORBIDDEN_ROLE");
+  }
+
+  const compLevel = COMPETITION_LEVEL_RANK[comp.level];
+
+  if (adminLevel === compLevel) {
+    await assertCompetitionWithinActorGeography(user, comp);
+    return "all";
+  }
+
+  if (adminLevel === compLevel - 1) {
+    await assertCompetitionOverlapsActorGeography(user, comp);
+    return "territory";
+  }
+
+  throw new AppError(
+    403,
+    "You may only clear participants on a competition at your level, or one level above",
+    "FORBIDDEN_SCOPE"
+  );
+}
+
+/**
  * Edit / delete / close: only the admin role that matches the competition level
  * (national → national admin, state → state admin, district → district admin),
  * within their geographic scope.

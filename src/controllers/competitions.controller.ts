@@ -50,6 +50,7 @@ import {
 } from "../validators/competition.validators.js";
 import * as participationRepository from "../repositories/participation.repository.js";
 import {
+  assertCanClearCompetitionParticipants,
   assertCanManageCompetition,
   assertCanViewCompetitionScopedReport,
 } from "../lib/competitionManagementScope.js";
@@ -634,16 +635,26 @@ export async function remove(req: Request, res: Response, next: NextFunction) {
   }
 }
 
-/** Remove all participants from a competition; the competition itself is kept. */
+/** Remove participants from a competition; the competition itself is kept.
+ * Same-level admin clears everyone. The role one step below may clear only their territory
+ * (TC → district, district admin → state, state admin → national).
+ */
 export async function removeAllParticipants(req: Request, res: Response, next: NextFunction) {
   try {
+    const actor = req.dbUser!;
     const comp = await competitionRepository.findByIdForPlayerEligibility(req.params.id);
     if (!comp) throw new AppError(404, "Competition not found");
-    await assertCanManageCompetition(req.dbUser!, comp);
-    const deleted = await competitionRepository.deleteCompetitionParticipants(comp.id);
+    const scope = await assertCanClearCompetitionParticipants(actor, comp);
+    const playerProfileWhere =
+      scope === "territory" ? actorPlayerProfileScopeWhere(actor) : undefined;
+    const deleted = await competitionRepository.deleteCompetitionParticipants(
+      comp.id,
+      playerProfileWhere
+    );
     res.json({
       id: comp.id,
       name: comp.name,
+      scope,
       ...deleted,
     });
   } catch (e) {

@@ -638,15 +638,34 @@ type CompetitionParticipantDeleteCounts = {
 
 async function deleteCompetitionParticipantRows(
   tx: Prisma.TransactionClient,
-  competitionId: string
+  competitionId: string,
+  playerProfileWhere?: Prisma.PlayerProfileWhereInput
 ): Promise<CompetitionParticipantDeleteCounts> {
+  const scoped = playerProfileWhere && Object.keys(playerProfileWhere).length > 0;
+  const playerUserFilter = scoped
+    ? { playerUser: { playerProfile: playerProfileWhere } }
+    : {};
+  const attendanceUserFilter = scoped
+    ? { user: { playerProfile: playerProfileWhere } }
+    : {};
+
   const [participations, tournamentRegistrations, attendance, results, aggregateStandings] =
     await Promise.all([
-      tx.participationRecord.deleteMany({ where: { competitionId } }),
-      tx.tournamentRegistration.deleteMany({ where: { competitionId } }),
-      tx.attendance.deleteMany({ where: { competitionId } }),
-      tx.competitionResult.deleteMany({ where: { competitionId } }),
-      tx.competitionAggregateStanding.deleteMany({ where: { competitionId } }),
+      tx.participationRecord.deleteMany({
+        where: { competitionId, ...playerUserFilter },
+      }),
+      tx.tournamentRegistration.deleteMany({
+        where: { competitionId, ...playerUserFilter },
+      }),
+      tx.attendance.deleteMany({
+        where: { competitionId, ...attendanceUserFilter },
+      }),
+      tx.competitionResult.deleteMany({
+        where: { competitionId, ...playerUserFilter },
+      }),
+      scoped
+        ? Promise.resolve({ count: 0 })
+        : tx.competitionAggregateStanding.deleteMany({ where: { competitionId } }),
     ]);
   return {
     participations: participations.count,
@@ -657,9 +676,14 @@ async function deleteCompetitionParticipantRows(
   };
 }
 
-/** Remove all participant-related rows; keeps the competition. */
-export function deleteCompetitionParticipants(id: string) {
-  return prisma.$transaction((tx) => deleteCompetitionParticipantRows(tx, id));
+/** Remove participant-related rows; keeps the competition. Optional profile filter = one territory. */
+export function deleteCompetitionParticipants(
+  id: string,
+  playerProfileWhere?: Prisma.PlayerProfileWhereInput
+) {
+  return prisma.$transaction((tx) =>
+    deleteCompetitionParticipantRows(tx, id, playerProfileWhere)
+  );
 }
 
 /** Hard-delete a competition and all participant-related rows in one transaction. */
