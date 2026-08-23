@@ -37,7 +37,7 @@ export function orgUnitLabelForCompetitionLevel(level: CompetitionLevel): string
 }
 
 export function isFariSotiEvent(event: Pick<EventLike, "name">): boolean {
-  return /\bFari\s*Soti\b/i.test(event.name);
+  return /\bFarr?i\s*Soti\b/i.test(event.name);
 }
 
 export function isFariSotiCatalogEventId(id: string | null | undefined): boolean {
@@ -48,8 +48,16 @@ export function isSingleSotiCatalogEventId(id: string | null | undefined): boole
   return !!id && SINGLE_SOTI_EVENT_IDS.has(id);
 }
 
+/** Team or individual Single Soti (`Single Soti Team`, `Individual Single Soti`, etc.). */
+export function isSingleSotiEvent(event: Pick<EventLike, "name">): boolean {
+  return /\bSingle\s*Soti\b/i.test(event.name);
+}
+
 export function isIndividualSingleSotiEvent(event: Pick<EventLike, "name">): boolean {
-  return /\bIndividual\b/i.test(event.name) && /\bSingle\s*Soti\b/i.test(event.name);
+  return (
+    /\bSingle\s*Soti\b/i.test(event.name) &&
+    /\bIndividual\b/i.test(event.name)
+  );
 }
 
 /** Per-event min/max from catalog `Event` (no per-competition overrides). */
@@ -101,8 +109,7 @@ export function playerHasSingleSotiParticipation(rows: ParticipationWithEvent[])
   return rows.some(
     (r) =>
       (r.eventId && SINGLE_SOTI_EVENT_IDS.has(r.eventId)) ||
-      (r.event &&
-        (isSingleSotiCatalogEventId(r.event.id) || isIndividualSingleSotiEvent(r.event)))
+      (r.event && (isSingleSotiCatalogEventId(r.event.id) || isSingleSotiEvent(r.event)))
   );
 }
 

@@ -1,6 +1,12 @@
 import type { CompetitionLevel, Gender, Prisma } from "@prisma/client";
 import * as competitionRepository from "../repositories/competition.repository.js";
 import * as participationRepository from "../repositories/participation.repository.js";
+import {
+  isFariSotiCatalogEventId,
+  isFariSotiEvent,
+  isSingleSotiCatalogEventId,
+  isSingleSotiEvent,
+} from "./competitionEventParticipation.js";
 
 export const AGE_WISE_REPORT_COLUMNS = [
   "district",
@@ -40,15 +46,54 @@ export function ageGroupLabel(ageCategory: { name: string; ageTo: number | null 
   return ageCategory.name;
 }
 
-export function eventNameToAgeWiseColumn(eventName: string): AgeWiseReportColumn | null {
+type AgeWiseEventHint = {
+  id?: string | null;
+  minPlayers?: number | null;
+  maxPlayers?: number | null;
+};
+
+/**
+ * Maps catalog names in either order (`Team Fari Soti` or `Farri Soti Team`)
+ * and both Fari/Farri spellings onto the six report columns.
+ */
+export function eventNameToAgeWiseColumn(
+  eventName: string,
+  event?: AgeWiseEventHint
+): AgeWiseReportColumn | null {
   const name = eventName.trim();
-  if (/^Team\s+Demo$/i.test(name)) return "teamDemo";
-  if (/^Team\s+Fari\s+Soti$/i.test(name)) return "teamFariSoti";
-  if (/^Team\s+Single\s+Soti$/i.test(name)) return "teamSingleSoti";
-  if (/^Individual\s+Demo$/i.test(name)) return "indvDemo";
-  if (/^Individual\s+Fari\s+Soti$/i.test(name)) return "indvFariSoti";
-  if (/^Individual\s+Single\s+Soti$/i.test(name)) return "indvSingleSoti";
+  const hasTeam = /\bTeam\b/i.test(name);
+  const hasIndividual = /\bIndividual\b/i.test(name);
+  const teamByBounds = (event?.minPlayers ?? 0) > 1 || (event?.maxPlayers ?? 0) > 1;
+  const isTeam = hasTeam || (teamByBounds && !hasIndividual);
+
+  const isDemo = /\bDemo\b/i.test(name);
+  const isFari = isFariSotiEvent({ name }) || isFariSotiCatalogEventId(event?.id);
+  const isSingle = isSingleSotiEvent({ name }) || isSingleSotiCatalogEventId(event?.id);
+
+  if (isFari) return isTeam ? "teamFariSoti" : "indvFariSoti";
+  if (isSingle) return isTeam ? "teamSingleSoti" : "indvSingleSoti";
+  if (isDemo) return isTeam ? "teamDemo" : "indvDemo";
   return null;
+}
+
+/** Row order inside an event-group participants list. */
+export const EVENT_GROUP_PARTICIPANT_SORT_COLUMNS: AgeWiseReportColumn[] = [
+  "teamDemo",
+  "indvDemo",
+  "teamFariSoti",
+  "indvFariSoti",
+  "teamSingleSoti",
+  "indvSingleSoti",
+];
+
+export function eventGroupParticipantSortRank(
+  eventName: string,
+  event?: AgeWiseEventHint
+): number {
+  const column = eventNameToAgeWiseColumn(eventName, event);
+  if (!column) return EVENT_GROUP_PARTICIPANT_SORT_COLUMNS.length;
+  const idx = EVENT_GROUP_PARTICIPANT_SORT_COLUMNS.indexOf(column);
+  return idx < 0 ? EVENT_GROUP_PARTICIPANT_SORT_COLUMNS.length : idx;
 }
 
 function emptyRow(): AgeWiseReportRow {
@@ -140,7 +185,8 @@ export async function buildCompetitionAgeWiseReport(
   for (const row of rows) {
     const profile = row.playerUser.playerProfile;
     const ageCategory = row.event?.eventGroup?.ageCategory;
-    const eventName = row.event?.name;
+    const catalogEvent = row.event;
+    const eventName = catalogEvent?.name;
     if (!profile || !ageCategory || !eventName) continue;
 
     const unitName = unitKeyForLevel(competitionLevel, profile);
@@ -157,7 +203,7 @@ export async function buildCompetitionAgeWiseReport(
     if (!entry) continue;
 
     entry.district.add(row.playerUserId);
-    const column = eventNameToAgeWiseColumn(eventName);
+    const column = eventNameToAgeWiseColumn(eventName, catalogEvent);
     if (column) {
       entry.columns.get(column)?.add(row.playerUserId);
     }

@@ -1775,8 +1775,10 @@ components:
           type: object
           description: >
             Keys are event group labels with age group (e.g. `Saif (Male) - U19`).
-            Values are participant rows, sorted by name. Each player appears once
-            per group even if registered for multiple events in that group.
+            Values are participant rows, sorted by event type then player name:
+            Team Demo, Individual Demo, Team Fari Soti, Individual Fari Soti,
+            Team Single Soti, Individual Single Soti. A player registered in
+            multiple events in the same group appears as separate rows.
           additionalProperties:
             type: array
             items: { $ref: "#/components/schemas/CompetitionEventGroupParticipantRow" }

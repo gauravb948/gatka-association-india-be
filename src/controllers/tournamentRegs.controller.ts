@@ -16,8 +16,8 @@ import {
 import {
   isFariSotiCatalogEventId,
   isFariSotiEvent,
-  isIndividualSingleSotiEvent,
   isSingleSotiCatalogEventId,
+  isSingleSotiEvent,
   isTeamEvent,
   orgUnitLabelForCompetitionLevel,
   playerHasFariSotiParticipation,
@@ -96,7 +96,7 @@ export async function create(req: Request, res: Response, next: NextFunction) {
       );
     }
     const signingUpSingleSoti =
-      isSingleSotiCatalogEventId(catalogEvent.id) || isIndividualSingleSotiEvent(catalogEvent);
+      isSingleSotiCatalogEventId(catalogEvent.id) || isSingleSotiEvent(catalogEvent);
     if (signingUpSingleSoti && playerHasFariSotiParticipation(existing)) {
       throw new AppError(
         400,

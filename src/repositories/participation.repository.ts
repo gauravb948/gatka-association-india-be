@@ -46,7 +46,10 @@ export async function findParticipationsForAgeWiseReport(
       },
       event: {
         select: {
+          id: true,
           name: true,
+          minPlayers: true,
+          maxPlayers: true,
           eventGroup: {
             select: {
               ageCategory: {
@@ -96,6 +99,8 @@ export async function findParticipationsForEventGroupParticipantsReport(
               dateOfBirth: true,
               aadharNumber: true,
               photoUrl: true,
+              gender: true,
+              district: { select: { name: true } },
             },
           },
         },
@@ -104,6 +109,8 @@ export async function findParticipationsForEventGroupParticipantsReport(
         select: {
           id: true,
           name: true,
+          minPlayers: true,
+          maxPlayers: true,
           eventGroup: {
             select: {
               segment: true,

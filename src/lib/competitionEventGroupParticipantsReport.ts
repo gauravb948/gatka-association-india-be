@@ -1,5 +1,6 @@
 import type { Gender, Prisma } from "@prisma/client";
 import { ageOnDate } from "./age.js";
+import { ageGroupLabel, eventGroupParticipantSortRank } from "./competitionAgeWiseReport.js";
 import { formatEventGroupTitle } from "./competitionResultList.js";
 import * as competitionRepository from "../repositories/competition.repository.js";
 import * as participationRepository from "../repositories/participation.repository.js";
@@ -10,6 +11,9 @@ export type CompetitionEventGroupParticipantRow = {
   motherName: string | null;
   dob: string;
   age: number;
+  ageGroup: string;
+  district: string;
+  gender: string;
   aadharNumber: string | null;
   photoUrl: string | null;
   /** One event name per row (multi-event players get multiple rows in the same group). */
@@ -40,6 +44,12 @@ function formatDobMmDdYyyy(dateOfBirth: Date): string {
   return `${mm}/${dd}/${yyyy}`;
 }
 
+function genderDisplay(gender: Gender): string {
+  if (gender === "MALE" || gender === "BOYS") return "Male";
+  if (gender === "FEMALE" || gender === "GIRLS") return "Female";
+  return gender;
+}
+
 function mapProfileToRow(
   profile: {
     fullName: string;
@@ -48,9 +58,12 @@ function mapProfileToRow(
     dateOfBirth: Date;
     aadharNumber: string | null;
     photoUrl: string | null;
+    gender: Gender;
+    district: { name: string } | null;
   },
   ageAsOf: Date,
-  participatingIn: string[]
+  participatingIn: string[],
+  ageGroup: string
 ): CompetitionEventGroupParticipantRow {
   return {
     name: profile.fullName,
@@ -58,6 +71,9 @@ function mapProfileToRow(
     motherName: profile.motherName,
     dob: formatDobMmDdYyyy(profile.dateOfBirth),
     age: ageOnDate(profile.dateOfBirth, ageAsOf),
+    ageGroup,
+    district: profile.district?.name?.trim() ?? "",
+    gender: genderDisplay(profile.gender),
     aadharNumber: profile.aadharNumber,
     photoUrl: profile.photoUrl,
     participatingIn,
@@ -96,6 +112,8 @@ export async function buildCompetitionEventGroupParticipantsReport(
     Array<{
       profile: NonNullable<(typeof rows)[number]["playerUser"]["playerProfile"]>;
       eventName: string;
+      eventSortRank: number;
+      ageGroup: string;
     }>
   >();
 
@@ -117,19 +135,25 @@ export async function buildCompetitionEventGroupParticipantsReport(
       entries = [];
       byGroup.set(label, entries);
     }
-    entries.push({ profile, eventName: event.name });
+    entries.push({
+      profile,
+      eventName: event.name,
+      eventSortRank: eventGroupParticipantSortRank(event.name, event),
+      ageGroup: ageGroupLabel(event.eventGroup.ageCategory),
+    });
   }
 
   for (const [label, entries] of byGroup) {
     result[label] = entries
-      .map(({ profile, eventName }) => mapProfileToRow(profile, ageAsOf, [eventName]))
       .sort((a, b) => {
-        const byName = a.name.localeCompare(b.name);
+        if (a.eventSortRank !== b.eventSortRank) return a.eventSortRank - b.eventSortRank;
+        const byName = a.profile.fullName.localeCompare(b.profile.fullName);
         if (byName !== 0) return byName;
-        const aEvent = a.participatingIn[0] ?? "";
-        const bEvent = b.participatingIn[0] ?? "";
-        return aEvent.localeCompare(bEvent);
-      });
+        return a.eventName.localeCompare(b.eventName);
+      })
+      .map(({ profile, eventName, ageGroup }) =>
+        mapProfileToRow(profile, ageAsOf, [eventName], ageGroup)
+      );
   }
 
   return {
