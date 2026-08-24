@@ -81,6 +81,23 @@ export function actorPlayerProfileScopeWhere(
   throw new AppError(403, "Forbidden", "FORBIDDEN_ROLE");
 }
 
+/** Closed by admin, or past `endDate` — roster must not change. */
+export function assertCompetitionAcceptsRosterChanges(comp: {
+  isClosed: boolean;
+  endDate: Date | null;
+}): void {
+  if (comp.isClosed) {
+    throw new AppError(400, "Competition is closed", "COMPETITION_CLOSED");
+  }
+  if (comp.endDate != null && Date.now() >= new Date(comp.endDate).getTime()) {
+    throw new AppError(
+      400,
+      "Cannot change participants after the competition has ended",
+      "COMPETITION_COMPLETED"
+    );
+  }
+}
+
 /**
  * Who may record participation: one level below the competition —
  * national → state admin, state → district admin, district → training center.

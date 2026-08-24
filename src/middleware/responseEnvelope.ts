@@ -46,6 +46,9 @@ function messageForKnownRoute(req: Request): string | null {
   if (method === "DELETE" && /\/competitions\/[^/]+\/?$/.test(path)) {
     return "Competition and participants deleted successfully";
   }
+  if (method === "DELETE" && /\/training-centers\/[^/]+\/?$/.test(path)) {
+    return "Training center and players deleted successfully";
+  }
 
   if (method !== "POST") return null;
 

@@ -6,6 +6,7 @@ import * as statePaymentRepository from "../repositories/statePayment.repository
 import * as paymentRepository from "../repositories/payment.repository.js";
 import * as participationRepository from "../repositories/participation.repository.js";
 import { AppError } from "../lib/errors.js";
+import { assertCompetitionAcceptsRosterChanges } from "../lib/competitionParticipation.js";
 import {
   assertParticipationPrerequisite,
   assertPlayerActiveForTournament,
@@ -47,9 +48,7 @@ export async function create(req: Request, res: Response, next: NextFunction) {
 
     const comp = await competitionRepository.findByIdForPlayerEligibility(body.competitionId);
     if (!comp) throw new AppError(404, "Competition not found");
-    if (comp.isClosed) {
-      throw new AppError(400, "Competition is closed", "COMPETITION_CLOSED");
-    }
+    assertCompetitionAcceptsRosterChanges(comp);
 
     const catalogEvent = await prisma.event.findFirst({
       where: { id: body.eventId, isActive: true },

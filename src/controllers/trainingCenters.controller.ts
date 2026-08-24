@@ -2,10 +2,23 @@ import type { NextFunction, Request, Response } from "express";
 import * as districtRepository from "../repositories/district.repository.js";
 import * as trainingCenterRepository from "../repositories/trainingCenter.repository.js";
 import { AppError } from "../lib/errors.js";
+import type { DbUser } from "../types/user.js";
 import {
   createTrainingCenterSchema,
   patchTrainingCenterSchema,
 } from "../validators/trainingCenter.validators.js";
+
+function assertCanManageTrainingCenter(
+  u: DbUser,
+  existing: { districtId: string; district: { stateId: string } }
+) {
+  if (u.role === "DISTRICT_ADMIN" && u.districtId !== existing.districtId) {
+    throw new AppError(403, "Forbidden");
+  }
+  if (u.role === "STATE_ADMIN" && u.stateId !== existing.district.stateId) {
+    throw new AppError(403, "Forbidden");
+  }
+}
 
 export async function listPublicByDistrict(req: Request, res: Response, next: NextFunction) {
   try {
@@ -64,15 +77,28 @@ export async function patch(req: Request, res: Response, next: NextFunction) {
     const u = req.dbUser!;
     const existing = await trainingCenterRepository.findByIdWithDistrict(req.params.id);
     if (!existing) throw new AppError(404, "Training center not found");
-    if (u.role === "DISTRICT_ADMIN" && u.districtId !== existing.districtId) {
-      throw new AppError(403, "Forbidden");
-    }
-    if (u.role === "STATE_ADMIN" && u.stateId !== existing.district.stateId) {
-      throw new AppError(403, "Forbidden");
-    }
+    assertCanManageTrainingCenter(u, existing);
     const body = patchTrainingCenterSchema.parse(req.body);
     const tc = await trainingCenterRepository.updateTrainingCenter(req.params.id, body);
     res.json(tc);
+  } catch (e) {
+    next(e);
+  }
+}
+
+/** Hard-delete a training center and all players (and other users) belonging to it. */
+export async function remove(req: Request, res: Response, next: NextFunction) {
+  try {
+    const u = req.dbUser!;
+    const existing = await trainingCenterRepository.findByIdWithDistrict(req.params.id);
+    if (!existing) throw new AppError(404, "Training center not found");
+    assertCanManageTrainingCenter(u, existing);
+    const deleted = await trainingCenterRepository.deleteTrainingCenterWithPlayers(existing.id);
+    res.json({
+      id: existing.id,
+      name: existing.name,
+      ...deleted,
+    });
   } catch (e) {
     next(e);
   }

@@ -30,6 +30,7 @@ import {
 } from "../lib/competitionEventParticipation.js";
 import {
   actorPlayerProfileScopeWhere,
+  assertCompetitionAcceptsRosterChanges,
   assertRegistrarCanRecordParticipation,
   playerProfileGenderWhereFromComp,
   playerProfileWhereCompetitionEnabledScope,
@@ -647,6 +648,7 @@ export async function removeAllParticipants(req: Request, res: Response, next: N
     const comp = await competitionRepository.findByIdForPlayerEligibility(req.params.id);
     if (!comp) throw new AppError(404, "Competition not found");
     const scope = await assertCanClearCompetitionParticipants(actor, comp);
+    assertCompetitionAcceptsRosterChanges(comp);
     const playerProfileWhere =
       scope === "territory" ? actorPlayerProfileScopeWhere(actor) : undefined;
     const deleted = await competitionRepository.deleteCompetitionParticipants(
@@ -669,9 +671,7 @@ export async function eligiblePlayers(req: Request, res: Response, next: NextFun
     const ctx = await competitionRepository.findByIdForParticipationContext(req.params.id);
     if (!ctx) throw new AppError(404, "Competition not found");
     const { comp, catalogEvents } = ctx;
-    if (comp.isClosed) {
-      throw new AppError(400, "Competition is closed", "COMPETITION_CLOSED");
-    }
+    assertCompetitionAcceptsRosterChanges(comp);
 
     const actor = req.dbUser!;
 
@@ -743,9 +743,7 @@ export async function createParticipation(req: Request, res: Response, next: Nex
     const ctx = await competitionRepository.findByIdForParticipationContext(req.params.id);
     if (!ctx) throw new AppError(404, "Competition not found");
     const { comp, catalogEvents } = ctx;
-    if (comp.isClosed) {
-      throw new AppError(400, "Competition is closed", "COMPETITION_CLOSED");
-    }
+    assertCompetitionAcceptsRosterChanges(comp);
 
     const catalogEvent = catalogEvents.find((e) => e.id === body.eventId);
     if (!catalogEvent) {
@@ -820,9 +818,56 @@ export async function createParticipation(req: Request, res: Response, next: Nex
 }
 
 /**
- * Unregister a player from a competition: deletes all of their participation rows,
+ * Team min/max still applies unless every remaining member of that team is in `removingPlayerIds`.
+ */
+async function assertTeamSizeAfterUnregister(
+  competitionId: string,
+  catalogEvents: CatalogEventWithGroup[],
+  removingPlayerIds: string[],
+  eventId?: string
+) {
+  const removing = new Set(removingPlayerIds);
+  let eventIds: string[];
+  if (eventId) {
+    eventIds = [eventId];
+  } else {
+    const rows = await participationRepository.findParticipatedEventIdsForPlayers(
+      competitionId,
+      removingPlayerIds
+    );
+    eventIds = rows.map((r) => r.eventId).filter((id): id is string => Boolean(id));
+  }
+
+  for (const eid of eventIds) {
+    const catalogEvent = catalogEvents.find((e) => e.id === eid);
+    if (!catalogEvent || !isTeamEvent(catalogEvent)) continue;
+
+    const rows = await participationRepository.findParticipatedPlayerRowsForEvent(
+      competitionId,
+      eid
+    );
+    const byTeam = new Map<string, string[]>();
+    for (const row of rows) {
+      const key = row.teamId ?? "";
+      const members = byTeam.get(key) ?? [];
+      members.push(row.playerUserId);
+      byTeam.set(key, members);
+    }
+
+    const bounds = effectiveEventBounds(catalogEvent);
+    for (const members of byTeam.values()) {
+      const remaining = members.filter((id) => !removing.has(id));
+      if (remaining.length === members.length) continue;
+      if (remaining.length === 0) continue;
+      assertTeamSize(remaining.length, bounds);
+    }
+  }
+}
+
+/**
+ * Unregister one or more players from a competition: deletes their participation rows,
  * or only the given `eventId` when provided. Same registrar roles/scope as signup.
- * Team events: remaining teammates for that team/event must still meet `minPlayers`.
+ * Team events: remaining teammates must still meet `minPlayers`, unless the whole team is selected.
  */
 export async function removeParticipation(req: Request, res: Response, next: NextFunction) {
   try {
@@ -831,61 +876,59 @@ export async function removeParticipation(req: Request, res: Response, next: Nex
     const ctx = await competitionRepository.findByIdForParticipationContext(req.params.id);
     if (!ctx) throw new AppError(404, "Competition not found");
     const { comp, catalogEvents } = ctx;
-    if (comp.isClosed) {
-      throw new AppError(400, "Competition is closed", "COMPETITION_CLOSED");
+    assertCompetitionAcceptsRosterChanges(comp);
+
+    const playerUserIds = [
+      ...new Set(
+        [...(body.playerUserIds ?? []), body.playerUserId ?? ""]
+          .map((s) => s.trim())
+          .filter(Boolean)
+      ),
+    ];
+    if (playerUserIds.length === 0) {
+      throw new AppError(400, "playerUserId or playerUserIds is required", "INVALID_UNREGISTER");
     }
 
-    const profile = await playerRepository.findProfileByUserId(body.playerUserId);
-    if (!profile) throw new AppError(404, "Player profile not found", "PLAYER_NOT_FOUND");
-    assertRegistrarCanRecordParticipation(actor, comp, profile);
+    for (const playerUserId of playerUserIds) {
+      const profile = await playerRepository.findProfileByUserId(playerUserId);
+      if (!profile) throw new AppError(404, "Player profile not found", "PLAYER_NOT_FOUND");
+      assertRegistrarCanRecordParticipation(actor, comp, profile);
 
-    const existing = await participationRepository.findParticipationsWithEventsForPlayer(
-      comp.id,
-      body.playerUserId
-    );
-    if (existing.length === 0) {
-      throw new AppError(404, "Player is not registered in this competition", "NOT_PARTICIPATING");
-    }
-
-    if (body.eventId) {
-      const inEvent = existing.some((r) => r.eventId === body.eventId);
-      if (!inEvent) {
+      const existing = await participationRepository.findParticipationsWithEventsForPlayer(
+        comp.id,
+        playerUserId
+      );
+      if (existing.length === 0) {
+        throw new AppError(404, "Player is not registered in this competition", "NOT_PARTICIPATING");
+      }
+      if (body.eventId && !existing.some((r) => r.eventId === body.eventId)) {
         throw new AppError(
           404,
           "Player is not registered for this event in the competition",
           "NOT_IN_EVENT"
         );
       }
-
-      const catalogEvent = catalogEvents.find((e) => e.id === body.eventId);
-      if (catalogEvent && isTeamEvent(catalogEvent)) {
-        const row = await participationRepository.findExistingParticipationForEvent(
-          comp.id,
-          body.playerUserId,
-          body.eventId
+      if (await participationRepository.playerHasCompetedInCompetition(comp.id, playerUserId)) {
+        throw new AppError(
+          400,
+          "Cannot unregister a player who has already competed in this competition",
+          "PLAYER_ALREADY_COMPETED"
         );
-        const bounds = effectiveEventBounds(catalogEvent);
-        const count =
-          row?.teamId != null
-            ? await participationRepository.countParticipatedInEvent(comp.id, body.eventId, {
-                teamId: row.teamId,
-              })
-            : await participationRepository.countParticipatedInEvent(comp.id, body.eventId, {
-                playerProfileWhere: actorPlayerProfileScopeWhere(actor),
-              });
-        assertTeamSize(count - 1, bounds);
       }
     }
 
-    const result = await participationRepository.deleteParticipationsForPlayer(
+    await assertTeamSizeAfterUnregister(comp.id, catalogEvents, playerUserIds, body.eventId);
+
+    const result = await participationRepository.deleteParticipationsForPlayers(
       comp.id,
-      body.playerUserId,
+      playerUserIds,
       body.eventId
     );
 
     res.status(200).json({
       unregisteredCount: result.count,
-      playerUserId: body.playerUserId,
+      playerUserId: playerUserIds.length === 1 ? playerUserIds[0] : undefined,
+      playerUserIds,
       eventId: body.eventId ?? null,
     });
   } catch (e) {
@@ -904,9 +947,7 @@ export async function replaceParticipation(req: Request, res: Response, next: Ne
     const ctx = await competitionRepository.findByIdForParticipationContext(req.params.id);
     if (!ctx) throw new AppError(404, "Competition not found");
     const { comp, catalogEvents } = ctx;
-    if (comp.isClosed) {
-      throw new AppError(400, "Competition is closed", "COMPETITION_CLOSED");
-    }
+    assertCompetitionAcceptsRosterChanges(comp);
 
     const removeId = body.removePlayerUserId.trim();
     const addId = body.addPlayerUserId.trim();
@@ -925,6 +966,14 @@ export async function replaceParticipation(req: Request, res: Response, next: Ne
     const removeProfile = await playerRepository.findProfileByUserId(removeId);
     if (!removeProfile) throw new AppError(404, "Player profile not found", "PLAYER_NOT_FOUND");
     assertRegistrarCanRecordParticipation(actor, comp, removeProfile);
+
+    if (await participationRepository.playerHasCompetedInCompetition(comp.id, removeId)) {
+      throw new AppError(
+        400,
+        "Cannot replace a player who has already competed in this competition",
+        "PLAYER_ALREADY_COMPETED"
+      );
+    }
 
     const removeRow = await participationRepository.findExistingParticipationForEvent(
       comp.id,
@@ -985,9 +1034,7 @@ export async function createParticipationBulk(req: Request, res: Response, next:
     const ctx = await competitionRepository.findByIdForParticipationContext(req.params.id);
     if (!ctx) throw new AppError(404, "Competition not found");
     const { comp, catalogEvents } = ctx;
-    if (comp.isClosed) {
-      throw new AppError(400, "Competition is closed", "COMPETITION_CLOSED");
-    }
+    assertCompetitionAcceptsRosterChanges(comp);
 
     const allPlayerIds = [
       ...new Set(
@@ -1069,9 +1116,7 @@ export async function listPlayersNotParticipated(req: Request, res: Response, ne
     const ctx = await competitionRepository.findByIdForParticipationContext(req.params.id);
     if (!ctx) throw new AppError(404, "Competition not found");
     const { comp, catalogEvents } = ctx;
-    if (comp.isClosed) {
-      throw new AppError(400, "Competition is closed", "COMPETITION_CLOSED");
-    }
+    assertCompetitionAcceptsRosterChanges(comp);
 
     const q = competitionParticipationListQuerySchema.parse(req.query);
     const skip = (q.page - 1) * q.pageSize;

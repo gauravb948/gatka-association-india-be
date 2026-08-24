@@ -39,11 +39,17 @@ export const competitionParticipationBodySchema = z.object({
   playerUserIds: z.array(z.string().min(1)).min(1).max(32),
 });
 
-/** Body for `DELETE /competitions/:id/participations` — unregister a player (all events, or one if `eventId` set). */
-export const competitionUnregisterParticipationBodySchema = z.object({
-  playerUserId: z.string().min(1),
-  eventId: z.string().min(1).optional(),
-});
+/** Body for `DELETE /competitions/:id/participations` — one player or many. Optional `eventId` limits to that event. */
+export const competitionUnregisterParticipationBodySchema = z
+  .object({
+    playerUserId: z.string().min(1).optional(),
+    playerUserIds: z.array(z.string().min(1)).min(1).max(500).optional(),
+    eventId: z.string().min(1).optional(),
+  })
+  .refine((b) => Boolean(b.playerUserId?.trim()) || (b.playerUserIds && b.playerUserIds.length > 0), {
+    message: "playerUserId or playerUserIds is required",
+    path: ["playerUserIds"],
+  });
 
 /** Body for `POST /competitions/:id/participations/replace` — swap one team (or event) player for another. */
 export const competitionReplaceParticipationBodySchema = z.object({

@@ -3325,6 +3325,60 @@ paths:
                     id: { type: string }
                     name: { type: string }
                     districtId: { type: string }
+  /training-centers/{id}:
+    delete:
+      security: [{ bearerAuth: [] }]
+      summary: Delete a training center and its players
+      description: >
+        Hard-deletes the training center and every player belonging to it (player profile,
+        login user, participations, tournament registrations, attendance, results, payments,
+        and related rows). Coaches and training-center login accounts on the same center
+        are also removed so the center itself can be deleted.
+        District admins may only delete centers in their district; state admins only in
+        their state. National admins may delete any center.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Training center deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - id
+                  - name
+                  - players
+                  - coaches
+                  - users
+                  - participations
+                  - tournamentRegistrations
+                  - attendance
+                  - results
+                  - payments
+                  - notices
+                properties:
+                  id: { type: string }
+                  name: { type: string }
+                  players: { type: integer, minimum: 0 }
+                  coaches: { type: integer, minimum: 0 }
+                  users: { type: integer, minimum: 0 }
+                  participations: { type: integer, minimum: 0 }
+                  tournamentRegistrations: { type: integer, minimum: 0 }
+                  attendance: { type: integer, minimum: 0 }
+                  results: { type: integer, minimum: 0 }
+                  payments: { type: integer, minimum: 0 }
+                  notices: { type: integer, minimum: 0 }
+        "403":
+          description: Forbidden for this role or geography
+        "404":
+          description: Training center not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
   /settings/global:
     get:
       security: [{ bearerAuth: [] }]
@@ -4397,10 +4451,13 @@ paths:
       security: [{ bearerAuth: [] }]
       summary: Unregister a player from a competition (or one event)
       description: >
-        Deletes `ParticipationRecord` rows for `playerUserId` in this competition.
-        Omit `eventId` to remove all of the player's events; set `eventId` to remove only that event.
-        Same registrar roles and hierarchy/scope rules as participation create.
-        Blocked when the competition is closed.
+        Deletes `ParticipationRecord` rows for one player (`playerUserId`) or many (`playerUserIds`)
+        in this competition. Omit `eventId` to remove all of each player's events; set `eventId` to
+        remove only that event. Same registrar roles and hierarchy/scope rules as participation create.
+        For team events, remaining teammates must still meet `minPlayers`, unless **every** member of
+        that team is included in the request (select-all). Blocked when the competition is closed,
+        when `endDate` has passed, or when a selected player already has tournament attendance or a
+        result in this competition.
       parameters:
         - name: id
           in: path
@@ -4412,12 +4469,17 @@ paths:
           application/json:
             schema:
               type: object
-              required: [playerUserId]
               properties:
-                playerUserId: { type: string }
+                playerUserId: { type: string, description: Single player (same as playerUserIds with one id) }
+                playerUserIds:
+                  type: array
+                  minItems: 1
+                  maxItems: 500
+                  items: { type: string }
+                  description: Bulk unregister; include every teammate to drop a whole team
                 eventId:
                   type: string
-                  description: Optional catalog event id; when omitted, all events for the player are removed
+                  description: Optional catalog event id; when omitted, all events for the player(s) are removed
       responses:
         "200":
           description: Player unregistered successfully
@@ -4427,10 +4489,16 @@ paths:
                 type: object
                 properties:
                   unregisteredCount: { type: integer }
-                  playerUserId: { type: string }
+                  playerUserId: { type: string, description: Present when a single player was unregistered }
+                  playerUserIds:
+                    type: array
+                    items: { type: string }
                   eventId: { type: string, nullable: true }
         "400":
-          description: Competition closed
+          description: >
+            Competition closed (`COMPETITION_CLOSED`), competition has ended
+            (`COMPETITION_COMPLETED`), player already competed (`PLAYER_ALREADY_COMPETED`),
+            or remaining team size would fall below the event minimum.
         "403":
           description: Role/level mismatch or player outside registrar scope
         "404":
@@ -4493,6 +4561,7 @@ paths:
         (e.g. district admin cannot clear a national competition; training center cannot clear
         a state competition).
         Aggregate standings are left unchanged on a territory-scoped delete.
+        Blocked when the competition is closed or `endDate` has passed.
         To unregister a single player, use `DELETE /competitions/{id}/participations`.
       parameters:
         - name: id
@@ -4529,6 +4598,8 @@ paths:
                   results: { type: integer, description: Competition result rows removed }
                   aggregateStandings:
                     { type: integer, description: Aggregate standing rows removed (0 when scope is territory) }
+        "400":
+          description: Competition closed or end date has passed
         "403":
           description: Outside admin scope or wrong hierarchy level
         "404":

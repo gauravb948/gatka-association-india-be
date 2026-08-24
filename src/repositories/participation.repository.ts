@@ -234,19 +234,65 @@ export async function createManyParticipationRecords(
   return prisma.participationRecord.createMany({ data });
 }
 
-/** Hard-delete participation rows for a player in a competition (optionally one event). */
-export function deleteParticipationsForPlayer(
+/** Hard-delete participation rows for players in a competition (optionally one event). */
+export function deleteParticipationsForPlayers(
   competitionId: string,
-  playerUserId: string,
+  playerUserIds: string[],
   eventId?: string
 ) {
+  if (playerUserIds.length === 0) return Promise.resolve({ count: 0 });
   return prisma.participationRecord.deleteMany({
     where: {
       competitionId,
-      playerUserId,
+      playerUserId: { in: playerUserIds },
       ...(eventId ? { eventId } : {}),
     },
   });
+}
+
+/** Player + team rows for one event (used to enforce min size after a bulk unregister). */
+export function findParticipatedPlayerRowsForEvent(competitionId: string, eventId: string) {
+  return prisma.participationRecord.findMany({
+    where: { competitionId, eventId, participated: true },
+    select: { playerUserId: true, teamId: true },
+  });
+}
+
+export function findParticipatedEventIdsForPlayers(competitionId: string, playerUserIds: string[]) {
+  if (playerUserIds.length === 0) return Promise.resolve([]);
+  return prisma.participationRecord.findMany({
+    where: {
+      competitionId,
+      playerUserId: { in: playerUserIds },
+      participated: true,
+      eventId: { not: null },
+    },
+    select: { eventId: true },
+    distinct: ["eventId"],
+  });
+}
+
+/** True when the player has tournament attendance or a recorded result in this competition. */
+export async function playerHasCompetedInCompetition(
+  competitionId: string,
+  playerUserId: string
+): Promise<boolean> {
+  const [attendance, result] = await Promise.all([
+    prisma.attendance.findFirst({
+      where: {
+        competitionId,
+        userId: playerUserId,
+        type: "TOURNAMENT",
+        present: true,
+      },
+      select: { id: true },
+    }),
+    prisma.competitionResult.findFirst({
+      where: { competitionId, playerUserId },
+      select: { id: true },
+    }),
+  ]);
+  return attendance != null || result != null;
 }
 
 export function findManyByCompetitionAndPlayers(competitionId: string, playerUserIds: string[]) {

@@ -26,3 +26,9 @@ trainingCentersRouter.patch(
   requireRoles("DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),
   trainingCentersController.patch
 );
+trainingCentersRouter.delete(
+  "/:id",
+  requireAuth,
+  requireRoles("DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),
+  trainingCentersController.remove
+);
