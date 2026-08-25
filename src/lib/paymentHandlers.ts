@@ -9,6 +9,7 @@ import * as trainingCenterRepository from "../repositories/trainingCenter.reposi
 import { EntityStatus, MembershipStatus, PaymentPurpose, type Role } from "@prisma/client";
 import { getMembershipBounds } from "./membership.js";
 import { prisma } from "./prisma.js";
+import { upsertCompetitionFeeSubmissionFromPayment } from "./competitionFee.js";
 
 async function createMembership(
   userId: string,
@@ -156,6 +157,9 @@ export async function applySuccessfulPayment(
   // (e.g. earlier verify without districtRegistrationId metadata).
   if (updated.count === 0) {
     await ensureOrgRegistrationSubmitted(pay);
+    if (pay.purpose === PaymentPurpose.COMPETITION_ENTRY_FEE) {
+      await upsertCompetitionFeeSubmissionFromPayment(pay);
+    }
     return;
   }
 
@@ -368,5 +372,9 @@ export async function applySuccessfulPayment(
       });
     }
     return;
+  }
+
+  if (pay.purpose === PaymentPurpose.COMPETITION_ENTRY_FEE) {
+    await upsertCompetitionFeeSubmissionFromPayment(pay);
   }
 }

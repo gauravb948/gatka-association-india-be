@@ -13,7 +13,14 @@ export async function createRazorpayOrder(req: Request, res: Response, next: Nex
   try {
     const body = createRazorpayOrderSchema.parse(req.body);
     const u = req.dbUser!;
-    const cfg = await getRazorpayConfigForPayment(body.purpose, body.stateId);
+    if (body.purpose === PaymentPurpose.COMPETITION_ENTRY_FEE) {
+      throw new AppError(
+        400,
+        "Competition entry fees must be created from the competition fee-submission endpoint",
+        "INVALID_PURPOSE"
+      );
+    }
+    const cfg = await getRazorpayConfigForPayment(body.purpose, body.stateId, body.metadata);
 
     const payData: Prisma.PaymentCreateInput = {
       user: { connect: { id: u.id } },
@@ -116,7 +123,7 @@ export async function verify(req: Request, res: Response, next: NextFunction) {
       return res.json({ verified: true, payment: refreshed ?? payment });
     }
 
-    const cfg = await getRazorpayConfigForPayment(payment.purpose, payment.stateId);
+    const cfg = await getRazorpayConfigForPayment(payment.purpose, payment.stateId, payment.metadata);
 
     const expectedSig = crypto
       .createHmac("sha256", cfg.razorpayKeySecret)
@@ -183,7 +190,7 @@ export async function reconcileRazorpay(req: Request, res: Response, next: NextF
       }
 
       try {
-        const cfg = await getRazorpayConfigForPayment(pay.purpose, pay.stateId);
+        const cfg = await getRazorpayConfigForPayment(pay.purpose, pay.stateId, pay.metadata);
         const cacheKey = `${cfg.razorpayKeyId}:${cfg.razorpayKeySecret}`;
         let rz = clientCache.get(cacheKey);
         if (!rz) {

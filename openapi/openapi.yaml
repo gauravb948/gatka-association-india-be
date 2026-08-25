@@ -1544,6 +1544,7 @@ components:
         registrationOpensAt: { type: string, format: date-time, nullable: true }
         registrationClosesAt: { type: string, format: date-time, nullable: true }
         finalSubmitRequiresPayment: { type: boolean }
+        entryFeePaise: { type: integer, nullable: true, description: Per unique player, in paise. Null for district competitions. }
         isClosed: { type: boolean }
         createdById: { type: string, nullable: true }
         createdBy:
@@ -1895,6 +1896,7 @@ components:
         registrationOpensAt: { type: string, format: date-time, nullable: true }
         registrationClosesAt: { type: string, format: date-time, nullable: true }
         finalSubmitRequiresPayment: { type: boolean }
+        entryFeePaise: { type: integer, nullable: true, description: Per unique player, in paise. Null for district competitions. }
         isClosed: { type: boolean }
         createdById: { type: string, nullable: true }
         createdBy:
@@ -2233,6 +2235,10 @@ components:
             Age-as-of date for tournament signup: when the competition lists age categories,
             the player must match at least one on this date; otherwise the selected event's
             age category (from its event group) applies.
+        entryFeePaise:
+          type: integer
+          minimum: 0
+          description: Required for STATE and NATIONAL (including 0). Omit for DISTRICT.
     CompetitionPatchBody:
       type: object
       description: >
@@ -2265,6 +2271,10 @@ components:
           type: array
           minItems: 1
           items: { type: string }
+        entryFeePaise:
+          type: integer
+          minimum: 0
+          description: Required for STATE and NATIONAL (including 0). Omit for DISTRICT.
     GalleryImage:
       type: object
       properties:

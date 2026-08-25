@@ -37,6 +37,18 @@ competitionsRouter.post(
   requireRoles("DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),
   competitionAggregateController.replaceAggregateResults
 );
+competitionsRouter.get(
+  "/:id/fee-submission",
+  requireAuth,
+  requireRoles("DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN", "TRAINING_CENTER"),
+  competitionsController.getFeeSubmission
+);
+competitionsRouter.post(
+  "/:id/fee-submissions/order",
+  requireAuth,
+  requireRoles("DISTRICT_ADMIN", "STATE_ADMIN"),
+  competitionsController.createFeeSubmissionOrder
+);
 competitionsRouter.get("/:id", competitionsController.getById);
 competitionsRouter.post(
   "/",

@@ -7,7 +7,7 @@ import * as paymentRepository from "../repositories/payment.repository.js";
 import * as razorpayWebhookRepository from "../repositories/razorpayWebhook.repository.js";
 import { applySuccessfulPayment } from "../lib/paymentHandlers.js";
 import { fetchCapturedPaymentForOrder, getRazorpayForState } from "../lib/razorpayClient.js";
-import { getRazorpayConfigForPayment } from "../lib/razorpayConfig.js";
+import { getRazorpayConfigForPayment, usesNationalRazorpayAccount } from "../lib/razorpayConfig.js";
 
 function verifySignature(body: string, signature: string | undefined, secret: string) {
   if (!signature || !secret) return false;
@@ -30,8 +30,8 @@ type RazorpayWebhookPayload = {
   };
 };
 
-async function resolveWebhookSecret(purpose: PaymentPurpose, stateId: string) {
-  if (purpose === PaymentPurpose.STATE_REGISTRATION) {
+async function resolveWebhookSecret(purpose: PaymentPurpose, stateId: string, metadata?: unknown) {
+  if (usesNationalRazorpayAccount(purpose, metadata)) {
     const cfg = await nationalPaymentRepository.findSingleton();
     return cfg?.webhookSecret || process.env.RAZORPAY_WEBHOOK_SECRET || "";
   }
@@ -107,7 +107,11 @@ export async function razorpay(req: Request, res: Response, next: NextFunction) 
       return;
     }
 
-    const webhookSecret = await resolveWebhookSecret(payment.purpose, payment.stateId);
+    const webhookSecret = await resolveWebhookSecret(
+      payment.purpose,
+      payment.stateId,
+      payment.metadata
+    );
     const signatureValid = verifySignature(bodyString, sig, webhookSecret);
     await razorpayWebhookRepository.update(row.id, { signatureValid });
 
@@ -119,7 +123,11 @@ export async function razorpay(req: Request, res: Response, next: NextFunction) 
       // for this decision — only Razorpay's authoritative response for this orderId.
       let recoveredViaApi = false;
       try {
-        const cfg = await getRazorpayConfigForPayment(payment.purpose, payment.stateId);
+        const cfg = await getRazorpayConfigForPayment(
+          payment.purpose,
+          payment.stateId,
+          payment.metadata
+        );
         const rz = getRazorpayForState(cfg.razorpayKeyId, cfg.razorpayKeySecret);
         const captured = await fetchCapturedPaymentForOrder(rz, orderId);
         if (captured?.id) {

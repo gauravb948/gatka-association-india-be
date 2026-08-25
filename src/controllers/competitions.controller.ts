@@ -1,4 +1,4 @@
-import type { CompetitionLevel, Prisma } from "@prisma/client";
+import { PaymentPurpose, PaymentStatus, type CompetitionLevel, type Prisma } from "@prisma/client";
 import type { NextFunction, Request, Response } from "express";
 import * as competitionRepository from "../repositories/competition.repository.js";
 import type { CatalogEventWithGroup } from "../repositories/competition.repository.js";
@@ -35,6 +35,14 @@ import {
   playerProfileGenderWhereFromComp,
   playerProfileWhereCompetitionEnabledScope,
 } from "../lib/competitionParticipation.js";
+import {
+  assertEntryFeeForLevel,
+  assertPayingUnitRosterUnlocked,
+  countFeeSubmissions,
+  countUniquePlayersForUnit,
+  findFeeSubmission,
+  payingUnitForActor,
+} from "../lib/competitionFee.js";
 import { fitsAgeCategory } from "../lib/age.js";
 import type { DbUser } from "../types/user.js";
 import {
@@ -50,6 +58,9 @@ import {
   competitionsForReportsQuerySchema,
 } from "../validators/competition.validators.js";
 import * as participationRepository from "../repositories/participation.repository.js";
+import * as paymentRepository from "../repositories/payment.repository.js";
+import { getRazorpayConfigForPayment } from "../lib/razorpayConfig.js";
+import { getRazorpayForState } from "../lib/razorpayClient.js";
 import {
   assertCanClearCompetitionParticipants,
   assertCanManageCompetition,
@@ -490,6 +501,7 @@ export async function create(req: Request, res: Response, next: NextFunction) {
     }
 
     const level = inferCompetitionLevel(req.dbUser!);
+    const entryFeePaise = assertEntryFeeForLevel(level, body.entryFeePaise ?? null);
 
     await assertCompetitionScope(level, stateIds, districtIds, req.dbUser!);
     await validateCompetitionGeographyInput(stateIds, districtIds);
@@ -520,6 +532,7 @@ export async function create(req: Request, res: Response, next: NextFunction) {
       registrationOpensAt: new Date(body.registrationOpensAt.trim()),
       registrationClosesAt: new Date(body.registrationClosesAt.trim()),
       finalSubmitRequiresPayment: true,
+      ...(entryFeePaise != null ? { entryFeePaise } : {}),
     };
     if (stateIds.length) {
       data.states = {
@@ -588,6 +601,19 @@ export async function patch(req: Request, res: Response, next: NextFunction) {
     if (body.ageTillDate !== undefined) {
       data.ageTillDate = new Date(body.ageTillDate.trim());
     }
+    if (body.entryFeePaise !== undefined) {
+      const fee = assertEntryFeeForLevel(comp.level, body.entryFeePaise);
+      if (fee !== comp.entryFeePaise) {
+        if ((await countFeeSubmissions(comp.id)) > 0) {
+          throw new AppError(
+            400,
+            "Cannot change the entry fee after a unit has submitted payment",
+            "FEE_LOCKED"
+          );
+        }
+        data.entryFeePaise = fee;
+      }
+    }
 
     const geo =
       stateIds !== undefined && districtIds !== undefined
@@ -654,6 +680,7 @@ export async function removeAllParticipants(req: Request, res: Response, next: N
     if (!comp) throw new AppError(404, "Competition not found");
     const scope = await assertCanClearCompetitionParticipants(actor, comp);
     assertCompetitionAcceptsRosterChanges(comp);
+    await assertPayingUnitRosterUnlocked(actor, comp.id, comp.level);
     const playerProfileWhere =
       scope === "territory" ? actorPlayerProfileScopeWhere(actor) : undefined;
     const deleted = await competitionRepository.deleteCompetitionParticipants(
@@ -749,6 +776,7 @@ export async function createParticipation(req: Request, res: Response, next: Nex
     if (!ctx) throw new AppError(404, "Competition not found");
     const { comp, catalogEvents } = ctx;
     assertCompetitionAcceptsRosterChanges(comp);
+    await assertPayingUnitRosterUnlocked(actor, comp.id, comp.level);
 
     const catalogEvent = catalogEvents.find((e) => e.id === body.eventId);
     if (!catalogEvent) {
@@ -882,6 +910,7 @@ export async function removeParticipation(req: Request, res: Response, next: Nex
     if (!ctx) throw new AppError(404, "Competition not found");
     const { comp, catalogEvents } = ctx;
     assertCompetitionAcceptsRosterChanges(comp);
+    await assertPayingUnitRosterUnlocked(actor, comp.id, comp.level);
 
     const playerUserIds = [
       ...new Set(
@@ -953,6 +982,7 @@ export async function replaceParticipation(req: Request, res: Response, next: Ne
     if (!ctx) throw new AppError(404, "Competition not found");
     const { comp, catalogEvents } = ctx;
     assertCompetitionAcceptsRosterChanges(comp);
+    await assertPayingUnitRosterUnlocked(actor, comp.id, comp.level);
 
     const removeId = body.removePlayerUserId.trim();
     const addId = body.addPlayerUserId.trim();
@@ -1040,6 +1070,7 @@ export async function createParticipationBulk(req: Request, res: Response, next:
     if (!ctx) throw new AppError(404, "Competition not found");
     const { comp, catalogEvents } = ctx;
     assertCompetitionAcceptsRosterChanges(comp);
+    await assertPayingUnitRosterUnlocked(actor, comp.id, comp.level);
 
     const allPlayerIds = [
       ...new Set(
@@ -1249,6 +1280,163 @@ export async function listParticipants(req: Request, res: Response, next: NextFu
       pageSize: q.pageSize,
       total,
       totalPages,
+    });
+  } catch (e) {
+    next(e);
+  }
+}
+
+function paymentStateIdForActor(
+  actor: DbUser,
+  comp: { states: { stateId: string }[] }
+): string {
+  if (actor.stateId) return actor.stateId;
+  const fromComp = comp.states[0]?.stateId;
+  if (fromComp) return fromComp;
+  throw new AppError(400, "State context missing for payment", "FORBIDDEN_SCOPE");
+}
+
+/** `GET /competitions/:id/fee-submission` — this unit's unique-player fee status. */
+export async function getFeeSubmission(req: Request, res: Response, next: NextFunction) {
+  try {
+    const actor = req.dbUser!;
+    const comp = await competitionRepository.findByIdForPlayerEligibility(req.params.id);
+    if (!comp) throw new AppError(404, "Competition not found");
+    await assertCanViewCompetitionScopedReport(actor, comp);
+
+    const unit = payingUnitForActor(actor, comp.level);
+    if (!unit) {
+      return res.json({
+        applicable: false,
+        entryFeePaise: comp.entryFeePaise,
+        uniquePlayerCount: 0,
+        amountPaise: 0,
+        submitted: false,
+        submittedAt: null,
+        requiresPayment: false,
+      });
+    }
+
+    const uniquePlayerCount = await countUniquePlayersForUnit(comp.id, unit);
+    const existing = await findFeeSubmission(comp.id, unit);
+    const fee = comp.entryFeePaise;
+    const amountPaise = fee == null ? 0 : uniquePlayerCount * fee;
+
+    res.json({
+      applicable: true,
+      entryFeePaise: fee,
+      uniquePlayerCount,
+      amountPaise,
+      submitted: Boolean(existing),
+      submittedAt: existing?.submittedAt ?? null,
+      requiresPayment: fee != null && fee > 0,
+    });
+  } catch (e) {
+    next(e);
+  }
+}
+
+/**
+ * `POST /competitions/:id/fee-submissions/order`
+ * Server computes uniquePlayers × fee. Fee 0 locks without Razorpay.
+ */
+export async function createFeeSubmissionOrder(req: Request, res: Response, next: NextFunction) {
+  try {
+    const actor = req.dbUser!;
+    const comp = await competitionRepository.findByIdForPlayerEligibility(req.params.id);
+    if (!comp) throw new AppError(404, "Competition not found");
+    assertCompetitionAcceptsRosterChanges(comp);
+
+    const unit = payingUnitForActor(actor, comp.level);
+    if (!unit) {
+      throw new AppError(
+        403,
+        "Only the lower hierarchy may submit an entry fee for this competition",
+        "FORBIDDEN_ROLE"
+      );
+    }
+
+    if (comp.entryFeePaise == null) {
+      throw new AppError(400, "This competition has no entry fee configured", "FEE_NOT_SET");
+    }
+
+    const existing = await findFeeSubmission(comp.id, unit);
+    if (existing) {
+      throw new AppError(409, "Roster has already been submitted", "ALREADY_SUBMITTED");
+    }
+
+    const uniquePlayerCount = await countUniquePlayersForUnit(comp.id, unit);
+    if (uniquePlayerCount < 1) {
+      throw new AppError(400, "Register at least one player before final submission", "NO_PLAYERS");
+    }
+
+    const amountPaise = uniquePlayerCount * comp.entryFeePaise;
+
+    if (amountPaise === 0) {
+      const row = await prisma.competitionFeeSubmission.create({
+        data: {
+          competitionId: comp.id,
+          unitType: unit.unitType,
+          unitId: unit.unitId,
+          playerCount: uniquePlayerCount,
+          amountPaise: 0,
+        },
+      });
+      return res.status(201).json({
+        submitted: true,
+        requiresPayment: false,
+        playerCount: uniquePlayerCount,
+        amountPaise: 0,
+        submittedAt: row.submittedAt,
+      });
+    }
+
+    const stateId = paymentStateIdForActor(actor, comp);
+    const metadata = {
+      competitionId: comp.id,
+      unitType: unit.unitType,
+      unitId: unit.unitId,
+      competitionLevel: comp.level,
+      playerCount: uniquePlayerCount,
+    };
+    const cfg = await getRazorpayConfigForPayment(
+      PaymentPurpose.COMPETITION_ENTRY_FEE,
+      stateId,
+      metadata
+    );
+
+    const payment = await paymentRepository.createPayment({
+      user: { connect: { id: actor.id } },
+      state: { connect: { id: stateId } },
+      purpose: PaymentPurpose.COMPETITION_ENTRY_FEE,
+      amountPaise,
+      status: PaymentStatus.PENDING,
+      metadata,
+    });
+
+    const rz = getRazorpayForState(cfg.razorpayKeyId, cfg.razorpayKeySecret);
+    const order = await rz.orders.create({
+      amount: amountPaise,
+      currency: "INR",
+      receipt: payment.id.slice(0, 40),
+      notes: {
+        paymentId: payment.id,
+        userId: actor.id,
+        purpose: PaymentPurpose.COMPETITION_ENTRY_FEE,
+        competitionId: comp.id,
+      },
+    });
+    await paymentRepository.updateRazorpayOrderId(payment.id, order.id);
+
+    res.status(201).json({
+      submitted: false,
+      requiresPayment: true,
+      paymentId: payment.id,
+      razorpayOrderId: order.id,
+      amountPaise,
+      currency: "INR",
+      keyId: cfg.razorpayKeyId,
+      playerCount: uniquePlayerCount,
     });
   } catch (e) {
     next(e);

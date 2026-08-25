@@ -5,12 +5,30 @@ import { AppError } from "./errors.js";
 
 /**
  * Resolve the Razorpay account (key id/secret) used to create/verify orders for a
- * payment `purpose`. `STATE_REGISTRATION` uses the national account; everything
- * else uses the target state's account. Shared by order creation, client-side
- * verify, admin reconcile, and the webhook's invalid-signature API fallback.
+ * payment `purpose`. `STATE_REGISTRATION` and national competition entry fees use
+ * the national account; everything else uses the target state's account.
  */
-export async function getRazorpayConfigForPayment(purpose: PaymentPurpose, stateId: string) {
-  if (purpose === PaymentPurpose.STATE_REGISTRATION) {
+function competitionLevelFromMetadata(metadata?: unknown): string | undefined {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return undefined;
+  const level = (metadata as { competitionLevel?: unknown }).competitionLevel;
+  return typeof level === "string" ? level : undefined;
+}
+
+/** National Razorpay account for state-association signup and national competition entry fees. */
+export function usesNationalRazorpayAccount(purpose: PaymentPurpose, metadata?: unknown): boolean {
+  if (purpose === PaymentPurpose.STATE_REGISTRATION) return true;
+  if (purpose === PaymentPurpose.COMPETITION_ENTRY_FEE) {
+    return competitionLevelFromMetadata(metadata) === "NATIONAL";
+  }
+  return false;
+}
+
+export async function getRazorpayConfigForPayment(
+  purpose: PaymentPurpose,
+  stateId: string,
+  metadata?: unknown
+) {
+  if (usesNationalRazorpayAccount(purpose, metadata)) {
     const cfg = await nationalPaymentRepository.findSingleton();
     if (cfg) return cfg;
     const keyId = process.env.RAZORPAY_KEY_ID;

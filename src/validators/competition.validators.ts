@@ -105,6 +105,8 @@ export const competitionBodySchema = z.object({
   registrationClosesAt: requiredDateString,
   ageTillDate: requiredDateString,
   ageCategoryIds: z.array(z.string().min(1)).min(1),
+  /** Paise. Required for STATE/NATIONAL (including 0). Must be omitted for DISTRICT. */
+  entryFeePaise: z.number().int().min(0).nullable().optional(),
 });
 
 /** Partial update; if `stateIds` is present, `districtIds` must also be present (and vice versa), each with at least one id. */
@@ -121,6 +123,7 @@ export const competitionPatchSchema = z
     registrationClosesAt: requiredDateString.optional(),
     ageTillDate: requiredDateString.optional(),
     ageCategoryIds: z.array(z.string().min(1)).min(1).optional(),
+    entryFeePaise: z.number().int().min(0).nullable().optional(),
   })
   .refine((b) => Object.keys(b).length > 0, { message: "At least one field is required" })
   .refine(

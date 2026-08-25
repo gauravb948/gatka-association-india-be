@@ -86,6 +86,7 @@ enum PaymentPurpose {
   TRAINING_CENTER_REGISTRATION
   TRAINING_CENTER_RENEWAL
   TOURNAMENT_REGISTRATION
+  COMPETITION_ENTRY_FEE
   CAMP_REGISTRATION
   STATE_REGISTRATION
   DISTRICT_REGISTRATION
@@ -577,11 +578,12 @@ model Payment {
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
-  tournamentRegs        TournamentRegistration[]
-  campRegs              CampRegistration[]
-  stateRegistrations    StateRegistration[]
-  districtRegistrations DistrictRegistration[]
-  memberships           Membership[]
+  tournamentRegs            TournamentRegistration[]
+  campRegs                  CampRegistration[]
+  stateRegistrations        StateRegistration[]
+  districtRegistrations     DistrictRegistration[]
+  memberships               Membership[]
+  competitionFeeSubmission  CompetitionFeeSubmission?
 
   @@index([userId])
   @@index([stateId])
@@ -621,6 +623,8 @@ model Competition {
   registrationOpensAt      DateTime?
   registrationClosesAt     DateTime?
   finalSubmitRequiresPayment Boolean        @default(true)
+  /// Per unique player, in paise. Required for STATE/NATIONAL (may be 0). Null for DISTRICT.
+  entryFeePaise            Int?
   isClosed                 Boolean          @default(false)
   createdById              String?
   createdBy                User?            @relation("CompetitionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
@@ -635,9 +639,34 @@ model Competition {
   attendance       Attendance[]
   results          CompetitionResult[]
   aggregateStandings CompetitionAggregateStanding[]
+  feeSubmissions   CompetitionFeeSubmission[]
 
   @@index([level])
   @@index([createdById])
+}
+
+enum CompetitionFeeUnitType {
+  DISTRICT
+  STATE
+}
+
+/// One paid (or zero-fee) final submission per lower-hierarchy unit for a competition.
+model CompetitionFeeSubmission {
+  id            String                  @id @default(cuid())
+  competitionId String
+  competition   Competition             @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  unitType      CompetitionFeeUnitType
+  unitId        String
+  playerCount   Int
+  amountPaise   Int
+  paymentId     String?                 @unique
+  payment       Payment?                @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  submittedAt   DateTime                @default(now())
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  @@unique([competitionId, unitType, unitId])
+  @@index([competitionId])
 }
 
 /// Per-event organization standings (TC / district / state) for a competition.

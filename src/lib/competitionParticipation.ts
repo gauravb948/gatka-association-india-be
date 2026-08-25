@@ -142,10 +142,10 @@ export function assertRegistrarCanRecordParticipation(
     if (profile.stateId !== actor.stateId) {
       throw new AppError(403, "Player not in your state", "FORBIDDEN_SCOPE");
     }
-    if (comp.level !== "NATIONAL") {
+    if (comp.level !== "NATIONAL" && comp.level !== "STATE") {
       throw new AppError(
         403,
-        "State admins may only sign players up for national-level competitions",
+        "State admins may only sign players up for national- or state-level competitions",
         "FORBIDDEN_LEVEL"
       );
     }
