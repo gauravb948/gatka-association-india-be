@@ -95,6 +95,25 @@ export async function countFeeSubmissions(competitionId: string): Promise<number
   return prisma.competitionFeeSubmission.count({ where: { competitionId } });
 }
 
+export function feeUnitTypeForSummarySheet(
+  level: CompetitionLevel
+): CompetitionFeeUnitType | null {
+  if (level === "STATE") return "DISTRICT";
+  if (level === "NATIONAL") return "STATE";
+  return null;
+}
+
+export function summarySheetRosterStatus(paid: boolean): "FINAL" | "PROVISIONAL" {
+  return paid ? "FINAL" : "PROVISIONAL";
+}
+
+export async function listFeeSubmissions(competitionId: string) {
+  return prisma.competitionFeeSubmission.findMany({
+    where: { competitionId },
+    select: { unitType: true, unitId: true, submittedAt: true },
+  });
+}
+
 /** Paying unit cannot change its roster after final submission. Organizers are never locked. */
 export async function assertPayingUnitRosterUnlocked(
   actor: DbUser,

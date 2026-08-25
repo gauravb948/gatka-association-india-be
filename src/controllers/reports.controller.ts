@@ -19,6 +19,10 @@ import {
   resolveCompetitionPrimaryGeo,
   resolveSummarySheetEntities,
 } from "../lib/summarySheetAllEntities.js";
+import {
+  feeUnitTypeForSummarySheet,
+  listFeeSubmissions,
+} from "../lib/competitionFee.js";
 import { streamSummarySheetAllEntitiesPdf } from "../lib/summarySheetAllEntitiesPdf.js";
 import {
   competitionAgeWiseReportQuerySchema,
@@ -172,6 +176,12 @@ export async function downloadReportsForAllEntities(
       associationStateId = district?.stateId?.trim() ?? "";
     }
     const associationTitle = await resolveAssociationTitle(comp.level, associationStateId);
+    const feeUnitType = feeUnitTypeForSummarySheet(comp.level);
+    const feeRows = feeUnitType ? await listFeeSubmissions(comp.id) : [];
+    const paidUnitIds = new Set(
+      feeRows.filter((row) => row.unitType === feeUnitType).map((row) => row.unitId)
+    );
+
     const safeName = (comp.name || "summary-sheet")
       .replace(/[^\w\s-]/g, "")
       .trim()
@@ -191,6 +201,7 @@ export async function downloadReportsForAllEntities(
       },
       gender: q.gender,
       bundles,
+      paidUnitIds,
     });
   } catch (e) {
     next(e);

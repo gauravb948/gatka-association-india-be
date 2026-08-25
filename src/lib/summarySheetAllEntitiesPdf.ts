@@ -10,6 +10,7 @@ import type {
   CompetitionEventRegistrationReportItem,
 } from "./competitionEventRegistrationReport.js";
 import type { SummarySheetEntityBundle } from "./summarySheetAllEntities.js";
+import { summarySheetRosterStatus } from "./competitionFee.js";
 
 const REPORT_PRINT_LOGO_URL =
   "https://punjabgatkaassociation.com/assets/images/gatka-logo.png";
@@ -77,13 +78,15 @@ type EntityHeaderArgs = {
   scopeLabel: string;
   showAffiliation: boolean;
   logoBuf: Buffer | null;
+  rosterStatus?: "FINAL" | "PROVISIONAL" | null;
 };
 
 /** Active header redrawn on every `addPage` / overflow while rendering an entity. */
 let activeEntityHeader: EntityHeaderArgs | null = null;
 
 function drawEntityHeader(doc: PdfDoc, args: EntityHeaderArgs) {
-  const { associationTitle, competition, scopeLabel, showAffiliation, logoBuf } = args;
+  const { associationTitle, competition, scopeLabel, showAffiliation, logoBuf, rosterStatus } =
+    args;
   const pageWidth = doc.page.width;
   const rightX = pageWidth - PAGE_MARGIN - LOGO_SIZE;
   const y0 = PAGE_MARGIN;
@@ -103,6 +106,14 @@ function drawEntityHeader(doc: PdfDoc, args: EntityHeaderArgs) {
 
   // Center titles on the full page (same visual center as FE dual-logo header).
   let y = y0 + 2;
+
+  if (rosterStatus) {
+    y = drawCenteredHeading(doc, rosterStatus, y, {
+      font: "Times-Bold",
+      size: 13,
+      gapAfter: 4,
+    });
+  }
 
   y = drawCenteredHeading(doc, associationTitle, y, {
     font: "Times-Bold",
@@ -445,9 +456,12 @@ export async function streamSummarySheetAllEntitiesPdf(
     competition: SummarySheetPdfCompetition;
     gender: Gender;
     bundles: SummarySheetEntityBundle[];
+    paidUnitIds?: Set<string>;
   }
 ): Promise<void> {
-  const { filename, associationTitle, competition, gender, bundles } = args;
+  const { filename, associationTitle, competition, gender, bundles, paidUnitIds } = args;
+  const showRosterStatus =
+    competition.level === "STATE" || competition.level === "NATIONAL";
   const showAffiliation =
     competition.level === "STATE" || competition.level === "DISTRICT";
   const genderLabel = formatGenderLabel(gender);
@@ -479,6 +493,9 @@ export async function streamSummarySheetAllEntitiesPdf(
       scopeLabel,
       showAffiliation,
       logoBuf,
+      rosterStatus: showRosterStatus
+        ? summarySheetRosterStatus(Boolean(paidUnitIds?.has(bundle.entity.id)))
+        : null,
     };
     drawEntityHeader(doc, activeEntityHeader);
     drawEntityBody(doc, bundle.registration, bundle.participants, photoCache);

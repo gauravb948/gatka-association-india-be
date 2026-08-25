@@ -41,6 +41,7 @@ import {
   countFeeSubmissions,
   countUniquePlayersForUnit,
   findFeeSubmission,
+  listFeeSubmissions,
   payingUnitForActor,
 } from "../lib/competitionFee.js";
 import { fitsAgeCategory } from "../lib/age.js";
@@ -1331,6 +1332,20 @@ export async function getFeeSubmission(req: Request, res: Response, next: NextFu
       submittedAt: existing?.submittedAt ?? null,
       requiresPayment: fee != null && fee > 0,
     });
+  } catch (e) {
+    next(e);
+  }
+}
+
+/** `GET /competitions/:id/fee-submissions` — paid units for summary-sheet Final vs Provisional. */
+export async function getFeeSubmissions(req: Request, res: Response, next: NextFunction) {
+  try {
+    const actor = req.dbUser!;
+    const comp = await competitionRepository.findByIdForPlayerEligibility(req.params.id);
+    if (!comp) throw new AppError(404, "Competition not found");
+    await assertCanViewCompetitionScopedReport(actor, comp);
+    const items = await listFeeSubmissions(comp.id);
+    res.json({ items });
   } catch (e) {
     next(e);
   }

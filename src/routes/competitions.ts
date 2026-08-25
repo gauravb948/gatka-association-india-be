@@ -43,6 +43,12 @@ competitionsRouter.get(
   requireRoles("DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN", "TRAINING_CENTER"),
   competitionsController.getFeeSubmission
 );
+competitionsRouter.get(
+  "/:id/fee-submissions",
+  requireAuth,
+  requireRoles("DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN", "TRAINING_CENTER"),
+  competitionsController.getFeeSubmissions
+);
 competitionsRouter.post(
   "/:id/fee-submissions/order",
   requireAuth,
