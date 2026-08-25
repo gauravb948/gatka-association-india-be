@@ -9,6 +9,10 @@ trainingCentersRouter.get(
   trainingCentersController.listPublicByDistrict
 );
 trainingCentersRouter.get(
+  "/public/by-state/:stateId",
+  trainingCentersController.listPublicByState
+);
+trainingCentersRouter.get(
   "/by-district/:districtId",
   requireAuth,
   requireRoles("DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),

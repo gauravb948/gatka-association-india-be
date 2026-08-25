@@ -11,6 +11,30 @@ export function findManyPublicByDistrict(districtId: string) {
   });
 }
 
+export function findManyPublicByState(stateId: string) {
+  return prisma.trainingCenter.findMany({
+    where: {
+      isEnabled: true,
+      status: EntityStatus.ACCEPTED,
+      district: { stateId },
+    },
+    orderBy: [{ district: { name: "asc" } }, { name: "asc" }],
+    select: {
+      id: true,
+      name: true,
+      address: true,
+      headName: true,
+      district: { select: { id: true, name: true } },
+      users: {
+        where: { role: "TRAINING_CENTER" },
+        take: 1,
+        select: { phone: true },
+        orderBy: { createdAt: "asc" },
+      },
+    },
+  });
+}
+
 export function findManyByDistrict(districtId: string) {
   return prisma.trainingCenter.findMany({
     where: { districtId },

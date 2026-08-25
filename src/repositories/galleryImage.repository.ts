@@ -4,14 +4,14 @@ import { prisma } from "../lib/prisma.js";
 export function findManyByState(stateId: string | null) {
   return prisma.galleryImage.findMany({
     where: { stateId },
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
   });
 }
 
 export function findMany(filter?: { stateId: string | null }) {
   return prisma.galleryImage.findMany({
     where: filter !== undefined ? { stateId: filter.stateId } : undefined,
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
     include: { state: { select: { id: true, name: true, code: true } } },
   });
 }
@@ -25,6 +25,14 @@ export function findById(id: string) {
 
 export function create(data: Prisma.GalleryImageUncheckedCreateInput) {
   return prisma.galleryImage.create({
+    data,
+    include: { state: { select: { id: true, name: true, code: true } } },
+  });
+}
+
+export function update(id: string, data: Prisma.GalleryImageUncheckedUpdateInput) {
+  return prisma.galleryImage.update({
+    where: { id },
     data,
     include: { state: { select: { id: true, name: true, code: true } } },
   });

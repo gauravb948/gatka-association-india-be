@@ -37,6 +37,9 @@ import { membershipsRouter } from "./memberships.js";
 import { aboutUsRouter } from "./aboutUs.js";
 import { dashboardRouter } from "./dashboard.js";
 import { domainsRouter } from "./domains.js";
+import { pagesContentRouter } from "./pagesContent.js";
+import { weaponsRouter } from "./weapons.js";
+import { associationMembersRouter } from "./associationMembers.js";
 export const apiRouter = Router();
 
 apiRouter.use(healthRouter);
@@ -77,3 +80,6 @@ apiRouter.use("/memberships", membershipsRouter);
 apiRouter.use("/about-us", aboutUsRouter);
 apiRouter.use("/dashboard", dashboardRouter);
 apiRouter.use("/domains", domainsRouter);
+apiRouter.use("/pages-content", pagesContentRouter);
+apiRouter.use("/weapons", weaponsRouter);
+apiRouter.use("/association-members", associationMembersRouter);

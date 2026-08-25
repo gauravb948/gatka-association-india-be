@@ -6,5 +6,6 @@ export const volunteerRegistrationsRouter = Router();
 
 const adminOnly = requireRoles("NATIONAL_ADMIN", "STATE_ADMIN", "DISTRICT_ADMIN");
 
+volunteerRegistrationsRouter.get("/public", ctrl.listPublic);
 volunteerRegistrationsRouter.get("/", requireAuth, adminOnly, ctrl.list);
 volunteerRegistrationsRouter.get("/:id", requireAuth, adminOnly, ctrl.getById);

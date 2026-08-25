@@ -355,7 +355,12 @@ async function validateCompetitionGeographyInput(stateIds: string[], districtIds
 export async function list(req: Request, res: Response, next: NextFunction) {
   try {
     const q = competitionsListQuerySchema.parse(req.query);
-    const rows = await competitionRepository.findMany({ nameContains: q.name, level: q.level });
+    const rows = await competitionRepository.findMany({
+      nameContains: q.name,
+      level: q.level,
+      stateId: q.stateId,
+      current: q.current,
+    });
     res.json(rows);
   } catch (e) {
     next(e);

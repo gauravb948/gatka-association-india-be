@@ -8,7 +8,22 @@ import * as volunteerRegistrationRepo from "../repositories/volunteerRegistratio
 import {
   volunteerRegistrationIdParamSchema,
   volunteerRegistrationListQuerySchema,
+  volunteerRegistrationPublicQuerySchema,
 } from "../validators/volunteerRegistration.validators.js";
+
+export async function listPublic(req: Request, res: Response, next: NextFunction) {
+  try {
+    const q = volunteerRegistrationPublicQuerySchema.parse(req.query);
+    if (!q.stateId) {
+      res.json([]);
+      return;
+    }
+    const rows = await volunteerRegistrationRepo.findManyPublicPhotos(q.stateId);
+    res.json(rows);
+  } catch (e) {
+    next(e);
+  }
+}
 
 export async function list(req: Request, res: Response, next: NextFunction) {
   try {

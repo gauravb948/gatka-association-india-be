@@ -294,8 +294,35 @@ function adminCompetitionCreatorWhere(user: {
   return {};
 }
 
-export function findMany(filters?: { nameContains?: string; level?: CompetitionLevel }) {
-  const where = withLevel(withNameContains({}, filters?.nameContains), filters?.level);
+export function findMany(filters?: {
+  nameContains?: string;
+  level?: CompetitionLevel;
+  stateId?: string;
+  current?: boolean;
+}) {
+  let where = withLevel(withNameContains({}, filters?.nameContains), filters?.level);
+
+  if (filters?.current) {
+    const startOfToday = new Date();
+    startOfToday.setUTCHours(0, 0, 0, 0);
+    const currentFilter: Prisma.CompetitionWhereInput = {
+      isClosed: false,
+      OR: [{ endDate: null }, { endDate: { gte: startOfToday } }],
+    };
+    where = Object.keys(where).length === 0 ? currentFilter : { AND: [where, currentFilter] };
+  }
+
+  if (filters?.stateId) {
+    const geoFilter: Prisma.CompetitionWhereInput = {
+      OR: [
+        { level: "NATIONAL" },
+        { level: "STATE", states: { some: { stateId: filters.stateId } } },
+        { level: "DISTRICT", districts: { some: { district: { stateId: filters.stateId } } } },
+      ],
+    };
+    where = Object.keys(where).length === 0 ? geoFilter : { AND: [where, geoFilter] };
+  }
+
   return prisma.competition.findMany({
     where,
     orderBy: { createdAt: "desc" },

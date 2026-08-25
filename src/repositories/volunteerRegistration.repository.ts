@@ -77,6 +77,17 @@ function buildWhere(params: VolunteerRegistrationListFilters): Prisma.VolunteerR
   return parts.length === 1 ? parts[0]! : { AND: parts };
 }
 
+export function findManyPublicPhotos(stateId: string) {
+  return prisma.volunteerRegistration.findMany({
+    where: {
+      stateId,
+      photoUrl: { not: "" },
+    },
+    select: { id: true, fullName: true, photoUrl: true },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
 export function findManyPaginated(params: VolunteerRegistrationListFilters) {
   const where = buildWhere(params);
   return prisma.$transaction([

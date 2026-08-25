@@ -23,3 +23,7 @@ export type VolunteerRegistrationListQuery = z.infer<typeof volunteerRegistratio
 export const volunteerRegistrationIdParamSchema = z.object({
   id: z.string().min(1),
 });
+
+export const volunteerRegistrationPublicQuerySchema = z.object({
+  stateId: z.string().min(1).optional(),
+});

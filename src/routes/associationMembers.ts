@@ -1,30 +1,29 @@
 import { Router } from "express";
 import { requireAuth, requireRoles } from "../middleware/auth.js";
-import * as ctrl from "../controllers/galleryImages.controller.js";
+import * as ctrl from "../controllers/associationMembers.controller.js";
 
-export const galleryImagesRouter = Router();
+export const associationMembersRouter = Router();
 
-galleryImagesRouter.get("/public/national", ctrl.listPublicNational);
-galleryImagesRouter.get("/public/by-state/:stateId", ctrl.listPublicByState);
-galleryImagesRouter.get(
+associationMembersRouter.get("/public/by-state/:stateId", ctrl.listPublicByState);
+associationMembersRouter.get(
   "/",
   requireAuth,
   requireRoles("NATIONAL_ADMIN", "STATE_ADMIN"),
-  ctrl.listAll
+  ctrl.listAdmin
 );
-galleryImagesRouter.post(
+associationMembersRouter.post(
   "/",
   requireAuth,
   requireRoles("NATIONAL_ADMIN", "STATE_ADMIN"),
   ctrl.create
 );
-galleryImagesRouter.patch(
+associationMembersRouter.patch(
   "/:id",
   requireAuth,
   requireRoles("NATIONAL_ADMIN", "STATE_ADMIN"),
   ctrl.patch
 );
-galleryImagesRouter.delete(
+associationMembersRouter.delete(
   "/:id",
   requireAuth,
   requireRoles("NATIONAL_ADMIN", "STATE_ADMIN"),

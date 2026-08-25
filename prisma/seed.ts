@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import * as bcrypt from "bcrypt";
+import { seedCmsContent } from "./seedCms.js";
 
 const prisma = new PrismaClient();
 
@@ -188,6 +189,8 @@ async function main() {
     ],
     skipDuplicates: true,
   });
+
+  await seedCmsContent(prisma, punjab.id);
 
   console.log("Seed OK", { session: session.id, state: punjab.code, tc: tc.id });
 }

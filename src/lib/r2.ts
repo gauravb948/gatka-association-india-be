@@ -1,4 +1,4 @@
-import { S3Client } from "@aws-sdk/client-s3";
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 
 function requiredEnv(name: string): string {
   const v = process.env[name];
@@ -24,5 +24,38 @@ export function getR2Bucket() {
 
 export function getR2PublicBaseUrl() {
   return requiredEnv("R2_PUBLIC_BASE_URL").replace(/\/+$/, "");
+}
+
+const CONTENT_TYPE_EXT: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/jpg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+};
+
+export function extFromContentType(contentType: string): string | undefined {
+  const base = contentType.split(";")[0]?.trim().toLowerCase();
+  return base ? CONTENT_TYPE_EXT[base] : undefined;
+}
+
+export async function uploadBufferToR2(params: {
+  key: string;
+  body: Buffer;
+  contentType: string;
+}): Promise<{ key: string; publicUrl: string }> {
+  const contentType = params.contentType.split(";")[0]?.trim() || "application/octet-stream";
+  await getR2Client().send(
+    new PutObjectCommand({
+      Bucket: getR2Bucket(),
+      Key: params.key,
+      Body: params.body,
+      ContentType: contentType,
+    })
+  );
+  return {
+    key: params.key,
+    publicUrl: `${getR2PublicBaseUrl()}/${params.key}`,
+  };
 }
 

@@ -31,6 +31,24 @@ export async function listPublicByDistrict(req: Request, res: Response, next: Ne
   }
 }
 
+export async function listPublicByState(req: Request, res: Response, next: NextFunction) {
+  try {
+    const rows = await trainingCenterRepository.findManyPublicByState(req.params.stateId);
+    res.json(
+      rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        address: row.address,
+        headName: row.headName,
+        district: row.district,
+        phone: row.users[0]?.phone ?? null,
+      }))
+    );
+  } catch (e) {
+    next(e);
+  }
+}
+
 export async function listByDistrict(req: Request, res: Response, next: NextFunction) {
   try {
     const u = req.dbUser!;

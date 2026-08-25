@@ -6165,6 +6165,28 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/GalleryImage" }
   /gallery/{id}:
+    patch:
+      security: [{ bearerAuth: [] }]
+      summary: Update gallery image (national/state admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                imageUrl: { type: string }
+                caption: { type: string, nullable: true }
+                category: { type: string, nullable: true }
+                categoryPa: { type: string, nullable: true }
+                sortOrder: { type: integer }
+      responses:
+        "200": { description: OK }
     delete:
       security: [{ bearerAuth: [] }]
       summary: Delete gallery image (national/state admin)
@@ -6175,6 +6197,107 @@ paths:
           schema: { type: string }
       responses:
         "204": { description: Deleted }
+  /pages-content/public/national:
+    get:
+      summary: Get national CMS HTML page (public)
+      parameters:
+        - in: query
+          name: page
+          required: true
+          schema: { type: string, enum: [HISTORY_OF_GATKA, DRESS_CODE, TYPES_OF_TOURNAMENTS] }
+      responses:
+        "200": { description: OK }
+  /pages-content/public/by-state/{stateId}:
+    get:
+      summary: Get state CMS HTML page (public)
+      parameters:
+        - in: path
+          name: stateId
+          required: true
+          schema: { type: string }
+        - in: query
+          name: page
+          required: true
+          schema: { type: string, enum: [HISTORY_OF_ASSOCIATION, OUR_ACHIEVEMENTS] }
+      responses:
+        "200": { description: OK }
+  /pages-content:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Get CMS HTML page for admin scope
+      parameters:
+        - in: query
+          name: page
+          required: true
+          schema: { type: string }
+        - in: query
+          name: stateId
+          required: false
+          schema: { type: string, nullable: true }
+      responses:
+        "200": { description: OK }
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Create or update CMS HTML page
+      responses:
+        "200": { description: OK }
+  /weapons/public:
+    get:
+      summary: List active weapons (public)
+      responses:
+        "200": { description: OK }
+  /weapons:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List weapons (national admin)
+      responses:
+        "200": { description: OK }
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Create weapon (national admin)
+      responses:
+        "201": { description: Created }
+  /association-members/public/by-state/{stateId}:
+    get:
+      summary: List association members for a state (public)
+      parameters:
+        - in: path
+          name: stateId
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: OK }
+  /association-members:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List association members (national/state admin)
+      responses:
+        "200": { description: OK }
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Create association member
+      responses:
+        "201": { description: Created }
+  /volunteer-registrations/public:
+    get:
+      summary: Public volunteer photos for a state
+      parameters:
+        - in: query
+          name: stateId
+          required: false
+          schema: { type: string }
+      responses:
+        "200": { description: OK }
+  /training-centers/public/by-state/{stateId}:
+    get:
+      summary: Public training centers directory for a state
+      parameters:
+        - in: path
+          name: stateId
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: OK }
   /messages/public/national:
     get:
       summary: List national-site messages (public)

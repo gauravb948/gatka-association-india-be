@@ -1,10 +1,15 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 
-export function findManyActiveWithAgeCategory() {
+export function findManyActiveWithAgeCategory(includeEvents = false) {
   return prisma.eventGroup.findMany({
     where: { isActive: true },
-    include: { ageCategory: true },
+    include: {
+      ageCategory: true,
+      ...(includeEvents
+        ? { events: { where: { isActive: true }, orderBy: { sortOrder: "asc" as const } } }
+        : {}),
+    },
     orderBy: { sortOrder: "asc" },
   });
 }

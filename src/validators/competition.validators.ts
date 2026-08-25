@@ -12,6 +12,11 @@ const competitionLevelQuery = z.enum(["NATIONAL", "STATE", "DISTRICT"]).optional
 export const competitionsListQuerySchema = z.object({
   name: optionalNameSearch,
   level: competitionLevelQuery,
+  stateId: z.string().min(1).optional(),
+  current: z
+    .union([z.literal("true"), z.literal("false"), z.boolean()])
+    .optional()
+    .transform((v) => v === true || v === "true"),
 });
 
 /** Query for `GET /competitions/me`. `session` = UTC calendar year of `createdAt` (competition season). */

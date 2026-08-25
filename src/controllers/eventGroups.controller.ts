@@ -8,9 +8,10 @@ import {
   eventGroupBodySchema,
 } from "../validators/eventGroup.validators.js";
 
-export async function listActive(_req: Request, res: Response, next: NextFunction) {
+export async function listActive(req: Request, res: Response, next: NextFunction) {
   try {
-    const rows = await eventGroupRepository.findManyActiveWithAgeCategory();
+    const includeEvents = String(req.query.include ?? "").toLowerCase() === "events";
+    const rows = await eventGroupRepository.findManyActiveWithAgeCategory(includeEvents);
     res.json(rows);
   } catch (e) {
     next(e);

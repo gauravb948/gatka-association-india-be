@@ -202,6 +202,7 @@ model State {
   galleryImages      GalleryImage[]
   messages           Message[]
   pagesContents      PagesContent[]
+  associationMembers AssociationMember[]
   competitionStates  CompetitionState[]
   banners            Banner[]
   aboutUs            AboutUs?
@@ -981,13 +982,14 @@ model StateDomain {
   @@index([stateId])
 }
 
+/// HTML CMS pages. `stateId` null = national federation site.
 model PagesContent {
   id                  String   @id @default(cuid())
   page                String
   title               String
   detailedDescription String
-  stateId             String
-  state               State    @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  stateId             String?
+  state               State?   @relation(fields: [stateId], references: [id], onDelete: Cascade)
   isEnabled           Boolean  @default(true)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
@@ -995,6 +997,7 @@ model PagesContent {
   @@unique([stateId, page])
   @@index([stateId])
   @@index([isEnabled])
+  @@index([page])
 }
 
 model StateRegistration {
@@ -1059,15 +1062,52 @@ model DistrictRegistration {
 
 /// Gallery images. `stateId` null = national federation site CMS.
 model GalleryImage {
-  id        String   @id @default(cuid())
-  imageUrl  String
-  stateId   String?
-  state     State?   @relation(fields: [stateId], references: [id], onDelete: Cascade)
-  caption   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(cuid())
+  imageUrl   String
+  stateId    String?
+  state      State?   @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  caption    String?
+  category   String?
+  categoryPa String?
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@index([stateId])
+  @@index([sortOrder])
+}
+
+/// National-only weapons catalog for the public weapons page.
+model Weapon {
+  id          String   @id @default(cuid())
+  name        String
+  namePa      String?
+  description String?
+  imageUrl    String
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([sortOrder])
+}
+
+/// State association office bearers / members listing.
+model AssociationMember {
+  id           String   @id @default(cuid())
+  stateId      String
+  state        State    @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  name         String
+  designation  String
+  mobile       String?
+  photoUrl     String?
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([stateId])
+  @@index([sortOrder])
 }
 
 /// Leadership / site messages. `stateId` null = national federation site CMS.
