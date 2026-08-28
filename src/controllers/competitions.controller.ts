@@ -13,7 +13,6 @@ import {
 import {
   assertTeamSize,
   effectiveEventBounds,
-  hasIndividualSingleSotiInEventGroup,
   isFariSotiCatalogEventId,
   isFariSotiEvent,
   isSingleSotiCatalogEventId,
@@ -230,16 +229,6 @@ async function validatePlayersForCompetitionEvent(
         "Cannot join Fari Soti after participating in Single Soti in this competition",
         "SINGLE_SOTI_BLOCKS_FARI_SOTI"
       );
-    }
-
-    if (signingUpSingleSoti) {
-      if (hasIndividualSingleSotiInEventGroup(existing, catalogEvent.eventGroupId)) {
-        throw new AppError(
-          409,
-          "Player already has an Individual Single Soti entry in this event group",
-          "DUPLICATE_SINGLE_SOTI_GROUP"
-        );
-      }
     }
 
     if (!team) {

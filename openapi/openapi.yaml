@@ -4385,7 +4385,7 @@ paths:
         Each item targets one catalog `Event` (`eventId`) with `playerUserIds` (one for individual
         events, team size between event min/max for team events). Enforces hierarchy by competition `createdAt` year,
         max two events per player, at most one team event per player, Fari Soti and Single Soti mutually exclusive,
-        at most one Individual Single Soti per event group, team size bounds, and for individual events only one player
+        team size bounds, and for individual events only one player
         per org unit (training center for district comps, district for state comps, state for national comps).
         Cross-item rules are applied across the whole bulk request. All items validated before any insert.
       parameters:
@@ -4456,7 +4456,7 @@ paths:
         "403":
           description: Role/level mismatch or player outside registrar scope
         "409":
-          description: Player already in this event or duplicate single-soti in group
+          description: Player already registered for this event
     delete:
       security: [{ bearerAuth: [] }]
       summary: Unregister a player from a competition (or one event)

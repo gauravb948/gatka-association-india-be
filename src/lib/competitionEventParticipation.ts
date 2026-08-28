@@ -53,13 +53,6 @@ export function isSingleSotiEvent(event: Pick<EventLike, "name">): boolean {
   return /\bSingle\s*Soti\b/i.test(event.name);
 }
 
-export function isIndividualSingleSotiEvent(event: Pick<EventLike, "name">): boolean {
-  return (
-    /\bSingle\s*Soti\b/i.test(event.name) &&
-    /\bIndividual\b/i.test(event.name)
-  );
-}
-
 /** Per-event min/max from catalog `Event` (no per-competition overrides). */
 export function effectiveEventBounds(event: EventLike): { min: number; max: number } {
   const min = event.minPlayers ?? 0;
@@ -110,17 +103,6 @@ export function playerHasSingleSotiParticipation(rows: ParticipationWithEvent[])
     (r) =>
       (r.eventId && SINGLE_SOTI_EVENT_IDS.has(r.eventId)) ||
       (r.event && (isSingleSotiCatalogEventId(r.event.id) || isSingleSotiEvent(r.event)))
-  );
-}
-
-export function hasIndividualSingleSotiInEventGroup(
-  rows: ParticipationWithEvent[],
-  eventGroupId: string
-): boolean {
-  return rows.some(
-    (r) =>
-      r.event?.eventGroupId === eventGroupId &&
-      (isSingleSotiCatalogEventId(r.eventId) || (r.event && isIndividualSingleSotiEvent(r.event)))
   );
 }
 

@@ -107,14 +107,6 @@ function drawEntityHeader(doc: PdfDoc, args: EntityHeaderArgs) {
   // Center titles on the full page (same visual center as FE dual-logo header).
   let y = y0 + 2;
 
-  if (rosterStatus) {
-    y = drawCenteredHeading(doc, rosterStatus, y, {
-      font: "Times-Bold",
-      size: 13,
-      gapAfter: 4,
-    });
-  }
-
   y = drawCenteredHeading(doc, associationTitle, y, {
     font: "Times-Bold",
     size: 16,
@@ -154,10 +146,11 @@ function drawEntityHeader(doc: PdfDoc, args: EntityHeaderArgs) {
     });
   }
 
-  if (scopeLabel) {
-    y = drawCenteredHeading(doc, scopeLabel, y, {
+  if (scopeLabel || rosterStatus) {
+    const scopeLine = [scopeLabel, rosterStatus].filter(Boolean).join(" — ");
+    y = drawCenteredHeading(doc, scopeLine, y, {
       font: "Times-Bold",
-      size: 11,
+      size: 12,
       gapAfter: 4,
     });
   }
