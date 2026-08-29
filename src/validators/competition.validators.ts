@@ -80,6 +80,7 @@ export const competitionParticipationListQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(200).default(20),
   search: optionalNameSearch,
   eventId: optionalEventId,
+  districtId: z.string().min(1).optional(),
 });
 
 const requiredDateString = z

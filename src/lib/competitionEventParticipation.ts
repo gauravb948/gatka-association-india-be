@@ -36,6 +36,16 @@ export function orgUnitLabelForCompetitionLevel(level: CompetitionLevel): string
   return "state";
 }
 
+/** Team min/max is one roster per org unit (TC / district / state), matching individual-event caps. */
+export function orgUnitProfileWhereForTeam(
+  level: CompetitionLevel,
+  profile: { trainingCenterId: string; districtId: string; stateId: string }
+): { trainingCenterId: string } | { districtId: string } | { stateId: string } {
+  if (level === "DISTRICT") return { trainingCenterId: profile.trainingCenterId };
+  if (level === "STATE") return { districtId: profile.districtId };
+  return { stateId: profile.stateId };
+}
+
 export function isFariSotiEvent(event: Pick<EventLike, "name">): boolean {
   return /\bFarr?i\s*Soti\b/i.test(event.name);
 }

@@ -21,6 +21,7 @@ import {
   newParticipationTeamId,
   orgUnitKeyForIndividualEvent,
   orgUnitLabelForCompetitionLevel,
+  orgUnitProfileWhereForTeam,
   type ParticipationWithEvent,
   playerFitsEventGroupAge,
   playerHasFariSotiParticipation,
@@ -781,13 +782,31 @@ export async function createParticipation(req: Request, res: Response, next: Nex
     let existingCount = 0;
     let existingTeamId: string | null = null;
     if (team) {
+      const firstProfile = await playerRepository.findProfileByUserId(playerIds[0]!);
+      if (!firstProfile) throw new AppError(404, "Player profile not found", "PLAYER_NOT_FOUND");
+      const orgKey = orgUnitKeyForIndividualEvent(comp.level, firstProfile);
+      const unitLabel = orgUnitLabelForCompetitionLevel(comp.level);
+      for (const playerUserId of playerIds) {
+        const profile = await playerRepository.findProfileByUserId(playerUserId);
+        if (!profile) throw new AppError(404, "Player profile not found", "PLAYER_NOT_FOUND");
+        if (orgUnitKeyForIndividualEvent(comp.level, profile) !== orgKey) {
+          throw new AppError(
+            400,
+            `All players added together must be from the same ${unitLabel}`,
+            "TEAM_ORG_UNIT_MISMATCH"
+          );
+        }
+      }
+      const orgWhere = orgUnitProfileWhereForTeam(comp.level, firstProfile);
+      const teamScope: Prisma.PlayerProfileWhereInput =
+        Object.keys(actorScope).length > 0 ? { AND: [actorScope, orgWhere] } : orgWhere;
       existingCount = await participationRepository.countParticipatedInEvent(comp.id, catalogEvent.id, {
-        playerProfileWhere: actorScope,
+        playerProfileWhere: teamScope,
       });
       const latest = await participationRepository.findLatestParticipatedInEventForScope(
         comp.id,
         catalogEvent.id,
-        actorScope
+        teamScope
       );
       existingTeamId = latest?.teamId ?? null;
     }
@@ -1238,6 +1257,17 @@ export async function listParticipants(req: Request, res: Response, next: NextFu
     const andParts: Prisma.PlayerProfileWhereInput[] = [];
     const scope = actorPlayerProfileScopeWhere(actor);
     if (Object.keys(scope).length > 0) andParts.push(scope);
+    if (q.districtId) {
+      if (actor.role === "STATE_ADMIN") {
+        if (!actor.stateId) throw new AppError(403, "State context missing", "FORBIDDEN_SCOPE");
+        const district = await prisma.district.findFirst({
+          where: { id: q.districtId, stateId: actor.stateId },
+          select: { id: true },
+        });
+        if (!district) throw new AppError(403, "districtId is outside your scope", "FORBIDDEN_FILTER");
+      }
+      andParts.push({ districtId: q.districtId });
+    }
     if (q.search) {
       andParts.push({
         OR: [
