@@ -40,3 +40,7 @@ export const downloadReportsForAllEntitiesQuerySchema = z.object({
   competitionId: z.string().min(1),
   gender: z.enum(["MALE", "FEMALE", "BOYS", "GIRLS"]),
 });
+
+export const competitionAccreditationQuerySchema = z.object({
+  competitionId: z.string().min(1),
+});

@@ -39,6 +39,7 @@ import {
   registerTrainingCenterSchema,
   registerVolunteerSchema,
 } from "../validators/auth.validators.js";
+import { applyZeroFeeSubmissionIfPending } from "../lib/zeroFeeRegistration.js";
 
 async function buildAuthSessionForUserId(userId: string) {
   const full = await userRepository.findByIdForLoginResponse(userId);
@@ -92,6 +93,9 @@ export async function login(req: Request, res: Response, next: NextFunction) {
     }
     const ok = await verifyPassword(password, user.passwordHash);
     if (!ok) throw new AppError(401, "Invalid credentials", "AUTH_FAILED");
+    if (user.status === EntityStatus.PENDING) {
+      await applyZeroFeeSubmissionIfPending(user.id, user.role);
+    }
     const full = await userRepository.findByIdForLoginResponse(user.id);
     if (!full) throw new AppError(401, "Invalid credentials", "AUTH_FAILED");
     assertHierarchyEnabled(full as UserForHierarchyCheck);
@@ -109,6 +113,9 @@ export async function login(req: Request, res: Response, next: NextFunction) {
 export async function me(req: Request, res: Response, next: NextFunction) {
   try {
     const u = req.dbUser!;
+    if (u.status === EntityStatus.PENDING) {
+      await applyZeroFeeSubmissionIfPending(u.id, u.role);
+    }
     const full = await userRepository.findByIdForLoginResponse(u.id);
     if (!full) throw new AppError(401, "User not found", "UNAUTHORIZED");
     assertHierarchyEnabled(full as UserForHierarchyCheck);
@@ -174,6 +181,7 @@ export async function registerPlayer(req: Request, res: Response, next: NextFunc
     };
     const user = await userRepository.createPlayerWithProfile(userData);
     await otpRepository.markConsumed(registrationVerification.otpId);
+    await applyZeroFeeSubmissionIfPending(user.id, Role.PLAYER);
     const payload = await buildAuthSessionForUserId(user.id);
     res.status(201).json(payload);
   } catch (e) {
@@ -227,6 +235,7 @@ export async function registerCoach(req: Request, res: Response, next: NextFunct
     };
     const user = await userRepository.createPlayerWithProfile(userData);
     await otpRepository.markConsumed(registrationVerification.otpId);
+    await applyZeroFeeSubmissionIfPending(user.id, Role.COACH);
     const payload = await buildAuthSessionForUserId(user.id);
     res.status(201).json(payload);
   } catch (e) {
@@ -282,6 +291,7 @@ export async function registerReferee(req: Request, res: Response, next: NextFun
     };
     const user = await userRepository.createPlayerWithProfile(userData);
     await otpRepository.markConsumed(registrationVerification.otpId);
+    await applyZeroFeeSubmissionIfPending(user.id, Role.REFEREE);
     const payload = await buildAuthSessionForUserId(user.id);
     res.status(201).json(payload);
   } catch (e) {
@@ -404,6 +414,7 @@ export async function registerTrainingCenter(
     };
     const user = await userRepository.createPlayerWithProfile(userData);
     await otpRepository.markConsumed(registrationVerification.otpId);
+    await applyZeroFeeSubmissionIfPending(user.id, Role.TRAINING_CENTER);
     const payload = await buildAuthSessionForUserId(user.id);
     res.status(201).json({
       ...payload,
@@ -556,6 +567,21 @@ export async function otpConfirm(req: Request, res: Response, next: NextFunction
     const newHash = await hashPassword(body.newPassword);
     await userRepository.completePasswordResetWithOtp(user.id, newHash, otp.id);
     res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+}
+
+/** PENDING accounts whose role fee is ₹0 skip Razorpay and move to SUBMITTED. */
+export async function completeZeroFeeRegistration(req: Request, res: Response, next: NextFunction) {
+  try {
+    const u = req.dbUser!;
+    await applyZeroFeeSubmissionIfPending(u.id, u.role);
+    const payload = await buildAuthSessionForUserId(u.id);
+    if (payload.user.status === EntityStatus.PENDING) {
+      throw new AppError(400, "A registration fee is required", "FEE_REQUIRED");
+    }
+    res.json({ user: payload.user, accessToken: payload.accessToken });
   } catch (e) {
     next(e);
   }

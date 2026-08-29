@@ -124,6 +124,54 @@ export async function findParticipationsForEventGroupParticipantsReport(
   });
 }
 
+/** Distinct registered players for accreditation export (photo zip + Excel roster). */
+export async function findParticipationsForAccreditationExport(
+  competitionId: string,
+  playerProfileWhere?: Prisma.PlayerProfileWhereInput
+) {
+  const profileFilter =
+    playerProfileWhere && Object.keys(playerProfileWhere).length > 0
+      ? { playerUser: { playerProfile: playerProfileWhere } }
+      : {};
+
+  return prisma.participationRecord.findMany({
+    where: {
+      competitionId,
+      participated: true,
+      ...profileFilter,
+    },
+    select: {
+      playerUserId: true,
+      playerUser: {
+        select: {
+          playerProfile: {
+            select: {
+              fullName: true,
+              fatherName: true,
+              dateOfBirth: true,
+              photoUrl: true,
+              gender: true,
+              registrationNumber: true,
+              state: { select: { name: true } },
+              district: { select: { name: true } },
+              trainingCenter: { select: { name: true } },
+            },
+          },
+        },
+      },
+      event: {
+        select: {
+          eventGroup: {
+            select: {
+              ageCategory: { select: { name: true, ageTo: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
 /** Distinct registered players per catalog event, scoped by optional player profile filters. */
 export async function countDistinctPlayersByEvent(
   competitionId: string,

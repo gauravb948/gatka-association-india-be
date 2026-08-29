@@ -13,11 +13,8 @@ authRouter.post("/register/player", authLimiter, authController.registerPlayer);
 authRouter.post("/register/coach", authLimiter, authController.registerCoach);
 authRouter.post("/register/referee", authLimiter, authController.registerReferee);
 authRouter.post("/register/volunteer", authLimiter, authController.registerVolunteer);
-authRouter.post(
-  "/register/training-center",
-  authLimiter,
-  authController.registerTrainingCenter
-);
+authRouter.post("/register/training-center", authLimiter, authController.registerTrainingCenter);
+authRouter.post("/complete-zero-fee", requireAuth, authController.completeZeroFeeRegistration);
 authRouter.post("/otp/request", authLimiter, authController.otpRequest);
 authRouter.post("/otp/verify", authLimiter, authController.otpVerify);
 authRouter.post("/otp/confirm", authLimiter, authController.otpConfirm);

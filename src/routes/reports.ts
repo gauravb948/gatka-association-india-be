@@ -46,3 +46,15 @@ reportsRouter.get(
   requireRoles("TRAINING_CENTER", "DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),
   reportsController.playersExpired
 );
+reportsRouter.get(
+  "/competition-accreditation-players",
+  requireAuth,
+  requireRoles("DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),
+  reportsController.competitionAccreditationPlayers
+);
+reportsRouter.get(
+  "/competition-accreditation-photos.zip",
+  requireAuth,
+  requireRoles("DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),
+  reportsController.competitionAccreditationPhotosZip
+);

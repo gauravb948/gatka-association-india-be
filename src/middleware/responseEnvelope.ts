@@ -50,6 +50,10 @@ function messageForKnownRoute(req: Request): string | null {
     return "Training center and players deleted successfully";
   }
 
+  if (method === "GET" && /\/reports\/competition-accreditation-players\/?$/.test(path)) {
+    return "Accreditation players retrieved successfully";
+  }
+
   if (method !== "POST") return null;
 
   if (/\/competitions\/[^/]+\/participations\/replace\/?$/.test(path)) {
@@ -57,6 +61,9 @@ function messageForKnownRoute(req: Request): string | null {
   }
 
   if (/\/auth\/login\/?$/.test(path)) return "Signed in successfully";
+  if (/\/auth\/complete-zero-fee\/?$/.test(path)) {
+    return "No registration fee is due; application submitted for review";
+  }
   if (/\/auth\/register\/player\/?$/.test(path)) return "Player registered successfully";
   if (/\/auth\/register\/coach\/?$/.test(path)) return "Coach registration submitted successfully";
   if (/\/auth\/register\/referee\/?$/.test(path)) return "Referee registration submitted successfully";

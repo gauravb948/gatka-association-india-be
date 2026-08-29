@@ -5,6 +5,7 @@ import { AppError } from "../lib/errors.js";
 import { prisma } from "../lib/prisma.js";
 import { hashPassword } from "../lib/password.js";
 import { buildRegistrationAuthPayload } from "../lib/registrationSessionResponse.js";
+import { applyZeroFeeSubmissionIfPending } from "../lib/zeroFeeRegistration.js";
 import { assertRegistrationVerificationToken, normalizePhoneOrEmail } from "../lib/otp.js";
 import * as stateRegistrationRepo from "../repositories/stateRegistration.repository.js";
 import * as stateRepo from "../repositories/state.repository.js";
@@ -128,7 +129,9 @@ export async function create(req: Request, res: Response, next: NextFunction) {
 
       const reg = await stateRegistrationRepo.findByStateId(body.stateId);
       if (!reg) throw new AppError(500, "Registration missing");
-      const payload = await buildRegistrationAuthPayload(userIdOut, reg);
+      await applyZeroFeeSubmissionIfPending(userIdOut, Role.STATE_ADMIN);
+      const submittedReg = (await stateRegistrationRepo.findByStateId(body.stateId)) ?? reg;
+      const payload = await buildRegistrationAuthPayload(userIdOut, submittedReg);
       await otpRepository.markConsumed(registrationVerification.otpId);
       return res.json(payload);
     }
@@ -149,7 +152,9 @@ export async function create(req: Request, res: Response, next: NextFunction) {
 
     const reg = await stateRegistrationRepo.findByStateId(body.stateId);
     if (!reg) throw new AppError(500, "Registration missing");
-    const payload = await buildRegistrationAuthPayload(userIdOut, reg);
+    await applyZeroFeeSubmissionIfPending(userIdOut, Role.STATE_ADMIN);
+    const submittedReg = (await stateRegistrationRepo.findByStateId(body.stateId)) ?? reg;
+    const payload = await buildRegistrationAuthPayload(userIdOut, submittedReg);
     await otpRepository.markConsumed(registrationVerification.otpId);
     res.status(201).json(payload);
   } catch (e) {

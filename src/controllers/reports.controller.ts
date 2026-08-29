@@ -29,8 +29,14 @@ import {
   competitionEventGroupParticipantsReportQuerySchema,
   competitionEventRegistrationReportQuerySchema,
   competitionRegistrationsReportQuerySchema,
+  competitionAccreditationQuerySchema,
   downloadReportsForAllEntitiesQuerySchema,
 } from "../validators/reports.validators.js";
+import { actorPlayerProfileScopeWhere } from "../lib/competitionParticipation.js";
+import {
+  buildAccreditationRoster,
+  streamAccreditationPhotosZip,
+} from "../lib/competitionAccreditationExport.js";
 
 export async function competitionRegistrations(
   req: Request,
@@ -256,5 +262,49 @@ export async function playersExpired(req: Request, res: Response, next: NextFunc
     res.json(rows);
   } catch (e) {
     next(e);
+  }
+}
+
+export async function competitionAccreditationPlayers(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const actor = req.dbUser!;
+    const q = competitionAccreditationQuerySchema.parse(req.query);
+    const comp = await competitionRepository.findByIdForPlayerEligibility(q.competitionId);
+    if (!comp) throw new AppError(404, "Competition not found");
+    await assertCanViewCompetitionScopedReport(actor, comp);
+
+    const { roster } = await buildAccreditationRoster(
+      q.competitionId,
+      actorPlayerProfileScopeWhere(actor)
+    );
+    res.json(roster);
+  } catch (e) {
+    next(e);
+  }
+}
+
+export async function competitionAccreditationPhotosZip(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const actor = req.dbUser!;
+    const q = competitionAccreditationQuerySchema.parse(req.query);
+    const comp = await competitionRepository.findByIdForPlayerEligibility(q.competitionId);
+    if (!comp) throw new AppError(404, "Competition not found");
+    await assertCanViewCompetitionScopedReport(actor, comp);
+
+    const { roster, internals } = await buildAccreditationRoster(
+      q.competitionId,
+      actorPlayerProfileScopeWhere(actor)
+    );
+    await streamAccreditationPhotosZip(res, roster.competitionName, internals);
+  } catch (e) {
+    if (!res.headersSent) next(e);
   }
 }
