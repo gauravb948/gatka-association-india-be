@@ -25,6 +25,12 @@ function rateLimitJson(
     max,
     standardHeaders: true,
     legacyHeaders: false,
+    // Next.js / nginx / Cloudflare send X-Forwarded-For. Never 500 the request
+    // when trust proxy is off; IP limiting still works when TRUST_PROXY=1.
+    validate: { xForwardedForHeader: false },
+    skip: (req) =>
+      typeof req.originalUrl === "string" &&
+      req.originalUrl.includes("competition-accreditation-photos.zip"),
     handler: (_req, res) => {
       res.status(429).json({
         error: "Too many requests",

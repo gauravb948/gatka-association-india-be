@@ -18,6 +18,7 @@ export type AccreditationPlayerRow = {
   organisation: string;
   gender: string;
   registrationNumber: string | null;
+  participatingIn: string;
   photoUrl: string | null;
 };
 
@@ -72,10 +73,10 @@ function ageGroupSortKey(label: string): number {
   return m ? Number(m[1]) : Number.POSITIVE_INFINITY;
 }
 
-function joinAgeGroups(labels: Set<string>): string {
+function joinLabels(labels: Set<string>, sortKey?: (label: string) => number): string {
   return [...labels]
     .filter(Boolean)
-    .sort((a, b) => ageGroupSortKey(a) - ageGroupSortKey(b) || a.localeCompare(b))
+    .sort((a, b) => (sortKey ? sortKey(a) - sortKey(b) : 0) || a.localeCompare(b))
     .join(", ");
 }
 
@@ -88,6 +89,7 @@ function toPublicRow(row: AccreditationPlayerInternal): AccreditationPlayerRow {
     organisation: row.organisation,
     gender: row.gender,
     registrationNumber: row.registrationNumber,
+    participatingIn: row.participatingIn,
     photoUrl: row.photoUrl,
   };
 }
@@ -104,7 +106,10 @@ export async function buildAccreditationRoster(
     playerProfileWhere
   );
 
-  const byPlayer = new Map<string, AccreditationPlayerInternal & { ageGroups: Set<string> }>();
+  const byPlayer = new Map<
+    string,
+    AccreditationPlayerInternal & { ageGroups: Set<string>; eventNames: Set<string> }
+  >();
 
   for (const row of rows) {
     const profile = row.playerUser.playerProfile;
@@ -121,8 +126,10 @@ export async function buildAccreditationRoster(
         organisation: organisationForLevel(comp.level, profile),
         gender: genderDisplay(profile.gender),
         registrationNumber: profile.registrationNumber,
+        participatingIn: "",
         photoUrl: profile.photoUrl,
         ageGroups: new Set<string>(),
+        eventNames: new Set<string>(),
       };
       byPlayer.set(row.playerUserId, entry);
     }
@@ -130,6 +137,10 @@ export async function buildAccreditationRoster(
     const ageCategory = row.event?.eventGroup?.ageCategory;
     if (ageCategory) {
       entry.ageGroups.add(accreditationAgeGroupLabel(ageCategory));
+    }
+    const eventName = row.event?.name?.trim();
+    if (eventName) {
+      entry.eventNames.add(eventName);
     }
   }
 
@@ -139,10 +150,11 @@ export async function buildAccreditationRoster(
       fullName: entry.fullName,
       fatherName: entry.fatherName,
       dateOfBirth: entry.dateOfBirth,
-      ageGroup: joinAgeGroups(entry.ageGroups),
+      ageGroup: joinLabels(entry.ageGroups, ageGroupSortKey),
       organisation: entry.organisation,
       gender: entry.gender,
       registrationNumber: entry.registrationNumber,
+      participatingIn: joinLabels(entry.eventNames),
       photoUrl: entry.photoUrl,
     }))
     .sort((a, b) => a.fullName.localeCompare(b.fullName) || (a.registrationNumber ?? "").localeCompare(b.registrationNumber ?? ""));
@@ -241,7 +253,8 @@ export async function streamAccreditationPhotosZip(
   res.setHeader("Content-Type", "application/zip");
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 
-  const archive = new ZipArchive({ zlib: { level: 5 } });
+  // JPEGs/PNGs barely shrink; store is much faster for 800+ photos.
+  const archive = new ZipArchive({ store: true });
   const archiveError = new Promise<never>((_, reject) => {
     archive.on("error", reject);
   });
@@ -250,15 +263,26 @@ export async function streamAccreditationPhotosZip(
 
   const usedNames = new Set<string>();
   const withPhotos = internals.filter((p) => p.photoUrl?.trim());
+  const concurrency = 8;
 
   const work = (async () => {
-    for (const player of withPhotos) {
-      const photoUrl = player.photoUrl!.trim();
-      const loaded = await loadPhotoBuffer(photoUrl);
-      if (!loaded) continue;
-      const base = sanitizeZipBase(player.registrationNumber?.trim() || player.playerUserId);
-      const ext = extFromContentTypeOrUrl(loaded.contentType, photoUrl);
-      archive.append(loaded.body, { name: uniqueZipName(base, ext, usedNames) });
+    for (let i = 0; i < withPhotos.length; i += concurrency) {
+      const batch = withPhotos.slice(i, i + concurrency);
+      const loaded = await Promise.all(
+        batch.map(async (player) => {
+          const photoUrl = player.photoUrl!.trim();
+          const file = await loadPhotoBuffer(photoUrl);
+          return { player, photoUrl, file };
+        })
+      );
+      for (const item of loaded) {
+        if (!item.file) continue;
+        const base = sanitizeZipBase(
+          item.player.registrationNumber?.trim() || item.player.playerUserId
+        );
+        const ext = extFromContentTypeOrUrl(item.file.contentType, item.photoUrl);
+        archive.append(item.file.body, { name: uniqueZipName(base, ext, usedNames) });
+      }
     }
     await archive.finalize();
   })();

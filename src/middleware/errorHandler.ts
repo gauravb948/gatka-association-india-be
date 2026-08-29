@@ -21,5 +21,15 @@ export function errorHandler(
     return res.status(400).json(buildZodValidationResponseBody(err));
   }
   console.error(err);
+  const code =
+    err && typeof err === "object" && "code" in err ? String((err as { code?: unknown }).code ?? "") : "";
+  if (code.startsWith("ERR_ERL_")) {
+    return res.status(400).json({
+      status: false,
+      data: null,
+      message: "Rate limiter proxy configuration error",
+      code,
+    });
+  }
   return res.status(500).json({ status: false, data: null, message: "Internal server error" });
 }

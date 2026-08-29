@@ -293,6 +293,8 @@ export async function competitionAccreditationPhotosZip(
   next: NextFunction
 ) {
   try {
+    req.setTimeout(30 * 60 * 1000);
+    res.setTimeout(30 * 60 * 1000);
     const actor = req.dbUser!;
     const q = competitionAccreditationQuerySchema.parse(req.query);
     const comp = await competitionRepository.findByIdForPlayerEligibility(q.competitionId);

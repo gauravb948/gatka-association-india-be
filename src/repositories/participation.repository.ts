@@ -161,6 +161,7 @@ export async function findParticipationsForAccreditationExport(
       },
       event: {
         select: {
+          name: true,
           eventGroup: {
             select: {
               ageCategory: { select: { name: true, ageTo: true } },

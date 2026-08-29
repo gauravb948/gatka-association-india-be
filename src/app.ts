@@ -13,7 +13,8 @@ import { responseEnvelope } from "./middleware/responseEnvelope.js";
 export function createApp() {
   const app = express();
 
-  if (process.env.TRUST_PROXY === "1") {
+  const trustProxy = (process.env.TRUST_PROXY ?? "1").trim().toLowerCase();
+  if (trustProxy !== "0" && trustProxy !== "false") {
     app.set("trust proxy", 1);
   }
 
