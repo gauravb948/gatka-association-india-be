@@ -34,7 +34,7 @@ export async function setTrainingCenterStatus(
     const body = trainingCenterStatusChangeBodySchema.parse(req.body);
     const existing = await prisma.trainingCenter.findUnique({
       where: { id: req.params.id },
-      select: { id: true, districtId: true, district: { select: { stateId: true } } },
+      select: { id: true, status: true, districtId: true, district: { select: { stateId: true } } },
     });
     if (!existing) throw new AppError(404, "Training center not found");
 
@@ -44,7 +44,16 @@ export async function setTrainingCenterStatus(
       (actor.role === "DISTRICT_ADMIN" && actor.districtId === existing.districtId);
     if (!allowed) throw new AppError(403, "Forbidden", "FORBIDDEN_ROLE");
 
-    const reason = body.status === "ACCEPTED" ? null : body.statusReason!;
+    if (
+      existing.status === EntityStatus.BLOCKED &&
+      body.status === "ACCEPTED" &&
+      !body.statusReason?.trim()
+    ) {
+      throw new AppError(400, "statusReason is required to unblock", "STATUS_REASON_REQUIRED");
+    }
+
+    const reason =
+      body.status === "ACCEPTED" ? body.statusReason?.trim() || null : body.statusReason!;
     const row = await prisma.trainingCenter.update({
       where: { id: req.params.id },
       data: {
@@ -77,6 +86,7 @@ export async function setUserStatus(req: Request, res: Response, next: NextFunct
       select: {
         id: true,
         role: true,
+        status: true,
         stateId: true,
         districtId: true,
         trainingCenterId: true,
@@ -100,6 +110,13 @@ export async function setUserStatus(req: Request, res: Response, next: NextFunct
     if (!allowed) throw new AppError(403, "Forbidden", "FORBIDDEN_ROLE");
 
     const nextStatus = body.status as EntityStatus;
+    if (
+      target.status === EntityStatus.BLOCKED &&
+      nextStatus === EntityStatus.ACCEPTED &&
+      !body.statusReason?.trim()
+    ) {
+      throw new AppError(400, "statusReason is required to unblock", "STATUS_REASON_REQUIRED");
+    }
     const row = await prisma.$transaction(async (tx) => {
       const updatedUser = await tx.user.update({
         where: { id: target.id },
