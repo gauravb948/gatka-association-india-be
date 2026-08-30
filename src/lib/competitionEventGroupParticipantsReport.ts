@@ -37,11 +37,11 @@ const EMPTY_REPORT: CompetitionEventGroupParticipantsReport = {
   groups: {},
 };
 
-function formatDobMmDdYyyy(dateOfBirth: Date): string {
+function formatDobDdMmYyyy(dateOfBirth: Date): string {
   const mm = String(dateOfBirth.getUTCMonth() + 1).padStart(2, "0");
   const dd = String(dateOfBirth.getUTCDate()).padStart(2, "0");
   const yyyy = dateOfBirth.getUTCFullYear();
-  return `${mm}/${dd}/${yyyy}`;
+  return `${dd}-${mm}-${yyyy}`;
 }
 
 function genderDisplay(gender: Gender): string {
@@ -69,7 +69,7 @@ function mapProfileToRow(
     name: profile.fullName,
     fatherName: profile.fatherName,
     motherName: profile.motherName,
-    dob: formatDobMmDdYyyy(profile.dateOfBirth),
+    dob: formatDobDdMmYyyy(profile.dateOfBirth),
     age: ageOnDate(profile.dateOfBirth, ageAsOf),
     ageGroup,
     district: profile.district?.name?.trim() ?? "",

@@ -1738,8 +1738,8 @@ components:
         motherName: { type: string, nullable: true }
         dob:
           type: string
-          description: Date of birth formatted as MM/DD/YYYY (UTC)
-          example: "05/14/2010"
+          description: Date of birth formatted as DD-MM-YYYY (UTC)
+          example: "14-05-2010"
         age:
           type: integer
           minimum: 0
