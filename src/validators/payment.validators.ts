@@ -23,3 +23,20 @@ export const reconcileRazorpaySchema = z.object({
   /** If true, report what would be marked without writing. */
   dryRun: z.boolean().optional().default(false),
 });
+
+export const createManualPaymentSchema = z.object({
+  stateId: z.string().min(1).optional(),
+  purpose: z.nativeEnum(PaymentPurpose),
+  amountPaise: z.number().int().positive(),
+  sessionId: z.string().optional(),
+  metadata: z.record(z.unknown()).optional(),
+  note: z.string().trim().max(500).optional(),
+});
+
+export const approveManualPaymentSchema = z.object({
+  statusReason: z.string().trim().max(500).optional(),
+});
+
+export const rejectManualPaymentSchema = z.object({
+  statusReason: z.string().trim().min(1).max(500),
+});

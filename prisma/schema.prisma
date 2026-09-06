@@ -74,6 +74,11 @@ enum PaymentStatus {
   REFUNDED
 }
 
+enum PaymentMethod {
+  RAZORPAY
+  MANUAL
+}
+
 enum PaymentPurpose {
   PLAYER_REGISTRATION
   PLAYER_RENEWAL
@@ -570,6 +575,7 @@ model Payment {
   amountPaise       Int
   currency          String         @default("INR")
   status            PaymentStatus  @default(PENDING)
+  method            PaymentMethod  @default(RAZORPAY)
   razorpayOrderId   String?        @unique
   razorpayPaymentId String?
   sessionId         String?
@@ -588,6 +594,7 @@ model Payment {
   @@index([userId])
   @@index([stateId])
   @@index([status])
+  @@index([method, status])
 }
 
 model Membership {

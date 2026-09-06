@@ -11,6 +11,26 @@ paymentsRouter.post("/razorpay/order", requireAuth, paymentsController.createRaz
 paymentsRouter.post("/verify", requireAuth, paymentsController.verify);
 paymentsRouter.get("/me", requireAuth, paymentsController.listMine);
 
+paymentsRouter.post("/manual", requireAuth, paymentsController.createManualPayment);
+paymentsRouter.get(
+  "/manual/pending",
+  requireAuth,
+  requireRoles("NATIONAL_ADMIN", "STATE_ADMIN", "DISTRICT_ADMIN", "TRAINING_CENTER"),
+  paymentsController.listPendingManualPayments
+);
+paymentsRouter.post(
+  "/manual/:id/approve",
+  requireAuth,
+  requireRoles("NATIONAL_ADMIN", "STATE_ADMIN", "DISTRICT_ADMIN", "TRAINING_CENTER"),
+  paymentsController.approveManualPayment
+);
+paymentsRouter.post(
+  "/manual/:id/reject",
+  requireAuth,
+  requireRoles("NATIONAL_ADMIN", "STATE_ADMIN", "DISTRICT_ADMIN", "TRAINING_CENTER"),
+  paymentsController.rejectManualPayment
+);
+
 paymentsRouter.post(
   "/reconcile-razorpay",
   requireAuth,

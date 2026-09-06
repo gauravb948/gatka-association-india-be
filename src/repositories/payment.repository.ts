@@ -1,5 +1,49 @@
 import type { Prisma } from "@prisma/client";
+import { PaymentMethod, PaymentStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
+
+const manualPaymentInclude = {
+  user: {
+    select: {
+      id: true,
+      role: true,
+      email: true,
+      phone: true,
+      status: true,
+      statusReason: true,
+      stateId: true,
+      districtId: true,
+      trainingCenterId: true,
+      state: { select: { id: true, name: true, code: true } },
+      district: {
+        select: {
+          id: true,
+          name: true,
+          stateId: true,
+          state: { select: { id: true, name: true } },
+        },
+      },
+      trainingCenter: {
+        select: {
+          id: true,
+          name: true,
+          districtId: true,
+          district: {
+            select: {
+              id: true,
+              name: true,
+              stateId: true,
+              state: { select: { id: true, name: true } },
+            },
+          },
+        },
+      },
+    },
+  },
+  state: {
+    select: { id: true, name: true, code: true },
+  },
+} as const;
 
 export function createPayment(data: Prisma.PaymentCreateInput) {
   return prisma.payment.create({ data });
@@ -62,6 +106,58 @@ export function findById(id: string) {
 
 export function findFirstByRazorpayOrderId(razorpayOrderId: string) {
   return prisma.payment.findFirst({ where: { razorpayOrderId } });
+}
+
+export function findPendingManualByUser(userId: string) {
+  return prisma.payment.findFirst({
+    where: {
+      userId,
+      method: PaymentMethod.MANUAL,
+      status: PaymentStatus.PENDING,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+export function findPendingManualForReview() {
+  return prisma.payment.findMany({
+    where: {
+      method: PaymentMethod.MANUAL,
+      status: PaymentStatus.PENDING,
+      user: { status: "PENDING" },
+    },
+    orderBy: { createdAt: "asc" },
+    include: manualPaymentInclude,
+  });
+}
+
+export function findManualByIdForReview(id: string) {
+  return prisma.payment.findUnique({
+    where: { id },
+    include: manualPaymentInclude,
+  });
+}
+
+export function failOtherPendingManual(userId: string, exceptPaymentId: string) {
+  return prisma.payment.updateMany({
+    where: {
+      userId,
+      method: PaymentMethod.MANUAL,
+      status: PaymentStatus.PENDING,
+      id: { not: exceptPaymentId },
+    },
+    data: { status: PaymentStatus.FAILED },
+  });
+}
+
+export function markFailed(id: string, metadata?: Prisma.InputJsonValue) {
+  return prisma.payment.update({
+    where: { id },
+    data: {
+      status: PaymentStatus.FAILED,
+      ...(metadata !== undefined ? { metadata } : {}),
+    },
+  });
 }
 
 /** PENDING payments that have a Razorpay order id (candidates for reconcile). */

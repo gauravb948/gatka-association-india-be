@@ -153,6 +153,8 @@ export async function applySuccessfulPayment(
   const pay = await paymentRepository.findById(paymentId);
   if (!pay) return;
 
+  await paymentRepository.failOtherPendingManual(pay.userId, paymentId);
+
   // Payment already PAID — still repair org registration if it stayed PENDING
   // (e.g. earlier verify without districtRegistrationId metadata).
   if (updated.count === 0) {

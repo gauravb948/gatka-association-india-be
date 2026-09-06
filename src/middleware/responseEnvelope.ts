@@ -64,6 +64,15 @@ function messageForKnownRoute(req: Request): string | null {
   if (/\/auth\/complete-zero-fee\/?$/.test(path)) {
     return "No registration fee is due; application submitted for review";
   }
+  if (/\/payments\/manual\/?$/.test(path)) {
+    return "Manual payment requested; waiting for manager confirmation";
+  }
+  if (/\/payments\/manual\/[^/]+\/approve\/?$/.test(path)) {
+    return "Manual payment accepted";
+  }
+  if (/\/payments\/manual\/[^/]+\/reject\/?$/.test(path)) {
+    return "Manual payment declined";
+  }
   if (/\/auth\/register\/player\/?$/.test(path)) return "Player registered successfully";
   if (/\/auth\/register\/coach\/?$/.test(path)) return "Coach registration submitted successfully";
   if (/\/auth\/register\/referee\/?$/.test(path)) return "Referee registration submitted successfully";
