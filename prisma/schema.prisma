@@ -196,7 +196,6 @@ model State {
   playerProfiles     PlayerProfile[]
   paymentConfig      StatePaymentConfig?
   campStates         CampState[]
-  notices            Notice[]
   migrationFrom      MigrationRequest[] @relation("MigrationFromState")
   migrationTo        MigrationRequest[] @relation("MigrationToState")
   refereeProfiles    RefereeProfile[]
@@ -229,7 +228,6 @@ model District {
   playerProfiles       PlayerProfile[]
   competitionDistricts CompetitionDistrict[]
   campDistricts   CampDistrict[]
-  notices         Notice[]
   registration    DistrictRegistration?
   refereeProfiles    RefereeProfile[]
   volunteerProfiles VolunteerProfile[]
@@ -263,7 +261,6 @@ model TrainingCenter {
   users          User[]
   playerProfiles PlayerProfile[]
   coachProfiles  CoachProfile[]
-  notices        Notice[]
 
   @@index([districtId])
 }
@@ -293,6 +290,7 @@ model User {
   refereeProfile         RefereeProfile?
   volunteerProfile       VolunteerProfile?
   noticesAuthored        Notice[]                 @relation("NoticeAuthor")
+  nationalNoticesUpdated NationalNotice[]         @relation("NationalNoticeUpdatedBy")
   otpCodes               OtpCode[]
   payments               Payment[]
   tournamentRegs         TournamentRegistration[] @relation("TournamentPlayer")
@@ -881,22 +879,27 @@ model CompetitionResult {
 }
 
 model Notice {
-  id               String          @id @default(cuid())
-  authorId         String
-  author           User            @relation("NoticeAuthor", fields: [authorId], references: [id])
-  title            String
-  body             String
-  stateId          String?
-  state            State?          @relation(fields: [stateId], references: [id])
-  districtId       String?
-  district         District?       @relation(fields: [districtId], references: [id])
-  trainingCenterId String?
-  trainingCenter   TrainingCenter? @relation(fields: [trainingCenterId], references: [id])
-  targetRole       Role?
-  createdAt        DateTime        @default(now())
+  id          String   @id @default(cuid())
+  authorId    String
+  author      User     @relation("NoticeAuthor", fields: [authorId], references: [id])
+  title       String
+  body        String
+  targetRoles Role[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  @@index([stateId])
-  @@index([districtId])
+  @@index([authorId])
+  @@index([createdAt])
+}
+
+model NationalNotice {
+  id          String   @id @default("singleton")
+  title       String
+  body        String
+  updatedById String?
+  updatedBy   User?    @relation("NationalNoticeUpdatedBy", fields: [updatedById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model OtpCode {

@@ -153,12 +153,10 @@ export function deleteTrainingCenterWithPlayers(id: string): Promise<TrainingCen
               }
             : { trainingCenterId: id },
       });
-      const notices = await tx.notice.deleteMany({
-        where:
-          userIds.length > 0
-            ? { OR: [{ trainingCenterId: id }, { authorId: { in: userIds } }] }
-            : { trainingCenterId: id },
-      });
+      const notices =
+        userIds.length > 0
+          ? await tx.notice.deleteMany({ where: { authorId: { in: userIds } } })
+          : { count: 0 };
 
       if (userIds.length > 0) {
         await tx.otpCode.deleteMany({ where: { userId: { in: userIds } } });
