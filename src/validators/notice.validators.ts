@@ -28,4 +28,5 @@ export const noticeListQuerySchema = z.object({
 export const nationalNoticeBodySchema = z.object({
   title: z.string().trim().min(1),
   body: z.string().trim().min(1),
+  display: z.boolean(),
 });

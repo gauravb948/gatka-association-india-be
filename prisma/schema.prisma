@@ -896,6 +896,7 @@ model NationalNotice {
   id          String   @id @default("singleton")
   title       String
   body        String
+  display     Boolean  @default(true)
   updatedById String?
   updatedBy   User?    @relation("NationalNoticeUpdatedBy", fields: [updatedById], references: [id])
   createdAt   DateTime @default(now())

@@ -102,6 +102,7 @@ export async function upsertNational(req: Request, res: Response, next: NextFunc
     const row = await nationalNoticeRepository.upsert({
       title: body.title,
       body: body.body,
+      display: body.display,
       updatedById: u.id,
     });
     res.json(row);
