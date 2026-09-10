@@ -93,13 +93,14 @@ const genderValue = z.enum(["MALE", "FEMALE", "BOYS", "GIRLS", "OPEN"]);
 /**
  * Save competition (admin form): name, venue, genders, states, districts, dates, age-as-of date.
  * `level` is inferred from admin role. Competition season year is inferred from `createdAt` (UTC).
+ * NATIONAL: `districtIds` is ignored (empty). STATE/DISTRICT: at least one district is required.
  */
 export const competitionBodySchema = z.object({
   name: z.string().min(1),
   venue: z.string().min(1),
   genders: z.array(genderValue).min(1),
   stateIds: z.array(z.string().min(1)).min(1),
-  districtIds: z.array(z.string().min(1)).min(1),
+  districtIds: z.array(z.string().min(1)).default([]),
   startDate: requiredDateString,
   endDate: requiredDateString,
   registrationOpensAt: requiredDateString,
@@ -110,13 +111,16 @@ export const competitionBodySchema = z.object({
   entryFeePaise: z.number().int().min(0).nullable().optional(),
 });
 
-/** Partial update; if `stateIds` is present, `districtIds` must also be present (and vice versa), each with at least one id. */
+/**
+ * Partial update. NATIONAL geography is `stateIds` only (`districtIds` may be omitted or empty).
+ * STATE/DISTRICT geography still requires both `stateIds` and non-empty `districtIds` together.
+ */
 export const competitionPatchSchema = z
   .object({
     name: z.string().min(1).optional(),
     venue: z.string().min(1).optional(),
     genders: z.array(genderValue).min(1).optional(),
-    stateIds: z.array(z.string().min(1)).optional(),
+    stateIds: z.array(z.string().min(1)).min(1).optional(),
     districtIds: z.array(z.string().min(1)).optional(),
     startDate: requiredDateString.optional(),
     endDate: requiredDateString.optional(),
@@ -126,17 +130,4 @@ export const competitionPatchSchema = z
     ageCategoryIds: z.array(z.string().min(1)).min(1).optional(),
     entryFeePaise: z.number().int().min(0).nullable().optional(),
   })
-  .refine((b) => Object.keys(b).length > 0, { message: "At least one field is required" })
-  .refine(
-    (b) => {
-      const hasS = b.stateIds !== undefined;
-      const hasD = b.districtIds !== undefined;
-      if (!hasS && !hasD) return true;
-      if (hasS !== hasD) return false;
-      return (b.stateIds?.length ?? 0) >= 1 && (b.districtIds?.length ?? 0) >= 1;
-    },
-    {
-      message: "stateIds and districtIds must both be sent together, each non-empty",
-      path: ["stateIds"],
-    }
-  );
+  .refine((b) => Object.keys(b).length > 0, { message: "At least one field is required" });

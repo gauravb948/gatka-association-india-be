@@ -484,7 +484,6 @@ export async function create(req: Request, res: Response, next: NextFunction) {
   try {
     const body = competitionBodySchema.parse(req.body);
     const stateIds = [...new Set(body.stateIds)];
-    const districtIds = [...new Set(body.districtIds)];
 
     const existing = await competitionRepository.findFirstByName(body.name.trim());
     if (existing) {
@@ -492,6 +491,11 @@ export async function create(req: Request, res: Response, next: NextFunction) {
     }
 
     const level = inferCompetitionLevel(req.dbUser!);
+    const districtIds =
+      level === "NATIONAL" ? [] : [...new Set(body.districtIds)];
+    if (level !== "NATIONAL" && districtIds.length === 0) {
+      throw new AppError(400, "Please select at least one district");
+    }
     const entryFeePaise = assertEntryFeeForLevel(level, body.entryFeePaise ?? null);
 
     await assertCompetitionScope(level, stateIds, districtIds, req.dbUser!);
@@ -561,9 +565,23 @@ export async function patch(req: Request, res: Response, next: NextFunction) {
     const districtIds =
       body.districtIds !== undefined ? [...new Set(body.districtIds)] : undefined;
 
-    if (stateIds !== undefined && districtIds !== undefined) {
+    let geo: { stateIds: string[]; districtIds: string[] } | undefined;
+    if (comp.level === "NATIONAL") {
+      if (stateIds !== undefined) {
+        await assertCompetitionScope(comp.level, stateIds, [], req.dbUser!);
+        await validateCompetitionGeographyInput(stateIds, []);
+        geo = { stateIds, districtIds: [] };
+      }
+    } else if (stateIds !== undefined || districtIds !== undefined) {
+      if (stateIds === undefined || districtIds === undefined) {
+        throw new AppError(400, "stateIds and districtIds must both be sent together");
+      }
+      if (districtIds.length === 0) {
+        throw new AppError(400, "Please select at least one district");
+      }
       await assertCompetitionScope(comp.level, stateIds, districtIds, req.dbUser!);
       await validateCompetitionGeographyInput(stateIds, districtIds);
+      geo = { stateIds, districtIds };
     }
 
     if (body.name !== undefined) {
@@ -605,11 +623,6 @@ export async function patch(req: Request, res: Response, next: NextFunction) {
         data.entryFeePaise = fee;
       }
     }
-
-    const geo =
-      stateIds !== undefined && districtIds !== undefined
-        ? { stateIds, districtIds }
-        : undefined;
 
     const ageCategoryIds =
       body.ageCategoryIds !== undefined ? [...new Set(body.ageCategoryIds)] : undefined;

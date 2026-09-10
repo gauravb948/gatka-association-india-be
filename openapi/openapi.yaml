@@ -2191,7 +2191,6 @@ components:
         - venue
         - genders
         - stateIds
-        - districtIds
         - startDate
         - endDate
         - registrationOpensAt
@@ -2215,8 +2214,11 @@ components:
           items: { type: string }
         districtIds:
           type: array
-          minItems: 1
+          minItems: 0
           items: { type: string }
+          description: >
+            Required and non-empty for STATE and DISTRICT competitions.
+            Ignored for NATIONAL — every district in the selected states is in scope.
         startDate:
           type: string
           description: ISO date or date-time (competition start)
@@ -2242,7 +2244,8 @@ components:
     CompetitionPatchBody:
       type: object
       description: >
-        At least one property required. If updating geography, send both stateIds and districtIds (each non-empty).
+        At least one property required. NATIONAL geography is stateIds only (districtIds is ignored).
+        STATE/DISTRICT geography still requires both stateIds and non-empty districtIds together.
         Cannot edit when isClosed is true. Same field semantics as create where present: `genders` and
         `ageCategoryIds` are full replacements when sent (non-empty arrays). Legacy competitions with no
         `createdBy` get the current user set as creator on the first successful patch.
@@ -2260,7 +2263,7 @@ components:
           items: { type: string }
         districtIds:
           type: array
-          minItems: 1
+          minItems: 0
           items: { type: string }
         startDate: { type: string }
         endDate: { type: string }
