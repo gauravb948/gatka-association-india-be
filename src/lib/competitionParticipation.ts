@@ -32,26 +32,30 @@ export function playerProfileWhereCompetitionEnabledScope(
   if (stateFirst && stateIds.length > 0) {
     return {
       stateId: { in: stateIds },
-      state: { isEnabled: true },
-      district: { isEnabled: true },
+      state: { isEnabled: true, deletedAt: null },
+      district: { isEnabled: true, deletedAt: null },
+      user: { deletedAt: null },
     };
   }
   if (districtIds.length > 0) {
     return {
       districtId: { in: districtIds },
-      district: { isEnabled: true, state: { isEnabled: true } },
+      district: { isEnabled: true, deletedAt: null, state: { isEnabled: true, deletedAt: null } },
+      user: { deletedAt: null },
     };
   }
   if (stateIds.length > 0) {
     return {
       stateId: { in: stateIds },
-      state: { isEnabled: true },
-      district: { isEnabled: true },
+      state: { isEnabled: true, deletedAt: null },
+      district: { isEnabled: true, deletedAt: null },
+      user: { deletedAt: null },
     };
   }
   return {
-    state: { isEnabled: true },
-    district: { isEnabled: true },
+    state: { isEnabled: true, deletedAt: null },
+    district: { isEnabled: true, deletedAt: null },
+    user: { deletedAt: null },
   };
 }
 
@@ -59,24 +63,24 @@ export function playerProfileWhereCompetitionEnabledScope(
 export function actorPlayerProfileScopeWhere(
   actor: DbUser
 ): Prisma.PlayerProfileWhereInput {
-  if (actor.role === "NATIONAL_ADMIN") return {};
+  if (actor.role === "NATIONAL_ADMIN") return { user: { deletedAt: null } };
   if (actor.role === "STATE_ADMIN") {
     if (!actor.stateId) {
       throw new AppError(403, "State context missing", "FORBIDDEN_SCOPE");
     }
-    return { stateId: actor.stateId };
+    return { stateId: actor.stateId, user: { deletedAt: null } };
   }
   if (actor.role === "DISTRICT_ADMIN") {
     if (!actor.districtId) {
       throw new AppError(403, "District context missing", "FORBIDDEN_SCOPE");
     }
-    return { districtId: actor.districtId };
+    return { districtId: actor.districtId, user: { deletedAt: null } };
   }
   if (actor.role === "TRAINING_CENTER") {
     if (!actor.trainingCenterId) {
       throw new AppError(403, "Training center context missing", "FORBIDDEN_SCOPE");
     }
-    return { trainingCenterId: actor.trainingCenterId };
+    return { trainingCenterId: actor.trainingCenterId, user: { deletedAt: null } };
   }
   throw new AppError(403, "Forbidden", "FORBIDDEN_ROLE");
 }

@@ -7,6 +7,7 @@ import * as competitionRepository from "./competition.repository.js";
 const acceptedUser: Prisma.UserWhereInput = {
   status: EntityStatus.ACCEPTED,
   isActive: true,
+  deletedAt: null,
 };
 
 const submittedUser: Prisma.UserWhereInput = {
@@ -27,6 +28,7 @@ const acceptedReferee: Prisma.UserWhereInput = {
 const acceptedTrainingCenter: Prisma.TrainingCenterWhereInput = {
   status: EntityStatus.ACCEPTED,
   isEnabled: true,
+  deletedAt: null,
 };
 
 const submittedDistrictRegistration: Prisma.DistrictRegistrationWhereInput = {
@@ -99,6 +101,7 @@ function tournamentRegsWhere(
     playerUser: {
       status: EntityStatus.ACCEPTED,
       isActive: true,
+      deletedAt: null,
       playerProfile: profileGeo,
     },
   };
@@ -123,8 +126,8 @@ export async function getDashboardCounts(params: {
 
   switch (scope.kind) {
     case "national":
-      totalStatesP = prisma.state.count({ where: { isEnabled: true } });
-      totalDistrictsP = prisma.district.count({ where: { isEnabled: true } });
+      totalStatesP = prisma.state.count({ where: { isEnabled: true, deletedAt: null } });
+      totalDistrictsP = prisma.district.count({ where: { isEnabled: true, deletedAt: null } });
       totalUsersP = prisma.user.count({ where: acceptedUser });
       playersP = prisma.playerProfile.count({ where: acceptedPlayer });
       tournamentRegistrationsP = prisma.tournamentRegistration.count({
@@ -133,7 +136,7 @@ export async function getDashboardCounts(params: {
       break;
     case "state":
       totalDistrictsP = prisma.district.count({
-        where: { stateId: scope.stateId, isEnabled: true },
+        where: { stateId: scope.stateId, isEnabled: true, deletedAt: null },
       });
       totalUsersP = prisma.user.count({ where: usersInStateAccepted(scope.stateId) });
       playersP = prisma.playerProfile.count({
@@ -145,7 +148,7 @@ export async function getDashboardCounts(params: {
       break;
     case "district":
       totalDistrictsP = prisma.district.count({
-        where: { id: scope.districtId, isEnabled: true },
+        where: { id: scope.districtId, isEnabled: true, deletedAt: null },
       });
       totalUsersP = prisma.user.count({ where: usersInDistrictAccepted(scope.districtId) });
       playersP = prisma.playerProfile.count({
@@ -157,7 +160,7 @@ export async function getDashboardCounts(params: {
       break;
     case "training_center":
       totalDistrictsP = prisma.district.count({
-        where: { id: scope.districtId, isEnabled: true },
+        where: { id: scope.districtId, isEnabled: true, deletedAt: null },
       });
       totalUsersP = prisma.user.count({
         where: {

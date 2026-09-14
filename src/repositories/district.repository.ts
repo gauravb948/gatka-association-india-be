@@ -6,14 +6,14 @@ const publicDistrictSelect = { id: true, name: true, stateId: true } as const;
 
 export function findManyPublicByState(stateId: string) {
   return prisma.district.findMany({
-    where: { stateId, isEnabled: true, registration: { is: null } },
+    where: { stateId, isEnabled: true, deletedAt: null, registration: { is: null } },
     orderBy: { name: "asc" },
     select: publicDistrictSelect,
   });
 }
 
 export function findManyPublicByStatePaginated(stateId: string, params: { skip: number; take: number }) {
-  const where = { stateId, isEnabled: true, registration: { is: null } };
+  const where = { stateId, isEnabled: true, deletedAt: null, registration: { is: null } };
   return prisma.$transaction([
     prisma.district.findMany({
       where,
@@ -32,6 +32,7 @@ export function findManyPublicByStateWithAcceptedRegistration(stateId: string) {
     where: {
       stateId,
       isEnabled: true,
+      deletedAt: null,
       registration: { is: { status: EntityStatus.ACCEPTED } },
     },
     orderBy: { name: "asc" },
@@ -46,6 +47,7 @@ export function findManyPublicByStateWithAcceptedRegistrationPaginated(
   const where = {
     stateId,
     isEnabled: true,
+    deletedAt: null,
     registration: { is: { status: EntityStatus.ACCEPTED } },
   };
   return prisma.$transaction([
@@ -62,7 +64,7 @@ export function findManyPublicByStateWithAcceptedRegistrationPaginated(
 
 export function findManyByState(stateId: string) {
   return prisma.district.findMany({
-    where: { stateId },
+    where: { stateId, deletedAt: null },
     orderBy: { name: "asc" },
   });
 }
@@ -72,12 +74,12 @@ export async function findManyByStatePaginated(
   stateId: string,
   params: { skip: number; take: number }
 ) {
-  const where = { stateId };
+  const where = { stateId, deletedAt: null };
   const [idRows, total] = await prisma.$transaction([
     prisma.$queryRaw<{ id: string }[]>`
       SELECT d.id FROM "District" d
       LEFT JOIN "DistrictRegistration" dr ON dr."districtId" = d.id
-      WHERE d."stateId" = ${stateId}
+      WHERE d."stateId" = ${stateId} AND d."deletedAt" IS NULL
       ORDER BY dr."updatedAt" DESC NULLS LAST, d.name ASC
       LIMIT ${params.take}
       OFFSET ${params.skip}
@@ -102,7 +104,7 @@ export async function findManyByStatePaginated(
 /** All districts in any of the given states (enabled + public shape). */
 export function findManyPublicByStateIds(stateIds: string[]) {
   return prisma.district.findMany({
-    where: { stateId: { in: stateIds }, isEnabled: true, registration: { is: null } },
+    where: { stateId: { in: stateIds }, isEnabled: true, deletedAt: null, registration: { is: null } },
     orderBy: [{ stateId: "asc" }, { name: "asc" }],
     select: publicDistrictSelect,
   });
@@ -117,6 +119,7 @@ export function findManyWithAcceptedRegistrationByStateIds(stateIds: string[]) {
     where: {
       stateId: { in: stateIds },
       isEnabled: true,
+      deletedAt: null,
       registration: { is: { status: EntityStatus.ACCEPTED } },
     },
     orderBy: [{ stateId: "asc" }, { name: "asc" }],
@@ -196,6 +199,7 @@ export function findByIdWithRelations(id: string) {
         },
       },
       trainingCenters: {
+        where: { deletedAt: null },
         orderBy: { name: "asc" },
         include: {
           district: { select: districtSlimSelect },

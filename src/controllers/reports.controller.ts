@@ -161,8 +161,12 @@ export async function downloadReportsForAllEntities(
     if (!comp) throw new AppError(404, "Competition not found");
     await assertCanViewCompetitionParticipants(actor, comp);
 
-    const geo = resolveCompetitionPrimaryGeo(comp, actor);
-    const entities = await resolveSummarySheetEntities(comp.level, geo);
+    const primaryGeo = resolveCompetitionPrimaryGeo(comp, actor);
+    const geo = {
+      stateId: q.stateId?.trim() || primaryGeo.stateId,
+      districtId: q.districtId?.trim() || primaryGeo.districtId,
+    };
+    const entities = await resolveSummarySheetEntities(comp.level, geo, q.entityKind);
     if (entities.length === 0) {
       throw new AppError(404, "No entities found for this competition level");
     }

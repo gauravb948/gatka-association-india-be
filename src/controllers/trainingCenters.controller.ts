@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import * as districtRepository from "../repositories/district.repository.js";
 import * as trainingCenterRepository from "../repositories/trainingCenter.repository.js";
 import { AppError } from "../lib/errors.js";
+import { softDeleteTrainingCenterByNationalAdmin } from "../lib/adminSoftDelete.js";
 import type { DbUser } from "../types/user.js";
 import {
   createTrainingCenterSchema,
@@ -104,19 +105,11 @@ export async function patch(req: Request, res: Response, next: NextFunction) {
   }
 }
 
-/** Hard-delete a training center and all players (and other users) belonging to it. */
+/** Soft-delete a training center after live players and coaches have been moved or deleted. */
 export async function remove(req: Request, res: Response, next: NextFunction) {
   try {
-    const u = req.dbUser!;
-    const existing = await trainingCenterRepository.findByIdWithDistrict(req.params.id);
-    if (!existing) throw new AppError(404, "Training center not found");
-    assertCanManageTrainingCenter(u, existing);
-    const deleted = await trainingCenterRepository.deleteTrainingCenterWithPlayers(existing.id);
-    res.json({
-      id: existing.id,
-      name: existing.name,
-      ...deleted,
-    });
+    await softDeleteTrainingCenterByNationalAdmin(req.params.id);
+    res.status(204).send();
   } catch (e) {
     next(e);
   }

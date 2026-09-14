@@ -16,6 +16,7 @@ export function findPrimaryNationalAdmin() {
     where: {
       role: "NATIONAL_ADMIN",
       isActive: true,
+      deletedAt: null,
     },
     orderBy: [{ isSuperNational: "desc" }, { createdAt: "asc" }],
     select: { id: true, email: true, isSuperNational: true },
@@ -151,6 +152,7 @@ export function findByIdForLoginResponse(id: string) {
       role: true,
       isActive: true,
       disabledReason: true,
+      deletedAt: true,
       status: true,
       statusReason: true,
       isSuperNational: true,
@@ -160,14 +162,15 @@ export function findByIdForLoginResponse(id: string) {
       createdAt: true,
       updatedAt: true,
       state: {
-        select: { id: true, name: true, code: true, isEnabled: true },
+        select: { id: true, name: true, code: true, isEnabled: true, deletedAt: true },
       },
       district: {
         select: {
           id: true,
           name: true,
           isEnabled: true,
-          state: { select: { id: true, isEnabled: true } },
+          deletedAt: true,
+          state: { select: { id: true, isEnabled: true, deletedAt: true } },
         },
       },
       trainingCenter: {
@@ -176,6 +179,7 @@ export function findByIdForLoginResponse(id: string) {
           name: true,
           registrationNumber: true,
           isEnabled: true,
+          deletedAt: true,
           status: true,
           statusReason: true,
           termsAcceptedAt: true,
@@ -183,7 +187,8 @@ export function findByIdForLoginResponse(id: string) {
             select: {
               id: true,
               isEnabled: true,
-              state: { select: { id: true, isEnabled: true } },
+              deletedAt: true,
+              state: { select: { id: true, isEnabled: true, deletedAt: true } },
             },
           },
         },
@@ -196,7 +201,7 @@ export function findByIdForLoginResponse(id: string) {
 export function findByIdRoleOnly(id: string) {
   return prisma.user.findUnique({
     where: { id },
-    select: { id: true, role: true },
+    select: { id: true, role: true, deletedAt: true },
   });
 }
 
@@ -363,7 +368,7 @@ export function findManyPaginatedForAdminList(params: {
   statuses?: EntityStatus[];
   roles?: Role[];
 }) {
-  const where: Prisma.UserWhereInput = {};
+  const where: Prisma.UserWhereInput = { deletedAt: null };
   if (params.statuses?.length) where.status = { in: params.statuses };
   if (params.roles?.length) where.role = { in: params.roles };
 
@@ -385,15 +390,16 @@ export function findManyPaginatedWithWhere(params: {
   skip: number;
   take: number;
 }) {
+  const where: Prisma.UserWhereInput = { AND: [params.where, { deletedAt: null }] };
   return prisma.$transaction([
     prisma.user.findMany({
-      where: params.where,
+      where,
       orderBy: { createdAt: "desc" },
       skip: params.skip,
       take: params.take,
       select: adminUserListSelect,
     }),
-    prisma.user.count({ where: params.where }),
+    prisma.user.count({ where }),
   ]);
 }
 
@@ -403,6 +409,7 @@ export function findPublicIdCardContextByUserId(userId: string) {
     where: {
       id: userId,
       isActive: true,
+      deletedAt: null,
       status: EntityStatus.ACCEPTED,
     },
     select: {

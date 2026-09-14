@@ -19,7 +19,7 @@ function buildListWhere(
   statuses?: EntityStatus[],
   search?: string
 ): Prisma.UserWhereInput {
-  const parts: Prisma.UserWhereInput[] = [{ role: targetRole }];
+  const parts: Prisma.UserWhereInput[] = [{ role: targetRole }, { deletedAt: null }];
   if (Object.keys(geo).length > 0) {
     parts.push(geo);
   }
@@ -291,13 +291,13 @@ export async function getUserById(req: Request, res: Response, next: NextFunctio
     // Allow anyone to view their own profile detail.
     if (actor.id === userId) {
       const self = await userRepository.findByIdForLoginResponse(userId);
-      if (!self) throw new AppError(404, "User not found");
+      if (!self || self.deletedAt) throw new AppError(404, "User not found");
       const userTypeProfile = await getUserTypeProfile(self.id, self.role);
       return res.json({ user: self, userTypeProfile });
     }
 
     const target = await userRepository.findByIdRoleOnly(userId);
-    if (!target) throw new AppError(404, "User not found");
+    if (!target || target.deletedAt) throw new AppError(404, "User not found");
 
     const geo = hierarchyGeoWhere(actor, target.role);
     const inScope = await userRepository.findByIdWithinScope(userId, geo);
@@ -306,7 +306,7 @@ export async function getUserById(req: Request, res: Response, next: NextFunctio
     }
 
     const full = await userRepository.findByIdForLoginResponse(userId);
-    if (!full) throw new AppError(404, "User not found");
+    if (!full || full.deletedAt) throw new AppError(404, "User not found");
     const userTypeProfile = await getUserTypeProfile(full.id, full.role);
     res.json({ user: full, userTypeProfile });
   } catch (e) {

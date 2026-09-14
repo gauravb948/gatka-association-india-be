@@ -53,26 +53,38 @@ export function resolveCompetitionPrimaryGeo(
   return { stateId, districtId };
 }
 
+export function defaultSummarySheetEntityKind(
+  level: CompetitionLevel
+): SummarySheetEntityKind {
+  if (level === "NATIONAL") return "state";
+  if (level === "STATE") return "district";
+  if (level === "DISTRICT") return "trainingCenter";
+  throw new AppError(400, "Unsupported competition level for all-entities report");
+}
+
 export async function resolveSummarySheetEntities(
   level: CompetitionLevel,
-  geo: { stateId: string; districtId: string }
+  geo: { stateId: string; districtId: string },
+  entityKind?: SummarySheetEntityKind
 ): Promise<SummarySheetEntity[]> {
-  if (level === "NATIONAL") {
+  const kind = entityKind ?? defaultSummarySheetEntityKind(level);
+
+  if (kind === "state") {
     const states = await stateRepository.findManyPublic();
     return states.map((s) => ({ id: s.id, name: s.name, kind: "state" as const }));
   }
 
-  if (level === "STATE") {
+  if (kind === "district") {
     if (!geo.stateId) {
-      throw new AppError(400, "Competition has no state scope for district listing");
+      throw new AppError(400, "State is required to list districts for this report");
     }
     const districts = await districtRepository.findManyPublicByState(geo.stateId);
     return districts.map((d) => ({ id: d.id, name: d.name, kind: "district" as const }));
   }
 
-  if (level === "DISTRICT") {
+  if (kind === "trainingCenter") {
     if (!geo.districtId) {
-      throw new AppError(400, "Competition has no district scope for training center listing");
+      throw new AppError(400, "District is required to list training centers for this report");
     }
     const centers = await trainingCenterRepository.findManyPublicByDistrict(geo.districtId);
     return centers.map((c) => ({
@@ -82,7 +94,7 @@ export async function resolveSummarySheetEntities(
     }));
   }
 
-  throw new AppError(400, "Unsupported competition level for all-entities report");
+  throw new AppError(400, "Unsupported entity kind for all-entities report");
 }
 
 export async function resolveAssociationTitle(

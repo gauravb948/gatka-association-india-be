@@ -35,10 +35,13 @@ export const competitionAgeWiseReportQuerySchema = z.object({
   gender: z.enum(["MALE", "FEMALE", "BOYS", "GIRLS"]),
 });
 
-/** All-entities summary sheet PDF — competition + gender only; entities resolved by level. */
+/** All-entities summary sheet PDF — optional geo narrows which entities are listed. */
 export const downloadReportsForAllEntitiesQuerySchema = z.object({
   competitionId: z.string().min(1),
   gender: z.enum(["MALE", "FEMALE", "BOYS", "GIRLS"]),
+  entityKind: z.enum(["state", "district", "trainingCenter"]).optional(),
+  stateId: z.string().min(1).optional(),
+  districtId: z.string().min(1).optional(),
 });
 
 export const competitionAccreditationQuerySchema = z.object({

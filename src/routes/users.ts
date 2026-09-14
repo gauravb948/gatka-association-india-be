@@ -3,6 +3,7 @@ import { requireAuth, requireRoles } from "../middleware/auth.js";
 import * as userIdCardController from "../controllers/userIdCard.controller.js";
 import * as usersPasswordController from "../controllers/usersPassword.controller.js";
 import * as usersListController from "../controllers/usersList.controller.js";
+import * as usersController from "../controllers/users.controller.js";
 import * as publicRefereesController from "../controllers/publicReferees.controller.js";
 
 export const usersRouter = Router();
@@ -32,3 +33,9 @@ usersRouter.patch(
   usersPasswordController.hierarchyResetPassword
 );
 usersRouter.get("/:id", requireAuth, usersListController.getUserById);
+usersRouter.delete(
+  "/:id",
+  requireAuth,
+  requireRoles("NATIONAL_ADMIN"),
+  usersController.remove
+);

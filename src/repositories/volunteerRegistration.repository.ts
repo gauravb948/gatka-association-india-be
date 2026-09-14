@@ -88,8 +88,42 @@ export function findManyPublicPhotos(stateId: string) {
   });
 }
 
-export function findManyPaginated(params: VolunteerRegistrationListFilters) {
-  const where = buildWhere(params);
+export async function findLiveVolunteerUsersByEmails(emails: string[]) {
+  const unique = [...new Set(emails.filter(Boolean))];
+  if (unique.length === 0) return [];
+  return prisma.user.findMany({
+    where: { role: "VOLUNTEER", deletedAt: null, email: { in: unique } },
+    select: {
+      id: true,
+      email: true,
+      phone: true,
+      role: true,
+      status: true,
+      statusReason: true,
+      isActive: true,
+      stateId: true,
+      districtId: true,
+      createdAt: true,
+      updatedAt: true,
+      state: { select: { id: true, name: true, code: true } },
+      district: { select: { id: true, name: true } },
+    },
+  });
+}
+
+export async function findManyPaginated(params: VolunteerRegistrationListFilters) {
+  const deletedVolunteerEmails = await prisma.user.findMany({
+    where: { role: "VOLUNTEER", deletedAt: { not: null } },
+    select: { email: true },
+  });
+  const where: Prisma.VolunteerRegistrationWhereInput = {
+    AND: [
+      buildWhere(params),
+      ...(deletedVolunteerEmails.length > 0
+        ? [{ email: { notIn: deletedVolunteerEmails.map((u) => u.email) } }]
+        : []),
+    ],
+  };
   return prisma.$transaction([
     prisma.volunteerRegistration.findMany({
       where,

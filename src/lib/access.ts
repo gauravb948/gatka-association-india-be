@@ -10,22 +10,32 @@ export async function loadUserForAccess(userId: string) {
 /** Minimal shape for hierarchy / enablement checks (login + middleware). */
 export type UserForHierarchyCheck = {
   isActive: boolean;
+  deletedAt?: Date | null;
   status: EntityStatus;
   role: User["role"];
   stateId: string | null;
   districtId: string | null;
   trainingCenterId: string | null;
-  state: { isEnabled: boolean } | null;
-  district: { isEnabled: boolean; state: { isEnabled: boolean } } | null;
+  state: { isEnabled: boolean; deletedAt?: Date | null } | null;
+  district: {
+    isEnabled: boolean;
+    deletedAt?: Date | null;
+    state: { isEnabled: boolean; deletedAt?: Date | null };
+  } | null;
   trainingCenter: {
     isEnabled: boolean;
+    deletedAt?: Date | null;
     status: EntityStatus;
-    district: { isEnabled: boolean; state: { isEnabled: boolean } };
+    district: {
+      isEnabled: boolean;
+      deletedAt?: Date | null;
+      state: { isEnabled: boolean; deletedAt?: Date | null };
+    };
   } | null;
 };
 
 export function assertHierarchyEnabled(user: UserForHierarchyCheck) {
-  if (!user.isActive) {
+  if (!user.isActive || user.deletedAt) {
     throw new AppError(403, "Account is disabled", "USER_DISABLED");
   }
   if (user.status === EntityStatus.BLOCKED) {
@@ -45,26 +55,33 @@ export function assertHierarchyEnabled(user: UserForHierarchyCheck) {
   }
 
   if (user.stateId && user.state) {
-    if (!user.state.isEnabled) {
+    if (!user.state.isEnabled || user.state.deletedAt) {
       throw new AppError(403, "State is disabled", "STATE_DISABLED");
     }
   }
   if (user.districtId && user.district) {
-    if (!user.district.isEnabled) {
+    if (!user.district.isEnabled || user.district.deletedAt) {
       throw new AppError(403, "District is disabled", "DISTRICT_DISABLED");
     }
-    if (!user.district.state.isEnabled) {
+    if (!user.district.state.isEnabled || user.district.state.deletedAt) {
       throw new AppError(403, "State is disabled", "STATE_DISABLED");
     }
   }
   if (user.trainingCenterId && user.trainingCenter) {
-    if (!user.trainingCenter.isEnabled || user.trainingCenter.status !== EntityStatus.ACCEPTED) {
+    if (
+      !user.trainingCenter.isEnabled ||
+      user.trainingCenter.deletedAt ||
+      user.trainingCenter.status !== EntityStatus.ACCEPTED
+    ) {
       throw new AppError(403, "Training center is disabled", "TC_DISABLED");
     }
-    if (!user.trainingCenter.district.isEnabled) {
+    if (!user.trainingCenter.district.isEnabled || user.trainingCenter.district.deletedAt) {
       throw new AppError(403, "District is disabled", "DISTRICT_DISABLED");
     }
-    if (!user.trainingCenter.district.state.isEnabled) {
+    if (
+      !user.trainingCenter.district.state.isEnabled ||
+      user.trainingCenter.district.state.deletedAt
+    ) {
       throw new AppError(403, "State is disabled", "STATE_DISABLED");
     }
   }

@@ -33,6 +33,6 @@ trainingCentersRouter.patch(
 trainingCentersRouter.delete(
   "/:id",
   requireAuth,
-  requireRoles("DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),
+  requireRoles("NATIONAL_ADMIN"),
   trainingCentersController.remove
 );

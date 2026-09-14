@@ -184,12 +184,13 @@ model RolePaymentFeeConfig {
 }
 
 model State {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   name      String
-  code      String   @unique
-  isEnabled Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  code      String    @unique
+  isEnabled Boolean   @default(false)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   districts          District[]
   users              User[]
@@ -215,13 +216,14 @@ model State {
 }
 
 model District {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   stateId   String
-  state     State    @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  state     State     @relation(fields: [stateId], references: [id], onDelete: Cascade)
   name      String
-  isEnabled Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isEnabled Boolean   @default(false)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   trainingCenters TrainingCenter[]
   users           User[]
@@ -255,6 +257,7 @@ model TrainingCenter {
   status     EntityStatus @default(ACCEPTED)
   statusReason String?
   termsAcceptedAt DateTime?
+  deletedAt  DateTime?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -282,6 +285,7 @@ model User {
   district         District?       @relation(fields: [districtId], references: [id])
   trainingCenterId String?
   trainingCenter   TrainingCenter? @relation(fields: [trainingCenterId], references: [id])
+  deletedAt        DateTime?
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 

@@ -6,14 +6,14 @@ const publicStateSelect = { id: true, name: true, code: true } as const;
 
 export function findManyPublic() {
   return prisma.state.findMany({
-    where: { isEnabled: true, registration: { is: null } },
+    where: { isEnabled: true, deletedAt: null, registration: { is: null } },
     orderBy: { name: "asc" },
     select: publicStateSelect,
   });
 }
 
 export function findManyPublicPaginated(params: { skip: number; take: number }) {
-  const where = { isEnabled: true, registration: { is: null } };
+  const where = { isEnabled: true, deletedAt: null, registration: { is: null } };
   return prisma.$transaction([
     prisma.state.findMany({
       where,
@@ -31,6 +31,7 @@ export function findManyPublicWithAcceptedRegistration() {
   return prisma.state.findMany({
     where: {
       isEnabled: true,
+      deletedAt: null,
       registration: { is: { status: EntityStatus.ACCEPTED } },
       paymentConfig: { isNot: null },
     },
@@ -45,6 +46,7 @@ export function findManyPublicWithAcceptedRegistrationPaginated(params: {
 }) {
   const where = {
     isEnabled: true,
+    deletedAt: null,
     registration: { is: { status: EntityStatus.ACCEPTED } },
     paymentConfig: { isNot: null },
   };
@@ -61,7 +63,7 @@ export function findManyPublicWithAcceptedRegistrationPaginated(params: {
 }
 
 export function findManyAll() {
-  return prisma.state.findMany({ orderBy: { name: "asc" } });
+  return prisma.state.findMany({ where: { deletedAt: null }, orderBy: { name: "asc" } });
 }
 
 /** Admin list: newest state-body registration activity first (`StateRegistration.updatedAt`), then alphabetically by name. */
@@ -70,11 +72,12 @@ export async function findManyAllPaginated(params: { skip: number; take: number 
     prisma.$queryRaw<{ id: string }[]>`
       SELECT s.id FROM "State" s
       LEFT JOIN "StateRegistration" sr ON sr."stateId" = s.id
+      WHERE s."deletedAt" IS NULL
       ORDER BY sr."updatedAt" DESC NULLS LAST, s.name ASC
       LIMIT ${params.take}
       OFFSET ${params.skip}
     `,
-    prisma.state.count(),
+    prisma.state.count({ where: { deletedAt: null } }),
   ]);
   const ids = idRows.map((r) => r.id);
   if (ids.length === 0) return [[], total] as const;

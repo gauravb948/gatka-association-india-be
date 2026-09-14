@@ -5,7 +5,7 @@ import { prisma } from "../lib/prisma.js";
 /** Public picker: enabled rows with registration `ACCEPTED` only (no pending/rejected TCs). */
 export function findManyPublicByDistrict(districtId: string) {
   return prisma.trainingCenter.findMany({
-    where: { districtId, isEnabled: true, status: EntityStatus.ACCEPTED },
+    where: { districtId, isEnabled: true, deletedAt: null, status: EntityStatus.ACCEPTED },
     orderBy: { name: "asc" },
     select: { id: true, name: true, districtId: true },
   });
@@ -15,6 +15,7 @@ export function findManyPublicByState(stateId: string) {
   return prisma.trainingCenter.findMany({
     where: {
       isEnabled: true,
+      deletedAt: null,
       status: EntityStatus.ACCEPTED,
       district: { stateId },
     },
@@ -26,7 +27,7 @@ export function findManyPublicByState(stateId: string) {
       headName: true,
       district: { select: { id: true, name: true } },
       users: {
-        where: { role: "TRAINING_CENTER" },
+        where: { role: "TRAINING_CENTER", deletedAt: null },
         take: 1,
         select: { phone: true },
         orderBy: { createdAt: "asc" },
@@ -37,7 +38,7 @@ export function findManyPublicByState(stateId: string) {
 
 export function findManyByDistrict(districtId: string) {
   return prisma.trainingCenter.findMany({
-    where: { districtId },
+    where: { districtId, deletedAt: null },
     orderBy: { name: "asc" },
   });
 }

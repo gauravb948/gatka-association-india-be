@@ -5,6 +5,7 @@ import * as stateRepository from "../repositories/state.repository.js";
 import * as statePaymentRepository from "../repositories/statePayment.repository.js";
 import { prisma } from "../lib/prisma.js";
 import { AppError } from "../lib/errors.js";
+import { softDeleteDistrictByNationalAdmin } from "../lib/adminSoftDelete.js";
 import {
   bulkDistrictsCreateSchema,
   createDistrictSchema,
@@ -289,17 +290,7 @@ export async function patchOne(req: Request, res: Response, next: NextFunction) 
 
 export async function remove(req: Request, res: Response, next: NextFunction) {
   try {
-    const u = req.dbUser!;
-    const existing = await districtRepository.findById(req.params.id);
-    if (!existing) throw new AppError(404, "District not found");
-    if (u.role === "STATE_ADMIN" && u.stateId !== existing.stateId) {
-      throw new AppError(403, "Cannot modify other state");
-    }
-    const used = await districtRepository.countUsagesBlockingDelete(existing.id);
-    if (used > 0) {
-      throw new AppError(400, "District in use by users, players, coaches, or volunteer registrations");
-    }
-    await districtRepository.deleteDistrict(existing.id);
+    await softDeleteDistrictByNationalAdmin(req.params.id);
     res.status(204).send();
   } catch (e) {
     next(e);
