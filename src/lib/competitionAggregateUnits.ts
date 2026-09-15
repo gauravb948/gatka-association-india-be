@@ -1,5 +1,5 @@
 import type { CompetitionLevel } from "@prisma/client";
-import { prisma } from "./prisma.js";
+import { prisma, includeSoftDeleted } from "./prisma.js";
 import { AppError } from "./errors.js";
 import type { CompetitionGeography } from "./eligibility.js";
 import { playerMatchesCompetitionGeography } from "./eligibility.js";
@@ -93,7 +93,7 @@ export async function assertAggregateUnitsInCompetitionScope(
     allowedStateIds = new Set(comp.states.map((x) => x.stateId));
   } else if (comp.districts.length > 0) {
     const drows = await prisma.district.findMany({
-      where: { id: { in: comp.districts.map((d) => d.districtId) } },
+      where: { id: { in: comp.districts.map((d) => d.districtId) }, ...includeSoftDeleted },
       select: { stateId: true },
     });
     allowedStateIds = new Set(drows.map((d) => d.stateId));

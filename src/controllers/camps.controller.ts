@@ -11,7 +11,7 @@ import {
 } from "../validators/camp.validators.js";
 import { assertUserInCampGeography } from "../lib/eligibility.js";
 import type { DbUser } from "../types/user.js";
-import { prisma } from "../lib/prisma.js";
+import { prisma, includeSoftDeleted } from "../lib/prisma.js";
 
 function inferCampLevel(user: DbUser): CampLevel {
   if (user.role === "NATIONAL_ADMIN") return "NATIONAL";
@@ -143,7 +143,7 @@ async function assertCanManageCamp(
     }
     if (camp.districts.length > 0) {
       const rows = await prisma.district.findMany({
-        where: { id: { in: camp.districts.map((d) => d.districtId) } },
+        where: { id: { in: camp.districts.map((d) => d.districtId) }, ...includeSoftDeleted },
         select: { stateId: true },
       });
       if (rows.some((r) => r.stateId !== user.stateId)) {

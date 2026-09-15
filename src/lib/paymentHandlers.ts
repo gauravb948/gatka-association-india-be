@@ -8,7 +8,7 @@ import * as districtRegistrationRepo from "../repositories/districtRegistration.
 import * as trainingCenterRepository from "../repositories/trainingCenter.repository.js";
 import { EntityStatus, MembershipStatus, PaymentPurpose, type Role } from "@prisma/client";
 import { getMembershipBounds } from "./membership.js";
-import { prisma } from "./prisma.js";
+import { prisma, includeSoftDeleted } from "./prisma.js";
 import { upsertCompetitionFeeSubmissionFromPayment } from "./competitionFee.js";
 
 async function createMembership(
@@ -97,7 +97,7 @@ async function allocateTrainingCenterRegistrationNumber(stateCode: string): Prom
   const year = new Date().getUTCFullYear();
   const prefix = `${stateCode.toUpperCase()}-TC-${year}-`;
   const last = await prisma.trainingCenter.findFirst({
-    where: { registrationNumber: { startsWith: prefix } },
+    where: { registrationNumber: { startsWith: prefix }, ...includeSoftDeleted },
     orderBy: { registrationNumber: "desc" },
     select: { registrationNumber: true },
   });

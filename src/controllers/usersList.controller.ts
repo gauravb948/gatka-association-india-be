@@ -20,6 +20,9 @@ function buildListWhere(
   search?: string
 ): Prisma.UserWhereInput {
   const parts: Prisma.UserWhereInput[] = [{ role: targetRole }, { deletedAt: null }];
+  if (targetRole === "TRAINING_CENTER") {
+    parts.push({ trainingCenter: { is: { deletedAt: null } } });
+  }
   if (Object.keys(geo).length > 0) {
     parts.push(geo);
   }

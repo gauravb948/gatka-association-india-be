@@ -1,5 +1,5 @@
 import type { Prisma } from "@prisma/client";
-import { prisma } from "../lib/prisma.js";
+import { prisma, includeSoftDeleted } from "../lib/prisma.js";
 import {
   buildResultsListCompetitionFilter,
   findEventGroupsInCompetitionAgeScope,
@@ -61,7 +61,7 @@ const unitEnricher = {
   async TRAINING_CENTER(ids: string[]) {
     if (ids.length === 0) return new Map();
     const rows = await prisma.trainingCenter.findMany({
-      where: { id: { in: ids } },
+      where: { id: { in: ids }, ...includeSoftDeleted },
       include: {
         district: {
           select: {
@@ -77,14 +77,14 @@ const unitEnricher = {
   async DISTRICT(ids: string[]) {
     if (ids.length === 0) return new Map();
     const rows = await prisma.district.findMany({
-      where: { id: { in: ids } },
+      where: { id: { in: ids }, ...includeSoftDeleted },
       include: { state: { select: { id: true, name: true, code: true } } },
     });
     return new Map(rows.map((r) => [r.id, r]));
   },
   async STATE(ids: string[]) {
     if (ids.length === 0) return new Map();
-    const rows = await prisma.state.findMany({ where: { id: { in: ids } } });
+    const rows = await prisma.state.findMany({ where: { id: { in: ids }, ...includeSoftDeleted } });
     return new Map(rows.map((r) => [r.id, r]));
   },
 } satisfies Record<string, (ids: string[]) => Promise<Map<string, unknown>>>;

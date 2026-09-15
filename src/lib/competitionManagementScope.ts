@@ -1,5 +1,5 @@
 import type { CompetitionLevel, Role } from "@prisma/client";
-import { prisma } from "./prisma.js";
+import { prisma, includeSoftDeleted } from "./prisma.js";
 import { AppError } from "./errors.js";
 import type { DbUser } from "../types/user.js";
 
@@ -41,7 +41,7 @@ async function assertCompetitionWithinActorGeography(user: DbUser, comp: Competi
     }
     if (comp.districts.length > 0) {
       const rows = await prisma.district.findMany({
-        where: { id: { in: comp.districts.map((d) => d.districtId) } },
+        where: { id: { in: comp.districts.map((d) => d.districtId) }, ...includeSoftDeleted },
         select: { stateId: true },
       });
       if (rows.some((r) => r.stateId !== user.stateId)) {
@@ -166,6 +166,7 @@ async function assertCompetitionOverlapsActorGeography(user: DbUser, comp: Compe
         where: {
           id: { in: comp.districts.map((d) => d.districtId) },
           stateId: user.stateId,
+          ...includeSoftDeleted,
         },
       });
       if (inState > 0) return;

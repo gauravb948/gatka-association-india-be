@@ -1,7 +1,7 @@
 import { EntityStatus, Role } from "@prisma/client";
 import * as playerRepository from "../repositories/player.repository.js";
 import * as trainingCenterRepository from "../repositories/trainingCenter.repository.js";
-import { prisma } from "./prisma.js";
+import { prisma, includeSoftDeleted } from "./prisma.js";
 
 const ZERO_FEE_REASON = "Registration fee is ₹0; submitted for approval";
 
@@ -41,7 +41,7 @@ async function allocatePrefixedNumber(
             select: { registrationNumber: true },
           })
         : await prisma.trainingCenter.findFirst({
-            where: { registrationNumber: { startsWith: prefix } },
+            where: { registrationNumber: { startsWith: prefix }, ...includeSoftDeleted },
             orderBy: { registrationNumber: "desc" },
             select: { registrationNumber: true },
           });
