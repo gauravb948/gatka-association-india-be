@@ -313,6 +313,7 @@ model User {
   districtRegistrationApplicant DistrictRegistration? @relation("DistrictRegistrationApplicant")
   competitionsCreated            Competition[]           @relation("CompetitionCreatedBy")
   campsCreated                   Camp[]                  @relation("CampCreatedBy")
+  certificateTemplatesUpdated    CertificateTemplate[]   @relation("CertificateTemplateUpdatedBy")
 
   @@index([role])
   @@index([stateId])
@@ -880,6 +881,22 @@ model CompetitionResult {
   updatedAt     DateTime    @updatedAt
 
   @@unique([competitionId, eventId, playerUserId])
+}
+
+enum CertificateKind {
+  WINNER
+  PARTICIPANT
+}
+
+/// One reusable A4 layout (background + positioned text blocks) per certificate kind.
+model CertificateTemplate {
+  id          String          @id @default(cuid())
+  kind        CertificateKind @unique
+  layout      Json
+  updatedById String?
+  updatedBy   User?           @relation("CertificateTemplateUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 }
 
 model Notice {

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { requireAuth, requireRoles } from "../middleware/auth.js";
+import * as certificatesController from "../controllers/certificates.controller.js";
 import * as competitionAggregateController from "../controllers/competitionAggregate.controller.js";
 import * as competitionsController from "../controllers/competitions.controller.js";
 
@@ -127,4 +128,16 @@ competitionsRouter.get(
   requireAuth,
   requireRoles("TRAINING_CENTER", "DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),
   competitionsController.listParticipants
+);
+competitionsRouter.get(
+  "/:id/events/:eventId/certificate-recipients",
+  requireAuth,
+  requireRoles("NATIONAL_ADMIN"),
+  certificatesController.listRecipients
+);
+competitionsRouter.post(
+  "/:id/events/:eventId/certificates",
+  requireAuth,
+  requireRoles("NATIONAL_ADMIN"),
+  certificatesController.generateCertificates
 );

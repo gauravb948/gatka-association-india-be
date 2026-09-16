@@ -53,6 +53,12 @@ function messageForKnownRoute(req: Request): string | null {
   if (method === "GET" && /\/reports\/competition-accreditation-players\/?$/.test(path)) {
     return "Accreditation players retrieved successfully";
   }
+  if (method === "GET" && /\/certificate-recipients\/?$/.test(path)) {
+    return "Certificate recipients retrieved successfully";
+  }
+  if (method === "PUT" && /\/certificate-templates\/?$/.test(path)) {
+    return "Certificate layout saved successfully";
+  }
 
   if (method !== "POST") return null;
 

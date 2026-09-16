@@ -40,6 +40,7 @@ import { domainsRouter } from "./domains.js";
 import { pagesContentRouter } from "./pagesContent.js";
 import { weaponsRouter } from "./weapons.js";
 import { associationMembersRouter } from "./associationMembers.js";
+import { certificateTemplatesRouter } from "./certificateTemplates.js";
 export const apiRouter = Router();
 
 apiRouter.use(healthRouter);
@@ -83,3 +84,4 @@ apiRouter.use("/domains", domainsRouter);
 apiRouter.use("/pages-content", pagesContentRouter);
 apiRouter.use("/weapons", weaponsRouter);
 apiRouter.use("/association-members", associationMembersRouter);
+apiRouter.use("/certificate-templates", certificateTemplatesRouter);

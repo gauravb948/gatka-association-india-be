@@ -590,6 +590,45 @@ const participationListInclude = {
   },
 } satisfies Prisma.ParticipationRecordInclude;
 
+/** All participated rows for one competition event (certificate recipients). */
+export async function findManyForEventCertificates(
+  competitionId: string,
+  eventId: string,
+  playerProfileWhere?: Prisma.PlayerProfileWhereInput
+) {
+  const where: Prisma.ParticipationRecordWhereInput = {
+    competitionId,
+    eventId,
+    participated: true,
+    ...(playerProfileWhere && Object.keys(playerProfileWhere).length > 0
+      ? { playerUser: { playerProfile: playerProfileWhere } }
+      : {}),
+  };
+  return prisma.participationRecord.findMany({
+    where,
+    orderBy: { createdAt: "asc" },
+    select: {
+      playerUserId: true,
+      playerUser: {
+        select: {
+          email: true,
+          playerProfile: {
+            select: {
+              fullName: true,
+              stateId: true,
+              districtId: true,
+              trainingCenterId: true,
+              state: { select: { name: true } },
+              district: { select: { name: true } },
+              trainingCenter: { select: { name: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
 /** Paginated `participated` rows for a competition; optional `eventId` scopes to one catalog event. */
 export async function findManyByCompetitionPaginated(
   competitionId: string,
