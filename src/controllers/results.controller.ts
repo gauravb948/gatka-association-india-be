@@ -6,6 +6,7 @@ import * as competitionResultRepository from "../repositories/competitionResult.
 import * as competitionAggregateStandingRepository from "../repositories/competitionAggregateStanding.repository.js";
 import { assertAttendanceForCertificate } from "../lib/eligibility.js";
 import { buildResultListItems } from "../lib/competitionResultList.js";
+import * as generatedCertificateRepository from "../repositories/generatedCertificate.repository.js";
 import {
   competitionResultBodySchema,
   resultListQuerySchema,
@@ -26,9 +27,21 @@ export async function list(req: Request, res: Response, next: NextFunction) {
     const grouped = await buildResultListItems(ctx);
     const total = grouped.length;
     const skip = (q.page - 1) * q.pageSize;
-    const pageItems = grouped.slice(skip, skip + q.pageSize).map((item, index) => ({
+    const slice = grouped.slice(skip, skip + q.pageSize);
+    const counts = await generatedCertificateRepository.countByEventKind(
+      slice.map((item) => ({ competitionId: item.competitionId, eventId: item.eventId }))
+    );
+    const countKey = (competitionId: string, eventId: string, kind: string) =>
+      `${competitionId}:${eventId}:${kind}`;
+    const countMap = new Map(
+      counts.map((row) => [countKey(row.competitionId, row.eventId, row.kind), row._count._all])
+    );
+    const pageItems = slice.map((item, index) => ({
       srNo: skip + index + 1,
       ...item,
+      winnerCertificateCount: countMap.get(countKey(item.competitionId, item.eventId, "WINNER")) ?? 0,
+      participantCertificateCount:
+        countMap.get(countKey(item.competitionId, item.eventId, "PARTICIPANT")) ?? 0,
     }));
     const totalPages = total === 0 ? 0 : Math.ceil(total / q.pageSize);
     res.json({

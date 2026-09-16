@@ -17,11 +17,21 @@ export type CertificateTextBlock = {
   color: string;
 };
 
+export type CertificateLogoBlock = {
+  id: string;
+  aboutUsId: string;
+  xMm: number;
+  yMm: number;
+  widthMm: number;
+  heightMm: number;
+};
+
 export type CertificateLayout = {
   widthMm: number;
   heightMm: number;
   backgroundUrl: string | null;
   blocks: CertificateTextBlock[];
+  logos: CertificateLogoBlock[];
 };
 
 export type CertificateMergeFields = {
@@ -64,6 +74,7 @@ export function defaultCertificateLayout(kind: CertificateKindQuery): Certificat
     widthMm: A4_LANDSCAPE_MM.widthMm,
     heightMm: A4_LANDSCAPE_MM.heightMm,
     backgroundUrl: null,
+    logos: [],
     blocks: [
       block({
         id: "org",

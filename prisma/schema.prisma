@@ -314,6 +314,8 @@ model User {
   competitionsCreated            Competition[]           @relation("CompetitionCreatedBy")
   campsCreated                   Camp[]                  @relation("CampCreatedBy")
   certificateTemplatesUpdated    CertificateTemplate[]   @relation("CertificateTemplateUpdatedBy")
+  generatedCertificates          GeneratedCertificate[]  @relation("GeneratedCertificatePlayer")
+  generatedCertificatesCreated   GeneratedCertificate[]  @relation("GeneratedCertificateCreatedBy")
 
   @@index([role])
   @@index([stateId])
@@ -553,6 +555,7 @@ model Event {
   tournamentRegs      TournamentRegistration[]
   results             CompetitionResult[]
   aggregateStandings  CompetitionAggregateStanding[]
+  generatedCertificates GeneratedCertificate[]
 
   @@index([eventGroupId])
 }
@@ -650,6 +653,7 @@ model Competition {
   results          CompetitionResult[]
   aggregateStandings CompetitionAggregateStanding[]
   feeSubmissions   CompetitionFeeSubmission[]
+  generatedCertificates GeneratedCertificate[]
 
   @@index([level])
   @@index([createdById])
@@ -897,6 +901,27 @@ model CertificateTemplate {
   updatedBy   User?           @relation("CertificateTemplateUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
+}
+
+/// Generated certificate PDF stored in R2, one per player / event / kind.
+model GeneratedCertificate {
+  id             String          @id @default(cuid())
+  competitionId  String
+  competition    Competition     @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  eventId        String
+  event          Event           @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  playerUserId   String
+  playerUser     User            @relation("GeneratedCertificatePlayer", fields: [playerUserId], references: [id], onDelete: Cascade)
+  kind           CertificateKind
+  fileUrl        String
+  generatedById  String?
+  generatedBy    User?           @relation("GeneratedCertificateCreatedBy", fields: [generatedById], references: [id], onDelete: SetNull)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@unique([competitionId, eventId, playerUserId, kind])
+  @@index([competitionId, eventId, kind])
+  @@index([playerUserId])
 }
 
 model Notice {

@@ -2,12 +2,20 @@ import type { NextFunction, Request, Response } from "express";
 import * as competitionRepository from "../repositories/competition.repository.js";
 import { assertCanViewCompetitionScopedReport } from "../lib/competitionManagementScope.js";
 import { actorPlayerProfileScopeWhere } from "../lib/competitionParticipation.js";
+import type { CertificateLayout } from "../lib/certificateLayout.js";
 import {
   buildCertificateRecipients,
+  dbKindFromQuery,
   loadSavedLayout,
   saveLayout,
 } from "../lib/certificateRecipients.js";
-import { sanitizeFileBase, streamCertificatePdf, streamCertificateZip } from "../lib/certificatePdf.js";
+import {
+  persistGeneratedPdf,
+  renderRecipientPdfs,
+  sanitizeFileBase,
+  streamCertificatePdf,
+  streamCertificateZip,
+} from "../lib/certificatePdf.js";
 import { prisma } from "../lib/prisma.js";
 import { AppError } from "../lib/errors.js";
 import {
@@ -17,7 +25,18 @@ import {
   certificateTemplateQuerySchema,
 } from "../validators/certificate.validators.js";
 
-const CERT_ROLES = new Set(["NATIONAL_ADMIN"]);
+const VIEW_ROLES = new Set(["DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"]);
+const MUTATE_ROLES = new Set(["NATIONAL_ADMIN"]);
+
+function toStoredLayout(layout: CertificateLayout): CertificateLayout {
+  return {
+    widthMm: 297,
+    heightMm: 210,
+    backgroundUrl: layout.backgroundUrl ?? null,
+    blocks: layout.blocks,
+    logos: layout.logos ?? [],
+  };
+}
 
 async function assertEventInCompetitionScope(competitionId: string, eventId: string) {
   const groups = await competitionRepository.findEventGroupsInCompetitionAgeScope(competitionId);
@@ -36,9 +55,10 @@ async function assertEventInCompetitionScope(competitionId: string, eventId: str
   return event;
 }
 
-async function loadCompetitionForCertificates(req: Request) {
+async function loadCompetitionForCertificates(req: Request, mutate: boolean) {
   const actor = req.dbUser!;
-  if (!CERT_ROLES.has(actor.role)) {
+  const allowed = mutate ? MUTATE_ROLES : VIEW_ROLES;
+  if (!allowed.has(actor.role)) {
     throw new AppError(403, "Forbidden", "FORBIDDEN_ROLE");
   }
   const comp = await competitionRepository.findByIdForPlayerEligibility(req.params.id);
@@ -51,7 +71,7 @@ async function loadCompetitionForCertificates(req: Request) {
 /** `GET /competitions/:id/events/:eventId/certificate-recipients?kind=` */
 export async function listRecipients(req: Request, res: Response, next: NextFunction) {
   try {
-    const { actor, comp } = await loadCompetitionForCertificates(req);
+    const { actor, comp } = await loadCompetitionForCertificates(req, false);
     const q = certificateRecipientsQuerySchema.parse(req.query);
     const payload = await buildCertificateRecipients({
       competition: {
@@ -73,10 +93,10 @@ export async function listRecipients(req: Request, res: Response, next: NextFunc
   }
 }
 
-/** `POST /competitions/:id/events/:eventId/certificates` — one PDF or zip of all. */
+/** `POST /competitions/:id/events/:eventId/certificates` — save to R2/DB, then PDF/zip unless persistOnly. */
 export async function generateCertificates(req: Request, res: Response, next: NextFunction) {
   try {
-    const { actor, comp } = await loadCompetitionForCertificates(req);
+    const { actor, comp } = await loadCompetitionForCertificates(req, true);
     const body = certificateGenerateBodySchema.parse(req.body);
     const payload = await buildCertificateRecipients({
       competition: {
@@ -93,13 +113,7 @@ export async function generateCertificates(req: Request, res: Response, next: Ne
       playerProfileWhere: actorPlayerProfileScopeWhere(actor),
     });
 
-    const layout = {
-      widthMm: 297,
-      heightMm: 210,
-      backgroundUrl: body.layout.backgroundUrl ?? null,
-      blocks: body.layout.blocks,
-    };
-
+    const layout = toStoredLayout(body.layout);
     await saveLayout(body.kind, layout, actor.id);
 
     let recipients = payload.recipients;
@@ -113,18 +127,38 @@ export async function generateCertificates(req: Request, res: Response, next: Ne
       throw new AppError(400, "No recipients for this certificate kind", "NO_RECIPIENTS");
     }
 
+    const files = await renderRecipientPdfs({ layout, recipients });
+    const dbKind = dbKindFromQuery(body.kind);
+    const saved: { playerUserId: string; fileUrl: string }[] = [];
+    for (const file of files) {
+      const fileUrl = await persistGeneratedPdf({
+        competitionId: comp.id,
+        eventId: req.params.eventId,
+        playerUserId: file.recipient.playerUserId,
+        kind: dbKind,
+        buf: file.buf,
+        generatedById: actor.id,
+      });
+      saved.push({ playerUserId: file.recipient.playerUserId, fileUrl });
+    }
+
+    if (body.persistOnly) {
+      res.json({ saved, count: saved.length });
+      return;
+    }
+
     const eventSlug = sanitizeFileBase(payload.event.name || req.params.eventId);
     const kindSlug = body.kind === "winners" ? "winner" : "participant";
 
-    if (recipients.length === 1) {
-      const person = recipients[0]!;
-      const filename = `${kindSlug}-certificate-${sanitizeFileBase(person.fullName)}.pdf`;
-      await streamCertificatePdf(res, filename, layout, person);
+    if (files.length === 1) {
+      const person = files[0]!;
+      const filename = `${kindSlug}-certificate-${sanitizeFileBase(person.recipient.fullName)}.pdf`;
+      await streamCertificatePdf(res, filename, person.buf);
       return;
     }
 
     const filename = `${kindSlug}-certificates-${eventSlug}.zip`;
-    await streamCertificateZip(res, filename, layout, recipients);
+    await streamCertificateZip(res, filename, files);
   } catch (e) {
     if (res.headersSent) return;
     next(e);
@@ -135,7 +169,7 @@ export async function generateCertificates(req: Request, res: Response, next: Ne
 export async function getTemplate(req: Request, res: Response, next: NextFunction) {
   try {
     const actor = req.dbUser!;
-    if (!CERT_ROLES.has(actor.role)) {
+    if (!MUTATE_ROLES.has(actor.role)) {
       throw new AppError(403, "Forbidden", "FORBIDDEN_ROLE");
     }
     const q = certificateTemplateQuerySchema.parse(req.query);
@@ -150,16 +184,11 @@ export async function getTemplate(req: Request, res: Response, next: NextFunctio
 export async function putTemplate(req: Request, res: Response, next: NextFunction) {
   try {
     const actor = req.dbUser!;
-    if (!CERT_ROLES.has(actor.role)) {
+    if (!MUTATE_ROLES.has(actor.role)) {
       throw new AppError(403, "Forbidden", "FORBIDDEN_ROLE");
     }
     const body = certificateTemplateBodySchema.parse(req.body);
-    const layout = {
-      widthMm: 297,
-      heightMm: 210,
-      backgroundUrl: body.layout.backgroundUrl ?? null,
-      blocks: body.layout.blocks,
-    };
+    const layout = toStoredLayout(body.layout);
     await saveLayout(body.kind, layout, actor.id);
     res.json({ kind: body.kind, layout });
   } catch (e) {

@@ -59,6 +59,9 @@ function messageForKnownRoute(req: Request): string | null {
   if (method === "PUT" && /\/certificate-templates\/?$/.test(path)) {
     return "Certificate layout saved successfully";
   }
+  if (method === "POST" && /\/certificates\/?$/.test(path)) {
+    return "Certificates saved successfully";
+  }
 
   if (method !== "POST") return null;
 

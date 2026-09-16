@@ -132,7 +132,7 @@ competitionsRouter.get(
 competitionsRouter.get(
   "/:id/events/:eventId/certificate-recipients",
   requireAuth,
-  requireRoles("NATIONAL_ADMIN"),
+  requireRoles("DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),
   certificatesController.listRecipients
 );
 competitionsRouter.post(
