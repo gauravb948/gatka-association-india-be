@@ -62,6 +62,9 @@ function messageForKnownRoute(req: Request): string | null {
   if (method === "POST" && /\/certificates\/?$/.test(path)) {
     return "Certificates saved successfully";
   }
+  if (method === "DELETE" && /\/certificates\/?$/.test(path)) {
+    return "Certificate deleted successfully";
+  }
 
   if (method !== "POST") return null;
 

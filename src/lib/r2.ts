@@ -1,4 +1,4 @@
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 
 function requiredEnv(name: string): string {
   const v = process.env[name];
@@ -57,5 +57,32 @@ export async function uploadBufferToR2(params: {
     key: params.key,
     publicUrl: `${getR2PublicBaseUrl()}/${params.key}`,
   };
+}
+
+export function r2KeyFromPublicUrl(url: string): string | null {
+  try {
+    const base = getR2PublicBaseUrl();
+    const normalized = url.trim();
+    if (!normalized || !normalized.toLowerCase().startsWith(base.toLowerCase() + "/")) return null;
+    return decodeURIComponent(normalized.slice(base.length + 1));
+  } catch {
+    return null;
+  }
+}
+
+/** Best-effort delete; missing objects and non-R2 URLs are ignored. */
+export async function deleteR2PublicUrl(url: string): Promise<void> {
+  const key = r2KeyFromPublicUrl(url);
+  if (!key) return;
+  try {
+    await getR2Client().send(
+      new DeleteObjectCommand({
+        Bucket: getR2Bucket(),
+        Key: key,
+      })
+    );
+  } catch {
+    // Leave the DB delete as the source of truth if R2 is already gone.
+  }
 }
 

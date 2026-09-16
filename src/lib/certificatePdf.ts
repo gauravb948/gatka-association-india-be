@@ -10,22 +10,11 @@ import {
 } from "./certificateLayout.js";
 import { mergeFieldsForRecipient, type CertificateRecipient } from "./certificateRecipients.js";
 import { prisma } from "./prisma.js";
-import { getR2Bucket, getR2Client, getR2PublicBaseUrl, uploadBufferToR2 } from "./r2.js";
+import { getR2Bucket, getR2Client, r2KeyFromPublicUrl, uploadBufferToR2 } from "./r2.js";
 import type { CertificateKind } from "@prisma/client";
 import * as generatedCertificateRepository from "../repositories/generatedCertificate.repository.js";
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
-
-function r2KeyFromPublicUrl(url: string): string | null {
-  try {
-    const base = getR2PublicBaseUrl();
-    const normalized = url.trim();
-    if (!normalized.toLowerCase().startsWith(base.toLowerCase() + "/")) return null;
-    return decodeURIComponent(normalized.slice(base.length + 1));
-  } catch {
-    return null;
-  }
-}
 
 async function loadImageBuffer(url: string): Promise<Buffer | null> {
   const key = r2KeyFromPublicUrl(url);

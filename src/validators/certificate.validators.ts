@@ -61,3 +61,8 @@ export const certificateTemplateBodySchema = z.object({
 export const certificateTemplateQuerySchema = z.object({
   kind: certificateKindQuerySchema,
 });
+
+export const certificateDeleteQuerySchema = z.object({
+  kind: certificateKindQuerySchema,
+  playerUserId: z.string().trim().min(1).optional(),
+});

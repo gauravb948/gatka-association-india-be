@@ -41,3 +41,19 @@ export function countByEventKind(pairs: { competitionId: string; eventId: string
     _count: { _all: true },
   });
 }
+
+export function deleteGenerated(params: {
+  competitionId: string;
+  eventId: string;
+  kind: CertificateKind;
+  playerUserId?: string;
+}) {
+  return prisma.generatedCertificate.deleteMany({
+    where: {
+      competitionId: params.competitionId,
+      eventId: params.eventId,
+      kind: params.kind,
+      ...(params.playerUserId ? { playerUserId: params.playerUserId } : {}),
+    },
+  });
+}

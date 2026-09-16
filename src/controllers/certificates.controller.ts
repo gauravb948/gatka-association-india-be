@@ -16,9 +16,12 @@ import {
   streamCertificatePdf,
   streamCertificateZip,
 } from "../lib/certificatePdf.js";
+import { deleteR2PublicUrl } from "../lib/r2.js";
 import { prisma } from "../lib/prisma.js";
 import { AppError } from "../lib/errors.js";
+import * as generatedCertificateRepository from "../repositories/generatedCertificate.repository.js";
 import {
+  certificateDeleteQuerySchema,
   certificateGenerateBodySchema,
   certificateRecipientsQuerySchema,
   certificateTemplateBodySchema,
@@ -161,6 +164,34 @@ export async function generateCertificates(req: Request, res: Response, next: Ne
     await streamCertificateZip(res, filename, files);
   } catch (e) {
     if (res.headersSent) return;
+    next(e);
+  }
+}
+
+/** `DELETE /competitions/:id/events/:eventId/certificates?kind=&playerUserId=` */
+export async function deleteCertificates(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { comp } = await loadCompetitionForCertificates(req, true);
+    const q = certificateDeleteQuerySchema.parse(req.query);
+    const dbKind = dbKindFromQuery(q.kind);
+    const rows = await generatedCertificateRepository.findManyForEvent(comp.id, req.params.eventId, dbKind);
+    const toDelete = q.playerUserId ? rows.filter((r) => r.playerUserId === q.playerUserId) : rows;
+    if (toDelete.length === 0) {
+      throw new AppError(
+        404,
+        q.playerUserId ? "Saved certificate not found" : "No saved certificates to delete",
+        "CERTIFICATE_NOT_FOUND"
+      );
+    }
+    await generatedCertificateRepository.deleteGenerated({
+      competitionId: comp.id,
+      eventId: req.params.eventId,
+      kind: dbKind,
+      playerUserId: q.playerUserId,
+    });
+    await Promise.all(toDelete.map((row) => deleteR2PublicUrl(row.fileUrl)));
+    res.json({ deleted: toDelete.length });
+  } catch (e) {
     next(e);
   }
 }

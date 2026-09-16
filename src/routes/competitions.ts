@@ -141,3 +141,9 @@ competitionsRouter.post(
   requireRoles("NATIONAL_ADMIN"),
   certificatesController.generateCertificates
 );
+competitionsRouter.delete(
+  "/:id/events/:eventId/certificates",
+  requireAuth,
+  requireRoles("NATIONAL_ADMIN"),
+  certificatesController.deleteCertificates
+);
