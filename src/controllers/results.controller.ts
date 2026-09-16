@@ -22,30 +22,71 @@ export async function list(req: Request, res: Response, next: NextFunction) {
         stateId: actor.stateId,
         districtId: actor.districtId,
       },
-      { competitionId: q.competitionId, search: q.search }
+      {
+        search: q.search,
+        level: q.level,
+        session: q.session,
+      }
     );
-    const grouped = await buildResultListItems(ctx);
-    const total = grouped.length;
-    const skip = (q.page - 1) * q.pageSize;
-    const slice = grouped.slice(skip, skip + q.pageSize);
+    let grouped = await buildResultListItems(ctx);
+    const competitions = [...ctx.competitions]
+      .map((c) => ({ id: c.id, name: c.name, level: c.level }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    if (q.competitionId) {
+      grouped = grouped.filter((item) => item.competitionId === q.competitionId);
+    }
+
+    const ageGroups = [...new Set(grouped.map((item) => item.ageGroup).filter(Boolean))].sort((a, b) =>
+      a.localeCompare(b)
+    );
+
+    if (q.ageGroup) {
+      grouped = grouped.filter((item) => item.ageGroup === q.ageGroup);
+    }
+    if (q.event) {
+      const needle = q.event.toLowerCase();
+      grouped = grouped.filter(
+        (item) =>
+          item.event.toLowerCase().includes(needle) || item.eventGroup.toLowerCase().includes(needle)
+      );
+    }
+
     const counts = await generatedCertificateRepository.countByEventKind(
-      slice.map((item) => ({ competitionId: item.competitionId, eventId: item.eventId }))
+      grouped.map((item) => ({ competitionId: item.competitionId, eventId: item.eventId }))
     );
     const countKey = (competitionId: string, eventId: string, kind: string) =>
       `${competitionId}:${eventId}:${kind}`;
     const countMap = new Map(
       counts.map((row) => [countKey(row.competitionId, row.eventId, row.kind), row._count._all])
     );
-    const pageItems = slice.map((item, index) => ({
-      srNo: skip + index + 1,
+    let withCerts = grouped.map((item) => ({
       ...item,
       winnerCertificateCount: countMap.get(countKey(item.competitionId, item.eventId, "WINNER")) ?? 0,
       participantCertificateCount:
         countMap.get(countKey(item.competitionId, item.eventId, "PARTICIPANT")) ?? 0,
     }));
+    if (q.certificates === "generated") {
+      withCerts = withCerts.filter(
+        (item) => item.winnerCertificateCount > 0 || item.participantCertificateCount > 0
+      );
+    } else if (q.certificates === "missing") {
+      withCerts = withCerts.filter(
+        (item) => item.winnerCertificateCount === 0 && item.participantCertificateCount === 0
+      );
+    }
+
+    const total = withCerts.length;
+    const skip = (q.page - 1) * q.pageSize;
+    const pageItems = withCerts.slice(skip, skip + q.pageSize).map((item, index) => ({
+      srNo: skip + index + 1,
+      ...item,
+    }));
     const totalPages = total === 0 ? 0 : Math.ceil(total / q.pageSize);
     res.json({
       items: pageItems,
+      competitions,
+      ageGroups,
       page: q.page,
       pageSize: q.pageSize,
       total,

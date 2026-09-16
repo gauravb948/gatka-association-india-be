@@ -112,7 +112,7 @@ export type ResultListContext = {
 
 export async function findResultListContext(
   user: { role: import("@prisma/client").Role; stateId: string | null; districtId: string | null },
-  opts?: { competitionId?: string; search?: string }
+  opts?: { competitionId?: string; search?: string; level?: import("@prisma/client").CompetitionLevel; session?: number }
 ): Promise<ResultListContext> {
   const competitionWhere = buildResultsListCompetitionFilter(user, opts);
   if (competitionWhere === null) {
@@ -174,7 +174,7 @@ export async function findResultListContext(
 /** @deprecated use findResultListContext */
 export async function findManyForResultList(
   user: { role: import("@prisma/client").Role; stateId: string | null; districtId: string | null },
-  opts?: { competitionId?: string; search?: string }
+  opts?: { competitionId?: string; search?: string; level?: import("@prisma/client").CompetitionLevel; session?: number }
 ) {
   const ctx = await findResultListContext(user, opts);
   return ctx.standings;

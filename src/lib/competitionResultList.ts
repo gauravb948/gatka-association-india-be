@@ -31,6 +31,7 @@ export type ResultListItem = {
   competitionId: string;
   eventId: string;
   competition: string;
+  level: import("@prisma/client").CompetitionLevel;
   ageGroup: string;
   eventGroup: string;
   event: string;
@@ -104,6 +105,7 @@ export async function buildResultListItems(ctx: ResultListContext): Promise<Resu
         competitionId: comp.id,
         eventId: event.id,
         competition: comp.name,
+        level: comp.level,
         ageGroup: event.eventGroup.ageCategory.name,
         eventGroup: formatEventGroupLabel(event.eventGroup.segment, event.eventGroup.gender),
         event: event.name,

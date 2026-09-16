@@ -178,7 +178,7 @@ export function competitionResultsVisibilityWhere(user: {
 
 export function buildResultsListCompetitionFilter(
   user: { role: Role; stateId: string | null; districtId: string | null },
-  opts?: { competitionId?: string; search?: string }
+  opts?: { competitionId?: string; search?: string; level?: CompetitionLevel; session?: number }
 ): Prisma.CompetitionWhereInput | null {
   const visibility = competitionResultsVisibilityWhere(user);
   if (visibility === null) return null;
@@ -187,8 +187,11 @@ export function buildResultsListCompetitionFilter(
   if (opts?.competitionId) {
     parts.push({ id: opts.competitionId });
   }
+  if (opts?.level) {
+    parts.push({ level: opts.level });
+  }
   const base = parts.length === 1 ? parts[0]! : { AND: parts };
-  return withNameContains(base, opts?.search);
+  return withSessionYear(withNameContains(base, opts?.search), opts?.session);
 }
 
 const defaultCompetitionInclude = {
