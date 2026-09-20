@@ -46,6 +46,19 @@ export function ageGroupLabel(ageCategory: { name: string; ageTo: number | null 
   return ageCategory.name;
 }
 
+export function compareAgeGroupLabels(a: string, b: string): number {
+  const parse = (value: string): number | null => {
+    const match = /^U-?(\d+)$/i.exec(value.trim());
+    return match ? Number(match[1]) : null;
+  };
+  const na = parse(a);
+  const nb = parse(b);
+  if (na != null && nb != null && na !== nb) return na - nb;
+  if (na != null && nb == null) return -1;
+  if (na == null && nb != null) return 1;
+  return a.localeCompare(b);
+}
+
 type AgeWiseEventHint = {
   id?: string | null;
   minPlayers?: number | null;

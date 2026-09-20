@@ -118,6 +118,30 @@ function withLevel(
   return { AND: [where, levelFilter] };
 }
 
+function withGeoScope(
+  where: Prisma.CompetitionWhereInput,
+  opts: { stateId?: string; districtId?: string; level?: CompetitionLevel }
+): Prisma.CompetitionWhereInput {
+  let geo: Prisma.CompetitionWhereInput | undefined;
+  if (opts.districtId) {
+    geo = { districts: { some: { districtId: opts.districtId } } };
+  } else if (opts.stateId) {
+    if (opts.level === "DISTRICT") {
+      geo = { districts: { some: { district: { stateId: opts.stateId } } } };
+    } else {
+      geo = {
+        OR: [
+          { states: { some: { stateId: opts.stateId } } },
+          { districts: { some: { district: { stateId: opts.stateId } } } },
+        ],
+      };
+    }
+  }
+  if (!geo) return where;
+  if (Object.keys(where).length === 0) return geo;
+  return { AND: [where, geo] };
+}
+
 function withListFilters(
   where: Prisma.CompetitionWhereInput,
   opts: {
@@ -125,11 +149,18 @@ function withListFilters(
     sessionYear?: number;
     level?: CompetitionLevel;
     openOnly?: boolean;
+    stateId?: string;
+    districtId?: string;
   }
 ): Prisma.CompetitionWhereInput {
   let next = withNameContains(where, opts.nameContains);
   next = withSessionYear(next, opts.sessionYear);
   next = withLevel(next, opts.level);
+  next = withGeoScope(next, {
+    stateId: opts.stateId,
+    districtId: opts.districtId,
+    level: opts.level,
+  });
   if (opts.openOnly) {
     return Object.keys(next).length === 0 ? { isClosed: false } : { AND: [next, { isClosed: false }] };
   }
@@ -371,10 +402,12 @@ export async function findManyForAuthenticatedUserPaginated(
     openOnly?: boolean;
     sessionYear?: number;
     level?: CompetitionLevel;
+    stateId?: string;
+    districtId?: string;
   }
 ) {
-  const { skip, take, nameContains, openOnly, sessionYear, level } = pagination;
-  const filters = { nameContains, sessionYear, level, openOnly };
+  const { skip, take, nameContains, openOnly, sessionYear, level, stateId, districtId } = pagination;
+  const filters = { nameContains, sessionYear, level, openOnly, stateId, districtId };
 
   if (user.role === "NATIONAL_ADMIN") {
     return findPaginatedForMe(withListFilters(adminCompetitionCreatorWhere(user), filters), skip, take);
@@ -738,7 +771,7 @@ export async function findEventGroupsInCompetitionAgeScope(
   const groups = await prisma.eventGroup.findMany({
     where: { isActive: true },
     include: { ageCategory: true },
-    orderBy: { sortOrder: "asc" },
+    orderBy: [{ ageCategory: { sortOrder: "asc" } }, { sortOrder: "asc" }],
   });
   const compCats = comp.ageCategories.map((c) => c.ageCategory);
   if (compCats.length === 0) {

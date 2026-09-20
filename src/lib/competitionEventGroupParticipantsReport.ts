@@ -1,6 +1,10 @@
 import type { Gender, Prisma } from "@prisma/client";
 import { ageOnDate } from "./age.js";
-import { ageGroupLabel, eventGroupParticipantSortRank } from "./competitionAgeWiseReport.js";
+import {
+  ageGroupLabel,
+  compareAgeGroupLabels,
+  eventGroupParticipantSortRank,
+} from "./competitionAgeWiseReport.js";
 import { formatEventGroupTitle } from "./competitionResultList.js";
 import * as competitionRepository from "../repositories/competition.repository.js";
 import * as participationRepository from "../repositories/participation.repository.js";
@@ -146,6 +150,8 @@ export async function buildCompetitionEventGroupParticipantsReport(
   for (const [label, entries] of byGroup) {
     result[label] = entries
       .sort((a, b) => {
+        const byAge = compareAgeGroupLabels(a.ageGroup, b.ageGroup);
+        if (byAge !== 0) return byAge;
         if (a.eventSortRank !== b.eventSortRank) return a.eventSortRank - b.eventSortRank;
         const byName = a.profile.fullName.localeCompare(b.profile.fullName);
         if (byName !== 0) return byName;

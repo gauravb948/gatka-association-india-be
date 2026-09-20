@@ -37,7 +37,11 @@ export async function buildCompetitionEventRegistrationReport(
     include: {
       eventGroup: { include: { ageCategory: true } },
     },
-    orderBy: [{ eventGroup: { sortOrder: "asc" } }, { sortOrder: "asc" }],
+    orderBy: [
+      { eventGroup: { ageCategory: { sortOrder: "asc" } } },
+      { eventGroup: { sortOrder: "asc" } },
+      { sortOrder: "asc" },
+    ],
   });
 
   const counts = await participationRepository.countDistinctPlayersByEvent(

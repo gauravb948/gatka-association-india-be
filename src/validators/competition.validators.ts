@@ -26,6 +26,8 @@ export const competitionsMeQuerySchema = z.object({
   name: optionalNameSearch,
   session: z.coerce.number().int().min(2000).max(2100).optional(),
   level: competitionLevelQuery,
+  stateId: z.string().min(1).optional(),
+  districtId: z.string().min(1).optional(),
 });
 
 /**

@@ -10,7 +10,21 @@ import type {
   CompetitionEventRegistrationReportItem,
 } from "./competitionEventRegistrationReport.js";
 import type { SummarySheetEntityBundle } from "./summarySheetAllEntities.js";
+import { compareAgeGroupLabels } from "./competitionAgeWiseReport.js";
 import { summarySheetRosterStatus } from "./competitionFee.js";
+
+function ageSuffixFromGroupLabel(label: string): string {
+  const idx = label.lastIndexOf(" - ");
+  return idx >= 0 ? label.slice(idx + 3).trim() : label.trim();
+}
+
+function sortGroupEntries<T>(entries: Array<[string, T]>): Array<[string, T]> {
+  return [...entries].sort(([a], [b]) => {
+    const byAge = compareAgeGroupLabels(ageSuffixFromGroupLabel(a), ageSuffixFromGroupLabel(b));
+    if (byAge !== 0) return byAge;
+    return a.localeCompare(b);
+  });
+}
 
 const REPORT_PRINT_LOGO_URL =
   "https://punjabgatkaassociation.com/assets/images/gatka-logo.png";
@@ -421,7 +435,7 @@ function drawEntityBody(
 ) {
   drawTotals(doc, participants);
 
-  const registrationEntries = Object.entries(registration ?? {});
+  const registrationEntries = sortGroupEntries(Object.entries(registration ?? {}));
   if (registrationEntries.length > 0) {
     drawMainSectionHeading(doc, "Event Group Wise");
     for (const [groupLabel, rows] of registrationEntries) {
@@ -429,8 +443,8 @@ function drawEntityBody(
     }
   }
 
-  const participantEntries = Object.entries(participants?.groups ?? {}).filter(
-    ([, rows]) => Array.isArray(rows) && rows.length > 0
+  const participantEntries = sortGroupEntries(
+    Object.entries(participants?.groups ?? {}).filter(([, rows]) => Array.isArray(rows) && rows.length > 0)
   );
   if (participantEntries.length > 0) {
     addPageWithHeader(doc);
