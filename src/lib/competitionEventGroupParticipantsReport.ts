@@ -4,6 +4,7 @@ import {
   ageGroupLabel,
   compareAgeGroupLabels,
   eventGroupParticipantSortRank,
+  orderRecordBySummarySheetGroupLabels,
 } from "./competitionAgeWiseReport.js";
 import { formatEventGroupTitle } from "./competitionResultList.js";
 import * as competitionRepository from "../repositories/competition.repository.js";
@@ -165,6 +166,6 @@ export async function buildCompetitionEventGroupParticipantsReport(
   return {
     totalParticipants: allPlayerIds.size,
     totalEventsPlayed: allEventIds.size,
-    groups: result,
+    groups: orderRecordBySummarySheetGroupLabels(result),
   };
 }

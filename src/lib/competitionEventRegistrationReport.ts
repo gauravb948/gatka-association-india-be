@@ -1,6 +1,10 @@
 import type { Gender, Prisma } from "@prisma/client";
 import { prisma } from "./prisma.js";
 import { formatEventGroupTitle } from "./competitionResultList.js";
+import {
+  compareSummarySheetRegistrationItems,
+  orderRecordBySummarySheetGroupLabels,
+} from "./competitionAgeWiseReport.js";
 import * as competitionRepository from "../repositories/competition.repository.js";
 import * as participationRepository from "../repositories/participation.repository.js";
 
@@ -71,5 +75,9 @@ export async function buildCompetitionEventRegistrationReport(
     });
   }
 
-  return result;
+  for (const rows of Object.values(result)) {
+    rows.sort(compareSummarySheetRegistrationItems);
+  }
+
+  return orderRecordBySummarySheetGroupLabels(result);
 }

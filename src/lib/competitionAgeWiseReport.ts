@@ -109,6 +109,66 @@ export function eventGroupParticipantSortRank(
   return idx < 0 ? EVENT_GROUP_PARTICIPANT_SORT_COLUMNS.length : idx;
 }
 
+/** Lowest (earliest) event rank among names — Team Demo before Individual Demo, etc. */
+export function eventGroupParticipantSortRankFromNames(
+  names: readonly string[],
+  event?: AgeWiseEventHint
+): number {
+  const ranks = names
+    .map((name) => eventGroupParticipantSortRank(name, event))
+    .filter((rank) => rank < EVENT_GROUP_PARTICIPANT_SORT_COLUMNS.length);
+  if (ranks.length === 0) return EVENT_GROUP_PARTICIPANT_SORT_COLUMNS.length;
+  return Math.min(...ranks);
+}
+
+export function compareSummarySheetRegistrationItems(
+  a: { eventName: string; minPlayers?: number | null; maxPlayers?: number | null },
+  b: { eventName: string; minPlayers?: number | null; maxPlayers?: number | null }
+): number {
+  const byEvent =
+    eventGroupParticipantSortRank(a.eventName, a) - eventGroupParticipantSortRank(b.eventName, b);
+  if (byEvent !== 0) return byEvent;
+  return a.eventName.localeCompare(b.eventName);
+}
+
+export function compareSummarySheetParticipantRows(
+  a: { ageGroup: string; name: string; participatingIn: string[] },
+  b: { ageGroup: string; name: string; participatingIn: string[] }
+): number {
+  const byAge = compareAgeGroupLabels(a.ageGroup, b.ageGroup);
+  if (byAge !== 0) return byAge;
+  const aEvents = a.participatingIn.filter(Boolean);
+  const bEvents = b.participatingIn.filter(Boolean);
+  const byEvent =
+    eventGroupParticipantSortRankFromNames(aEvents) - eventGroupParticipantSortRankFromNames(bEvents);
+  if (byEvent !== 0) return byEvent;
+  const byName = a.name.localeCompare(b.name);
+  if (byName !== 0) return byName;
+  return aEvents.join(" ").localeCompare(bEvents.join(" "));
+}
+
+function ageSuffixFromGroupLabel(label: string): string {
+  const idx = label.lastIndexOf(" - ");
+  return idx >= 0 ? label.slice(idx + 3).trim() : label.trim();
+}
+
+/** Age group first, then Team Demo → Individual Demo → Team Fari → Individual Fari → Team Single → Individual Single. */
+export function compareSummarySheetGroupLabels(a: string, b: string): number {
+  const byAge = compareAgeGroupLabels(ageSuffixFromGroupLabel(a), ageSuffixFromGroupLabel(b));
+  if (byAge !== 0) return byAge;
+  const byEvent = eventGroupParticipantSortRank(a) - eventGroupParticipantSortRank(b);
+  if (byEvent !== 0) return byEvent;
+  return a.localeCompare(b);
+}
+
+export function orderRecordBySummarySheetGroupLabels<T>(record: Record<string, T>): Record<string, T> {
+  const ordered: Record<string, T> = {};
+  for (const key of Object.keys(record).sort(compareSummarySheetGroupLabels)) {
+    ordered[key] = record[key]!;
+  }
+  return ordered;
+}
+
 function emptyRow(): AgeWiseReportRow {
   return {
     district: 0,

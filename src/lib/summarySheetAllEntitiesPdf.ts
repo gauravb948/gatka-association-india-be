@@ -10,20 +10,27 @@ import type {
   CompetitionEventRegistrationReportItem,
 } from "./competitionEventRegistrationReport.js";
 import type { SummarySheetEntityBundle } from "./summarySheetAllEntities.js";
-import { compareAgeGroupLabels } from "./competitionAgeWiseReport.js";
+import {
+  compareSummarySheetGroupLabels,
+  compareSummarySheetParticipantRows,
+  compareSummarySheetRegistrationItems,
+} from "./competitionAgeWiseReport.js";
 import { summarySheetRosterStatus } from "./competitionFee.js";
 
-function ageSuffixFromGroupLabel(label: string): string {
-  const idx = label.lastIndexOf(" - ");
-  return idx >= 0 ? label.slice(idx + 3).trim() : label.trim();
+function sortGroupEntries<T>(entries: Array<[string, T]>): Array<[string, T]> {
+  return [...entries].sort(([a], [b]) => compareSummarySheetGroupLabels(a, b));
 }
 
-function sortGroupEntries<T>(entries: Array<[string, T]>): Array<[string, T]> {
-  return [...entries].sort(([a], [b]) => {
-    const byAge = compareAgeGroupLabels(ageSuffixFromGroupLabel(a), ageSuffixFromGroupLabel(b));
-    if (byAge !== 0) return byAge;
-    return a.localeCompare(b);
-  });
+function sortedRegistrationRows(
+  rows: CompetitionEventRegistrationReportItem[]
+): CompetitionEventRegistrationReportItem[] {
+  return [...rows].sort(compareSummarySheetRegistrationItems);
+}
+
+function sortedParticipantRows(
+  rows: CompetitionEventGroupParticipantRow[]
+): CompetitionEventGroupParticipantRow[] {
+  return [...rows].sort(compareSummarySheetParticipantRows);
 }
 
 const REPORT_PRINT_LOGO_URL =
@@ -240,7 +247,7 @@ function drawRegistrationSection(
     return;
   }
 
-  for (const row of rows) {
+  for (const row of sortedRegistrationRows(rows)) {
     ensureSpace(doc, 16);
     const y = doc.y;
     doc.font("Helvetica").fontSize(8).fillColor("#000000");
@@ -301,7 +308,7 @@ function drawParticipantSection(
   ];
   drawTableHeader(doc, cols);
 
-  for (const row of rows) {
+  for (const row of sortedParticipantRows(rows)) {
     ensureSpace(doc, photoW + 12);
     const y = doc.y;
     const photoUrl = row.photoUrl?.trim() || "";

@@ -1278,6 +1278,18 @@ export async function listParticipants(req: Request, res: Response, next: NextFu
     const andParts: Prisma.PlayerProfileWhereInput[] = [];
     const scope = actorPlayerProfileScopeWhere(actor);
     if (Object.keys(scope).length > 0) andParts.push(scope);
+    if (q.stateId) {
+      if (actor.role === "NATIONAL_ADMIN") {
+        andParts.push({ stateId: q.stateId });
+      } else if (actor.role === "STATE_ADMIN") {
+        if (!actor.stateId || q.stateId !== actor.stateId) {
+          throw new AppError(403, "stateId is outside your scope", "FORBIDDEN_FILTER");
+        }
+        andParts.push({ stateId: q.stateId });
+      } else {
+        throw new AppError(403, "State filter is not allowed for this role", "FORBIDDEN_FILTER");
+      }
+    }
     if (q.districtId) {
       if (actor.role === "STATE_ADMIN") {
         if (!actor.stateId) throw new AppError(403, "State context missing", "FORBIDDEN_SCOPE");
