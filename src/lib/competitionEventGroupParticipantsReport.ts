@@ -18,6 +18,7 @@ export type CompetitionEventGroupParticipantRow = {
   age: number;
   ageGroup: string;
   district: string;
+  state: string;
   gender: string;
   aadharNumber: string | null;
   photoUrl: string | null;
@@ -64,7 +65,8 @@ function mapProfileToRow(
     aadharNumber: string | null;
     photoUrl: string | null;
     gender: Gender;
-    district: { name: string } | null;
+    district: { name: string; state: { name: string } | null } | null;
+    state: { name: string } | null;
   },
   ageAsOf: Date,
   participatingIn: string[],
@@ -78,6 +80,10 @@ function mapProfileToRow(
     age: ageOnDate(profile.dateOfBirth, ageAsOf),
     ageGroup,
     district: profile.district?.name?.trim() ?? "",
+    state:
+      profile.district?.state?.name?.trim() ||
+      profile.state?.name?.trim() ||
+      "",
     gender: genderDisplay(profile.gender),
     aadharNumber: profile.aadharNumber,
     photoUrl: profile.photoUrl,

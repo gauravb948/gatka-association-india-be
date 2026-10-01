@@ -70,7 +70,7 @@ export async function resolveSummarySheetEntities(
   const kind = entityKind ?? defaultSummarySheetEntityKind(level);
 
   if (kind === "state") {
-    const states = await stateRepository.findManyPublic();
+    const states = await stateRepository.findManyPublicWithAcceptedRegistration();
     return states.map((s) => ({ id: s.id, name: s.name, kind: "state" as const }));
   }
 

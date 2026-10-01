@@ -17,6 +17,12 @@ import {
 } from "./competitionAgeWiseReport.js";
 import { summarySheetRosterStatus } from "./competitionFee.js";
 
+function summarySheetHasPlayers(
+  participants: CompetitionEventGroupParticipantsReport | null | undefined
+): boolean {
+  return (participants?.totalParticipants ?? 0) > 0;
+}
+
 function sortGroupEntries<T>(entries: Array<[string, T]>): Array<[string, T]> {
   return [...entries].sort(([a], [b]) => compareSummarySheetGroupLabels(a, b));
 }
@@ -434,12 +440,27 @@ function drawMainSectionHeading(doc: PdfDoc, title: string) {
   doc.y = lineY + 10;
 }
 
+function drawUnavailableMessage(doc: PdfDoc) {
+  ensureSpace(doc, 48);
+  doc.font("Helvetica-Bold").fontSize(12).fillColor("#000000");
+  doc.text("Summary sheet unavailable", PAGE_MARGIN, doc.y, {
+    width: doc.page.width - PAGE_MARGIN * 2,
+    align: "center",
+    lineBreak: false,
+  });
+}
+
 function drawEntityBody(
   doc: PdfDoc,
   registration: CompetitionEventRegistrationReport,
   participants: CompetitionEventGroupParticipantsReport,
   photoCache: Map<string, Buffer | null>
 ) {
+  if (!summarySheetHasPlayers(participants)) {
+    drawUnavailableMessage(doc);
+    return;
+  }
+
   drawTotals(doc, participants);
 
   const registrationEntries = sortGroupEntries(Object.entries(registration ?? {}));
@@ -471,9 +492,11 @@ export async function streamSummarySheetAllEntitiesPdf(
     gender: Gender;
     bundles: SummarySheetEntityBundle[];
     paidUnitIds?: Set<string>;
+    parentStateName?: string | null;
   }
 ): Promise<void> {
-  const { filename, associationTitle, competition, gender, bundles, paidUnitIds } = args;
+  const { filename, associationTitle, competition, gender, bundles, paidUnitIds, parentStateName } =
+    args;
   const showRosterStatus =
     competition.level === "STATE" || competition.level === "NATIONAL";
   const showAffiliation =
@@ -497,9 +520,14 @@ export async function streamSummarySheetAllEntitiesPdf(
   for (let i = 0; i < bundles.length; i += 1) {
     if (i > 0) doc.addPage();
     const bundle = bundles[i]!;
-    const scopeLabel = genderLabel
-      ? `${bundle.entity.name} (${genderLabel})`
-      : bundle.entity.name;
+    const placeParts =
+      bundle.entity.kind === "state"
+        ? [bundle.entity.name]
+        : [parentStateName?.trim(), bundle.entity.name].filter(
+            (part): part is string => Boolean(part)
+          );
+    const placeLabel = [...new Set(placeParts)].join(" — ");
+    const scopeLabel = genderLabel ? `${placeLabel} (${genderLabel})` : placeLabel;
 
     activeEntityHeader = {
       associationTitle,

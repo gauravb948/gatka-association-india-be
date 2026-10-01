@@ -3,6 +3,7 @@ import * as playerRepository from "../repositories/player.repository.js";
 import * as participationRepository from "../repositories/participation.repository.js";
 import * as competitionRepository from "../repositories/competition.repository.js";
 import * as districtRepository from "../repositories/district.repository.js";
+import * as stateRepository from "../repositories/state.repository.js";
 import { buildCompetitionRegistrationStats } from "../lib/competitionRegistrationStats.js";
 import { buildCompetitionEventRegistrationReport } from "../lib/competitionEventRegistrationReport.js";
 import { buildCompetitionEventGroupParticipantsReport } from "../lib/competitionEventGroupParticipantsReport.js";
@@ -186,6 +187,9 @@ export async function downloadReportsForAllEntities(
       associationStateId = district?.stateId?.trim() ?? "";
     }
     const associationTitle = await resolveAssociationTitle(comp.level, associationStateId);
+    const parentStateName = associationStateId
+      ? (await stateRepository.findById(associationStateId))?.name?.trim() ?? ""
+      : "";
     const feeUnitType = feeUnitTypeForSummarySheet(comp.level);
     const feeRows = feeUnitType ? await listFeeSubmissions(comp.id) : [];
     const paidUnitIds = new Set(
@@ -212,6 +216,7 @@ export async function downloadReportsForAllEntities(
       gender: q.gender,
       bundles,
       paidUnitIds,
+      parentStateName,
     });
   } catch (e) {
     next(e);
