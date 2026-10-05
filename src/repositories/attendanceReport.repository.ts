@@ -1,7 +1,6 @@
 import type { Attendance, Prisma } from "@prisma/client";
 import { Role } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
-import * as participationRepository from "./participation.repository.js";
 
 const userReportSelect = {
   id: true,
@@ -39,7 +38,7 @@ export type AttendanceUserRow = {
 
 /**
  * All players in the TC, split by who has TC_DAILY+tcId+present for that date vs everyone else in the TC.
- * Other same-day attendance (e.g. tournament) is still returned on the row for context.
+ * Other same-day attendance (e.g. camp) is still returned on the row for context.
  */
 export async function reportTrainingCenterDay(
   trainingCenterId: string,
@@ -85,151 +84,6 @@ export async function reportTrainingCenterDay(
     else absent.push({ ...entry, isPresent: false });
   }
   return { trainingCenterId, date: dateYmd, present, absent };
-}
-
-/**
- * All players who have participation in the competition (optionally a single event),
- * split into present / absent for tournament attendance on this competition.
- * If `dateYmd` is set, a player is "present" only for that calendar day. Otherwise, present if
- * they have any TOURNAMENT+competitionId row with `present: true`.
- */
-export async function reportCompetition(
-  competitionId: string,
-  opts: {
-    eventId?: string;
-    dateYmd?: string;
-    playerProfileWhere?: Prisma.PlayerProfileWhereInput;
-  }
-): Promise<{
-  competitionId: string;
-  eventId: string | null;
-  date: string | null;
-  present: (AttendanceUserRow & { participations: { id: string; eventId: string | null; eventName: string | null }[] })[];
-  absent: (AttendanceUserRow & { participations: { id: string; eventId: string | null; eventName: string | null }[] })[];
-}> {
-  const { eventId, dateYmd, playerProfileWhere } = opts;
-  const date = dateYmd ? parseDayUtc(dateYmd) : null;
-
-  let playerIds: string[];
-  if (eventId) {
-    const set = await participationRepository.findPlayerUserIdsParticipatedInEvent(
-      competitionId,
-      eventId
-    );
-    playerIds = [...set];
-  } else {
-    playerIds = await participationRepository.findParticipatedPlayerIds(competitionId);
-  }
-
-  if (playerIds.length === 0) {
-    return {
-      competitionId,
-      eventId: eventId ?? null,
-      date: dateYmd ?? null,
-      present: [],
-      absent: [],
-    };
-  }
-
-  const scopedProfile =
-    playerProfileWhere && Object.keys(playerProfileWhere).length > 0
-      ? playerProfileWhere
-      : undefined;
-  const users = await prisma.user.findMany({
-    where: {
-      id: { in: playerIds },
-      ...(scopedProfile ? { playerProfile: scopedProfile } : {}),
-    },
-    orderBy: { id: "asc" },
-    select: userReportSelect,
-  });
-  const userById = new Map(users.map((u) => [u.id, u]));
-
-  const partRows = await prisma.participationRecord.findMany({
-    where: {
-      competitionId,
-      playerUserId: { in: playerIds },
-      participated: true,
-      ...(eventId ? { eventId } : {}),
-    },
-    include: {
-      event: { select: { id: true, name: true } },
-    },
-  });
-  const partsByUser = new Map<string, { id: string; eventId: string | null; eventName: string | null }[]>();
-  for (const p of partRows) {
-    const list = partsByUser.get(p.playerUserId) ?? [];
-    list.push({
-      id: p.id,
-      eventId: p.eventId,
-      eventName: p.event?.name ?? null,
-    });
-    partsByUser.set(p.playerUserId, list);
-  }
-
-  const tournamentWhere: Prisma.AttendanceWhereInput = {
-    competitionId,
-    type: "TOURNAMENT",
-    userId: { in: playerIds },
-    ...(date ? { date } : {}),
-  };
-  const attRows = await prisma.attendance.findMany({ where: tournamentWhere });
-  const attByUser = new Map<string, Attendance[]>();
-  for (const a of attRows) {
-    const list = attByUser.get(a.userId) ?? [];
-    list.push(a);
-    attByUser.set(a.userId, list);
-  }
-
-  const present: (AttendanceUserRow & {
-    participations: { id: string; eventId: string | null; eventName: string | null }[];
-  })[] = [];
-  const absent: (AttendanceUserRow & {
-    participations: { id: string; eventId: string | null; eventName: string | null }[];
-  })[] = [];
-
-  for (const playerUserId of playerIds) {
-    const user = userById.get(playerUserId);
-    if (!user || !isPlayer(user)) continue;
-    const participations = partsByUser.get(playerUserId) ?? [];
-    const atts = attByUser.get(playerUserId) ?? [];
-
-    let isPresent: boolean;
-    let attendanceForResponse: Attendance | null;
-    if (date) {
-      const one = atts[0] ?? null;
-      attendanceForResponse = one;
-      isPresent = !!(one && one.present);
-    } else {
-      attendanceForResponse = atts.find((a) => a.present) ?? atts[0] ?? null;
-      isPresent = atts.some((a) => a.present);
-    }
-
-    const row: AttendanceUserRow & {
-      participations: { id: string; eventId: string | null; eventName: string | null }[];
-    } = {
-      user,
-      attendance: attendanceForResponse,
-      isPresent,
-      participations,
-    };
-    if (isPresent) present.push(row);
-    else
-      absent.push({
-        user,
-        attendance: attendanceForResponse,
-        isPresent: false,
-        participations,
-      });
-  }
-
-  return {
-    competitionId,
-    eventId: eventId ?? null,
-    date: dateYmd ?? null,
-    present,
-    absent,
-  };
 }
 
 /**

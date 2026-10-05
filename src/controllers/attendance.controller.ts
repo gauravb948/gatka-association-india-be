@@ -1,9 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import * as attendanceRepository from "../repositories/attendance.repository.js";
-import * as competitionRepository from "../repositories/competition.repository.js";
 import { AppError } from "../lib/errors.js";
-import { assertCanManageCompetition, assertCanViewCompetitionScopedReport } from "../lib/competitionManagementScope.js";
-import { actorPlayerProfileScopeWhere } from "../lib/competitionParticipation.js";
 import {
   attendanceBulkMarkSchema,
   attendanceMarkSchema,
@@ -14,18 +11,13 @@ import type { DbUser } from "../types/user.js";
 
 type MarkBody = {
   userId: string;
-  type: "TOURNAMENT" | "CAMP" | "TC_DAILY";
+  type: "CAMP" | "TC_DAILY";
   present?: boolean;
   date: string;
-  competitionId?: string;
   campId?: string;
   trainingCenterId?: string;
   notes?: string;
 };
-
-type CompetitionForAttendance = NonNullable<
-  Awaited<ReturnType<typeof competitionRepository.findByIdForPlayerEligibility>>
->;
 
 function canAccessAttendance(roles: { role: string }): boolean {
   return (
@@ -37,10 +29,9 @@ function canAccessAttendance(roles: { role: string }): boolean {
   );
 }
 
-async function assertCanMarkAttendanceItem(
+function assertCanMarkAttendanceItem(
   marker: DbUser,
-  body: Pick<MarkBody, "type" | "competitionId" | "trainingCenterId" | "campId">,
-  competitionCache: Map<string, CompetitionForAttendance>
+  body: Pick<MarkBody, "type" | "trainingCenterId" | "campId">
 ) {
   if (body.type === "TC_DAILY") {
     if (marker.role !== "TRAINING_CENTER") {
@@ -60,21 +51,6 @@ async function assertCanMarkAttendanceItem(
         "FORBIDDEN_SCOPE"
       );
     }
-    return;
-  }
-
-  if (body.type === "TOURNAMENT") {
-    if (!body.competitionId) {
-      throw new AppError(400, "competitionId is required for tournament attendance");
-    }
-    let comp = competitionCache.get(body.competitionId);
-    if (!comp) {
-      const found = await competitionRepository.findByIdForPlayerEligibility(body.competitionId);
-      if (!found) throw new AppError(404, "Competition not found");
-      comp = found;
-      competitionCache.set(body.competitionId, found);
-    }
-    await assertCanManageCompetition(marker, comp);
     return;
   }
 
@@ -98,7 +74,7 @@ export async function mark(req: Request, res: Response, next: NextFunction) {
     if (!canAccessAttendance(marker)) {
       throw new AppError(403, "Cannot mark attendance");
     }
-    await assertCanMarkAttendanceItem(marker, body, new Map());
+    assertCanMarkAttendanceItem(marker, body);
 
     const d = new Date(body.date + "T12:00:00.000Z");
     const { row, created } = await attendanceRepository.markAttendance(
@@ -117,7 +93,6 @@ function toMarkInput(body: MarkBody, date: Date, markedById: string) {
     date,
     markedById,
     present: body.present ?? true,
-    competitionId: body.competitionId,
     campId: body.campId,
     trainingCenterId: body.trainingCenterId,
     notes: body.notes,
@@ -132,9 +107,8 @@ export async function markBulk(req: Request, res: Response, next: NextFunction) 
       throw new AppError(403, "Cannot mark attendance");
     }
 
-    const competitionCache = new Map<string, CompetitionForAttendance>();
     for (const item of body.items) {
-      await assertCanMarkAttendanceItem(marker, item, competitionCache);
+      assertCanMarkAttendanceItem(marker, item);
     }
 
     const items = body.items.map((it) =>
@@ -177,25 +151,6 @@ export async function report(req: Request, res: Response, next: NextFunction) {
       );
       return res.json({ kind: "trainingCenter" as const, ...out });
     }
-    if (q.competitionId) {
-      if (marker.role === "TRAINING_CENTER") {
-        throw new AppError(
-          403,
-          "Training centers cannot view competition attendance",
-          "FORBIDDEN_SCOPE"
-        );
-      }
-      const comp = await competitionRepository.findByIdForPlayerEligibility(q.competitionId);
-      if (!comp) throw new AppError(404, "Competition not found");
-      await assertCanViewCompetitionScopedReport(marker, comp);
-      const scope = actorPlayerProfileScopeWhere(marker);
-      const out = await attendanceReportRepository.reportCompetition(q.competitionId, {
-        eventId: q.eventId,
-        dateYmd: q.date,
-        playerProfileWhere: Object.keys(scope).length > 0 ? scope : undefined,
-      });
-      return res.json({ kind: "competition" as const, ...out });
-    }
     if (q.campId) {
       if (marker.role === "TRAINING_CENTER") {
         throw new AppError(403, "Training centers cannot view camp attendance", "FORBIDDEN_SCOPE");
@@ -215,21 +170,6 @@ export async function listByUser(req: Request, res: Response, next: NextFunction
       throw new AppError(403, "Forbidden");
     }
     const rows = await attendanceRepository.findManyByUser(req.params.userId, 200);
-    res.json(rows);
-  } catch (e) {
-    next(e);
-  }
-}
-
-export async function competitionSummary(req: Request, res: Response, next: NextFunction) {
-  try {
-    const actor = req.dbUser!;
-    const comp = await competitionRepository.findByIdForPlayerEligibility(req.params.competitionId);
-    if (!comp) throw new AppError(404, "Competition not found");
-    await assertCanViewCompetitionScopedReport(actor, comp);
-    const rows = await attendanceRepository.findManyTournamentByCompetition(
-      req.params.competitionId
-    );
     res.json(rows);
   } catch (e) {
     next(e);

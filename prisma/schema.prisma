@@ -302,6 +302,8 @@ model User {
   campRegs               CampRegistration[]
   attendanceMarked       Attendance[]             @relation("AttendanceMarker")
   attendanceAsSubject    Attendance[]             @relation("AttendanceSubject")
+  competitionAttendanceMarked     CompetitionAttendance[] @relation("CompetitionAttendanceMarker")
+  competitionAttendanceAsSubject  CompetitionAttendance[] @relation("CompetitionAttendanceSubject")
   participations         ParticipationRecord[]
   migrationRequests      MigrationRequest[]
   complaints             Complaint[]
@@ -556,6 +558,7 @@ model Event {
   results             CompetitionResult[]
   aggregateStandings  CompetitionAggregateStanding[]
   generatedCertificates GeneratedCertificate[]
+  competitionAttendances CompetitionAttendance[]
 
   @@index([eventGroupId])
 }
@@ -649,11 +652,11 @@ model Competition {
   ageCategories    CompetitionAgeCategory[]
   tournamentRegs   TournamentRegistration[]
   participations   ParticipationRecord[]
-  attendance       Attendance[]
   results          CompetitionResult[]
   aggregateStandings CompetitionAggregateStanding[]
   feeSubmissions   CompetitionFeeSubmission[]
   generatedCertificates GeneratedCertificate[]
+  competitionAttendances CompetitionAttendance[]
 
   @@index([level])
   @@index([createdById])
@@ -857,8 +860,6 @@ model Attendance {
   markedById   String
   markedBy     User         @relation("AttendanceMarker", fields: [markedById], references: [id])
   present      Boolean      @default(true)
-  competitionId String?
-  competition   Competition? @relation(fields: [competitionId], references: [id])
   campId       String?
   camp         Camp?        @relation(fields: [campId], references: [id])
   trainingCenterId String?
@@ -866,8 +867,30 @@ model Attendance {
   createdAt    DateTime     @default(now())
 
   @@unique([userId, date])
-  @@index([competitionId])
   @@index([campId])
+}
+
+/// One row per player per event within a competition. Marked once (upsert on the
+/// unique key below) rather than per calendar day — a competition attendance mark
+/// is "did they attend this event", not a recurring daily record.
+model CompetitionAttendance {
+  id            String      @id @default(cuid())
+  competitionId String
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  eventId       String
+  event         Event       @relation(fields: [eventId], references: [id])
+  userId        String
+  user          User        @relation("CompetitionAttendanceSubject", fields: [userId], references: [id])
+  markedById    String
+  markedBy      User        @relation("CompetitionAttendanceMarker", fields: [markedById], references: [id])
+  present       Boolean     @default(true)
+  notes         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([competitionId, eventId, userId])
+  @@index([competitionId])
+  @@index([eventId])
 }
 
 model CompetitionResult {

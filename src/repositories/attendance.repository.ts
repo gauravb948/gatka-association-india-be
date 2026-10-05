@@ -9,7 +9,6 @@ export type MarkAttendanceInput = {
   date: Date;
   markedById: string;
   present: boolean;
-  competitionId?: string;
   campId?: string;
   trainingCenterId?: string;
   notes?: string;
@@ -23,17 +22,7 @@ async function markAttendanceInTx(
   db: AttendanceClient,
   input: MarkAttendanceInput
 ): Promise<{ row: Attendance; created: boolean }> {
-  const {
-    userId,
-    type,
-    date,
-    markedById,
-    present,
-    competitionId,
-    campId,
-    trainingCenterId,
-    notes,
-  } = input;
+  const { userId, type, date, markedById, present, campId, trainingCenterId, notes } = input;
 
   const existing = await db.attendance.findFirst({
     where: { userId, date },
@@ -45,9 +34,6 @@ async function markAttendanceInTx(
         type,
         markedBy: { connect: { id: markedById } },
         present,
-        competition: competitionId
-          ? { connect: { id: competitionId } }
-          : { disconnect: true },
         camp: campId ? { connect: { id: campId } } : { disconnect: true },
         trainingCenterId: trainingCenterId ?? null,
         notes: notes ?? null,
@@ -62,9 +48,6 @@ async function markAttendanceInTx(
       user: { connect: { id: userId } },
       markedBy: { connect: { id: markedById } },
       present,
-      competition: competitionId
-        ? { connect: { id: competitionId } }
-        : undefined,
       camp: campId ? { connect: { id: campId } } : undefined,
       trainingCenterId: trainingCenterId ?? undefined,
       notes: notes ?? undefined,
@@ -94,26 +77,5 @@ export function findManyByUser(userId: string, take: number) {
     where: { userId },
     orderBy: { date: "desc" },
     take,
-  });
-}
-
-export function findManyTournamentByCompetition(competitionId: string) {
-  return prisma.attendance.findMany({
-    where: { competitionId, type: "TOURNAMENT" },
-    include: { user: { select: { id: true, email: true } } },
-  });
-}
-
-export function findTournamentPresentForPlayer(
-  competitionId: string,
-  userId: string
-) {
-  return prisma.attendance.findMany({
-    where: {
-      competitionId,
-      userId,
-      type: "TOURNAMENT",
-      present: true,
-    },
   });
 }

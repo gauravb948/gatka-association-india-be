@@ -100,7 +100,7 @@ export async function list(req: Request, res: Response, next: NextFunction) {
 export async function upsert(req: Request, res: Response, next: NextFunction) {
   try {
     const body = competitionResultBodySchema.parse(req.body);
-    await assertAttendanceForCertificate(body.competitionId, body.playerUserId);
+    await assertAttendanceForCertificate(body.competitionId, body.eventId, body.playerUserId);
     const payload = JSON.stringify({
       t: "result",
       c: body.competitionId,

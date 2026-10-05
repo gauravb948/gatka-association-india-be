@@ -13,10 +13,11 @@ info:
 
     **Age categories:** `GET /age-categories` is **unauthenticated** (no JWT).
 
-    **Attendance:** `POST /attendance` requires COACH, TRAINING_CENTER, or district/state/national admin.
+    **Attendance:** `POST /attendance` (training center daily, or camp) requires COACH, TRAINING_CENTER, or district/state/national admin.
     `GET /attendance/user/{userId}` is for the same user when `role` is PLAYER, or any user for other roles.
-    `GET /attendance/competition/{competitionId}/summary` lists TOURNAMENT rows for that competition (district/state/national admin only).
-    `GET /attendance/report` returns present vs absent **players** for a training center + day, a competition (optional event + day), or a camp (optional day) — same roles as marking attendance.
+    `GET /attendance/report` returns present vs absent **players** for a training center + day, or a camp (optional day) — same roles as marking attendance.
+
+    **Competition attendance:** separate from the above — marked **once per player per event** (not per calendar day) via `POST /competition-attendance` / `/competition-attendance/bulk`, and read via `GET /competition-attendance/report?competitionId=&eventId=`. Allowed: the admin role matching the competition's level, within their geography.
 servers:
   - url: http://localhost:4000/api
     description: Local
@@ -2050,7 +2051,7 @@ components:
           items: { $ref: "#/components/schemas/CampSignupRole" }
     AttendanceType:
       type: string
-      enum: [TOURNAMENT, CAMP, TC_DAILY]
+      enum: [CAMP, TC_DAILY]
     AttendanceMarkRequest:
       type: object
       required: [userId, date, type]
@@ -2062,9 +2063,6 @@ components:
           description: Calendar date (YYYY-MM-DD); server normalizes to UTC date.
         present: { type: boolean, default: true }
         type: { $ref: "#/components/schemas/AttendanceType" }
-        competitionId:
-          type: string
-          description: Optional; use with TOURNAMENT.
         campId:
           type: string
           description: Optional; use with CAMP.
@@ -2081,23 +2079,10 @@ components:
         userId: { type: string }
         markedById: { type: string }
         present: { type: boolean }
-        competitionId: { type: string, nullable: true }
         campId: { type: string, nullable: true }
         trainingCenterId: { type: string, nullable: true }
         notes: { type: string, nullable: true }
         createdAt: { type: string, format: date-time }
-    AttendanceUserSnippet:
-      type: object
-      properties:
-        id: { type: string }
-        email: { type: string, format: email }
-    AttendanceTournamentListItem:
-      allOf:
-        - $ref: "#/components/schemas/Attendance"
-        - type: object
-          properties:
-            user:
-              $ref: "#/components/schemas/AttendanceUserSnippet"
     AttendanceBulkMarkRequest:
       type: object
       required: [items]
@@ -2131,19 +2116,6 @@ components:
           allOf:
             - { $ref: "#/components/schemas/Attendance" }
         isPresent: { type: boolean }
-    AttendanceReportRowCompetition:
-      allOf:
-        - { $ref: "#/components/schemas/AttendanceReportRow" }
-        - type: object
-          properties:
-            participations:
-              type: array
-              items:
-                type: object
-                properties:
-                  id: { type: string }
-                  eventId: { type: string, nullable: true }
-                  eventName: { type: string, nullable: true }
     AttendanceReportTrainingCenter:
       type: object
       required: [kind, trainingCenterId, date, present, absent]
@@ -2157,20 +2129,6 @@ components:
         absent:
           type: array
           items: { $ref: "#/components/schemas/AttendanceReportRow" }
-    AttendanceReportCompetition:
-      type: object
-      required: [kind, competitionId, eventId, date, present, absent]
-      properties:
-        kind: { type: string, enum: [competition] }
-        competitionId: { type: string }
-        eventId: { type: string, nullable: true }
-        date: { type: string, format: date, nullable: true }
-        present:
-          type: array
-          items: { $ref: "#/components/schemas/AttendanceReportRowCompetition" }
-        absent:
-          type: array
-          items: { $ref: "#/components/schemas/AttendanceReportRowCompetition" }
     AttendanceReportCamp:
       type: object
       required: [kind, campId, date, present, absent]
@@ -2184,6 +2142,75 @@ components:
         absent:
           type: array
           items: { $ref: "#/components/schemas/AttendanceReportRow" }
+    CompetitionAttendanceMarkRequest:
+      type: object
+      required: [competitionId, eventId, userId]
+      properties:
+        competitionId: { type: string }
+        eventId: { type: string }
+        userId: { type: string, description: Player whose attendance is recorded }
+        present: { type: boolean, default: true }
+        notes: { type: string, nullable: true }
+    CompetitionAttendance:
+      type: object
+      properties:
+        id: { type: string }
+        competitionId: { type: string }
+        eventId: { type: string }
+        userId: { type: string }
+        markedById: { type: string }
+        present: { type: boolean }
+        notes: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    CompetitionAttendanceBulkMarkRequest:
+      type: object
+      required: [competitionId, eventId, items]
+      properties:
+        competitionId: { type: string }
+        eventId: { type: string }
+        items:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            type: object
+            required: [userId]
+            properties:
+              userId: { type: string }
+              present: { type: boolean, default: true }
+              notes: { type: string, nullable: true }
+    CompetitionAttendanceBulkMarkResponse:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items: { $ref: "#/components/schemas/CompetitionAttendance" }
+    CompetitionAttendanceReportRow:
+      type: object
+      properties:
+        user:
+          type: object
+          description: Player `User` with `playerProfile` (fullName, registrationNumber, trainingCenter, …)
+        attendance:
+          nullable: true
+          allOf:
+            - { $ref: "#/components/schemas/CompetitionAttendance" }
+        isPresent: { type: boolean }
+    CompetitionAttendanceReport:
+      type: object
+      required: [kind, competitionId, eventId, present, absent]
+      properties:
+        kind: { type: string, enum: [competition] }
+        competitionId: { type: string }
+        eventId: { type: string }
+        present:
+          type: array
+          items: { $ref: "#/components/schemas/CompetitionAttendanceReportRow" }
+        absent:
+          type: array
+          items: { $ref: "#/components/schemas/CompetitionAttendanceReportRow" }
     CompetitionCreateBody:
       type: object
       required:
@@ -4727,12 +4754,13 @@ paths:
   /attendance:
     post:
       security: [{ bearerAuth: [] }]
-      summary: Mark attendance
+      summary: Mark attendance (training center daily, or camp)
       description: >
         Allowed roles: COACH, TRAINING_CENTER, DISTRICT_ADMIN, STATE_ADMIN, NATIONAL_ADMIN.
-        Body `type` selects context: use `competitionId` for TOURNAMENT, `campId` for CAMP, `trainingCenterId` for TC_DAILY as needed.
+        Body `type` selects context: use `campId` for CAMP, `trainingCenterId` for TC_DAILY as needed.
         There is at most one row per subject user per calendar `date`. A repeat call for the same `userId` and `date` updates
         that row (latest payload wins) and returns 200; first write returns 201.
+        For competition attendance (marked once per player per event, not per day), see `/competition-attendance`.
       requestBody:
         required: true
         content:
@@ -4783,33 +4811,24 @@ paths:
   /attendance/report:
     get:
       security: [{ bearerAuth: [] }]
-      summary: Player attendance report (training center, competition, or camp)
+      summary: Player attendance report (training center, or camp)
       description: >
         Same roles as marking attendance. Exactly one of:
         (1) `trainingCenterId` and `date` — all **players** in that TC: **present** if that day’s row is `TC_DAILY`, same
         `trainingCenterId`, and `present` (see `isPresent`); **absent** otherwise (same-day row may still be returned for
-        other contexts e.g. tournament);
-        (2) `competitionId`, optional `eventId` (only players who participated in that event), optional `date` — **present**
-        if TOURNAMENT attendance for this competition is marked `present` (for that day if `date` is set, or any day if
-        omitted); **absent** = participated but not present per those rules, with `participations` for context;
-        (3) `campId`, optional `date` — **players** registered for the camp: **present** for `CAMP`+`present` (that day
+        other contexts e.g. camp);
+        (2) `campId`, optional `date` — **players** registered for the camp: **present** for `CAMP`+`present` (that day
         or any day with `date` omitted); **absent** = registered but not in the present set.
+        For competition attendance reports, see `GET /competition-attendance/report`.
       parameters:
         - in: query
           name: trainingCenterId
           schema: { type: string }
-          description: Use with `date` (mutually exclusive with `competitionId` / `campId`).
+          description: Use with `date` (mutually exclusive with `campId`).
         - in: query
           name: date
           schema: { type: string, format: date }
-          description: Calendar date (YYYY-MM-DD). Required for `trainingCenterId`; optional for competition/camp to scope to that day in UTC.
-        - in: query
-          name: competitionId
-          schema: { type: string }
-        - in: query
-          name: eventId
-          schema: { type: string }
-          description: Catalog event id; requires `competitionId`; limits to players with participation in that event.
+          description: Calendar date (YYYY-MM-DD). Required for `trainingCenterId`; optional for camp to scope to that day in UTC.
         - in: query
           name: campId
           schema: { type: string }
@@ -4821,7 +4840,6 @@ paths:
               schema:
                 oneOf:
                   - { $ref: "#/components/schemas/AttendanceReportTrainingCenter" }
-                  - { $ref: "#/components/schemas/AttendanceReportCompetition" }
                   - { $ref: "#/components/schemas/AttendanceReportCamp" }
         "400":
           description: Invalid or ambiguous query
@@ -4852,30 +4870,90 @@ paths:
           description: Missing or invalid JWT
         "403":
           description: Player may not list another user
-  /attendance/competition/{competitionId}/summary:
-    parameters:
-      - name: competitionId
-        in: path
-        required: true
-        schema: { type: string }
-    get:
+  /competition-attendance:
+    post:
       security: [{ bearerAuth: [] }]
-      summary: Tournament attendance rows for a competition
+      summary: Mark competition attendance for one player on one event
       description: >
-        Returns `type` TOURNAMENT attendance for the competition, including subject `user` (id, email).
-        Allowed roles: DISTRICT_ADMIN, STATE_ADMIN, NATIONAL_ADMIN.
+        Allowed: the admin role matching the competition's level, within their geography (same gate as
+        competition management). One row per (`competitionId`, `eventId`, `userId`) — a repeat call for the
+        same three ids updates that row rather than creating a new one, so attendance for a competition is
+        recorded once per player per event, not per calendar day.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CompetitionAttendanceMarkRequest" }
+      responses:
+        "200":
+          description: OK — created or updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CompetitionAttendance" }
+        "400":
+          description: Validation error
+        "401":
+          description: Missing or invalid JWT
+        "403":
+          description: Role cannot manage this competition
+        "404":
+          description: Competition not found
+  /competition-attendance/bulk:
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Bulk mark competition attendance for one event's roster
+      description: >
+        Same role gate as `POST /competition-attendance`. One `competitionId` + `eventId`, with 1–500
+        `items` (one per player). All rows are written in **one transaction**.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CompetitionAttendanceBulkMarkRequest" }
       responses:
         "200":
           description: OK
           content:
             application/json:
-              schema:
-                type: array
-                items: { $ref: "#/components/schemas/AttendanceTournamentListItem" }
+              schema: { $ref: "#/components/schemas/CompetitionAttendanceBulkMarkResponse" }
+        "400":
+          description: Validation error
         "401":
           description: Missing or invalid JWT
         "403":
-          description: Forbidden for this role
+          description: Role cannot manage this competition
+        "404":
+          description: Competition not found
+  /competition-attendance/report:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Competition attendance report for one event
+      description: >
+        Players who participated in `eventId` within `competitionId`, split into present/absent by
+        `CompetitionAttendance.present`. Training centers cannot view this report.
+      parameters:
+        - in: query
+          name: competitionId
+          required: true
+          schema: { type: string }
+        - in: query
+          name: eventId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CompetitionAttendanceReport" }
+        "400":
+          description: Validation error
+        "401":
+          description: Missing or invalid JWT
+        "403":
+          description: Role cannot view this report
+        "404":
+          description: Competition not found
   /results:
     get:
       security: [{ bearerAuth: [] }]

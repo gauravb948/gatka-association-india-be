@@ -1,6 +1,7 @@
 import type { CompetitionLevel, Gender, Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { buildResultsListCompetitionFilter } from "./competition.repository.js";
+import * as competitionAttendanceRepository from "./competitionAttendance.repository.js";
 import type { RegistrationStatSource } from "../lib/competitionRegistrationStats.js";
 
 export async function findParticipationsForAgeWiseReport(
@@ -322,21 +323,13 @@ export function findParticipatedEventIdsForPlayers(competitionId: string, player
   });
 }
 
-/** True when the player has tournament attendance or a recorded result in this competition. */
+/** True when the player has competition attendance or a recorded result in this competition. */
 export async function playerHasCompetedInCompetition(
   competitionId: string,
   playerUserId: string
 ): Promise<boolean> {
   const [attendance, result] = await Promise.all([
-    prisma.attendance.findFirst({
-      where: {
-        competitionId,
-        userId: playerUserId,
-        type: "TOURNAMENT",
-        present: true,
-      },
-      select: { id: true },
-    }),
+    competitionAttendanceRepository.findAnyPresentForPlayer(competitionId, playerUserId),
     prisma.competitionResult.findFirst({
       where: { competitionId, playerUserId },
       select: { id: true },
@@ -657,7 +650,7 @@ export async function findManyByCompetitionPaginated(
   return { items, total };
 }
 
-/** Lower-level competition completed in calendar year (UTC) of `year`, with tournament attendance marked present. */
+/** Lower-level competition completed in calendar year (UTC) of `year`, with competition attendance marked present. */
 export async function hasCompletedCompetitionAtLevel(
   playerUserId: string,
   year: number,
@@ -679,14 +672,10 @@ export async function hasCompletedCompetitionAtLevel(
     distinct: ["competitionId"],
   });
   for (const r of rows) {
-    const att = await prisma.attendance.findFirst({
-      where: {
-        userId: playerUserId,
-        competitionId: r.competitionId,
-        type: "TOURNAMENT",
-        present: true,
-      },
-    });
+    const att = await competitionAttendanceRepository.findAnyPresentForPlayer(
+      r.competitionId,
+      playerUserId
+    );
     if (att) return true;
   }
   return false;

@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Gatka Association India BE",
-    "description": "API collection (baseUrl includes `/api`). Rate limits: 429 with `code: RATE_LIMITED`. Auth routes use stricter limits; R2 upload/presign are public with upload rate limits. After **Auth → Me**, `userId` is set on the collection for user-scoped calls (e.g. attendance). Set `competitionId` / `campId` where needed for attendance and competitions.",
+    "description": "API collection (baseUrl includes `/api`). Rate limits: 429 with `code: RATE_LIMITED`. Auth routes use stricter limits; R2 upload/presign are public with upload rate limits. After **Auth \u2192 Me**, `userId` is set on the collection for user-scoped calls (e.g. attendance). Set `competitionId` / `campId` where needed for attendance and competitions.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -137,7 +137,10 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -145,10 +148,9 @@
             },
             "url": "{{baseUrl}}/auth/login"
           }
-        }
-        ,
+        },
         {
-          "name": "Me — current user by token",
+          "name": "Me \u2014 current user by token",
           "event": [
             {
               "listen": "test",
@@ -164,7 +166,12 @@
           ],
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "url": "{{baseUrl}}/auth/me"
           }
         },
@@ -173,8 +180,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -184,10 +197,15 @@
           }
         },
         {
-          "name": "OTP — request (registration)",
+          "name": "OTP \u2014 request (registration)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"phoneOrEmail\": \"{{phoneOrEmail}}\",\n  \"purpose\": \"REGISTRATION\"\n}"
@@ -196,7 +214,7 @@
           }
         },
         {
-          "name": "OTP — verify (registration)",
+          "name": "OTP \u2014 verify (registration)",
           "event": [
             {
               "listen": "test",
@@ -212,7 +230,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"phoneOrEmail\": \"{{phoneOrEmail}}\",\n  \"purpose\": \"REGISTRATION\",\n  \"code\": \"{{otpCode}}\"\n}"
@@ -221,10 +244,15 @@
           }
         },
         {
-          "name": "OTP — request (password reset)",
+          "name": "OTP \u2014 request (password reset)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"phoneOrEmail\": \"{{phoneOrEmail}}\",\n  \"purpose\": \"PASSWORD_RESET\"\n}"
@@ -233,10 +261,15 @@
           }
         },
         {
-          "name": "OTP — confirm password reset",
+          "name": "OTP \u2014 confirm password reset",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"phoneOrEmail\": \"{{phoneOrEmail}}\",\n  \"code\": \"{{otpCode}}\",\n  \"newPassword\": \"ChangeMe123!\"\n}"
@@ -245,10 +278,15 @@
           }
         },
         {
-          "name": "Register — Player",
+          "name": "Register \u2014 Player",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"fullName\": \"Test Player\",\n  \"fatherName\": \"Father Name\",\n  \"motherName\": \"Mother Name\",\n  \"aadharNumber\": \"123456789012\",\n  \"maritalStatus\": \"SINGLE\",\n  \"email\": \"testplayer01@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"mobileNo\": \"9999999999\",\n  \"address\": \"Full postal address line 1 and 2\",\n  \"gender\": \"MALE\",\n  \"dateOfBirth\": \"2005-01-01T00:00:00.000Z\",\n  \"stateId\": \"{{stateId}}\",\n  \"districtId\": \"{{districtId}}\",\n  \"trainingCenterId\": \"{{trainingCenterId}}\",\n  \"photoUrl\": \"https://example.com/uploads/player-photo.png\",\n  \"aadharFrontUrl\": \"https://example.com/uploads/aadhar-front.png\",\n  \"aadharBackUrl\": \"https://example.com/uploads/aadhar-back.png\",\n  \"tShirtSize\": \"M\",\n  \"playingHand\": \"RIGHT\",\n  \"verificationToken\": \"{{verificationToken}}\",\n  \"acceptTerms\": true\n}"
@@ -257,10 +295,15 @@
           }
         },
         {
-          "name": "Register — Coach",
+          "name": "Register \u2014 Coach",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"fullName\": \"Test Coach\",\n  \"fatherName\": \"Father Name\",\n  \"aadharNumber\": \"123456789012\",\n  \"address\": \"Full postal address\",\n  \"education\": \"Bachelor of Physical Education\",\n  \"stateId\": \"{{stateId}}\",\n  \"districtId\": \"{{districtId}}\",\n  \"trainingCenterId\": \"{{trainingCenterId}}\",\n  \"email\": \"testcoach01@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"phone\": \"9999999999\",\n  \"appliedFor\": \"ASSISTANT_COACH\",\n  \"experienceInGatka\": \"Y1_3\",\n  \"photoUrl\": \"https://example.com/uploads/coach-photo.png\",\n  \"aadharFrontUrl\": \"https://example.com/uploads/coach-aadhar-front.png\",\n  \"aadharBackUrl\": \"https://example.com/uploads/coach-aadhar-back.png\",\n  \"gender\": \"MALE\",\n  \"verificationToken\": \"{{verificationToken}}\",\n  \"acceptTerms\": true\n}"
@@ -269,10 +312,15 @@
           }
         },
         {
-          "name": "Register — Referee",
+          "name": "Register \u2014 Referee",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"fullName\": \"Test Referee\",\n  \"fatherName\": \"Father Name\",\n  \"aadharNumber\": \"123456789012\",\n  \"address\": \"Full postal address\",\n  \"education\": \"Graduate\",\n  \"appliedFor\": \"District referee\",\n  \"experienceInGatka\": \"Y1_3\",\n  \"email\": \"testreferee01@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"phone\": \"9999999999\",\n  \"gender\": \"MALE\",\n  \"stateId\": \"{{stateId}}\",\n  \"districtId\": \"{{districtId}}\",\n  \"photoUrl\": \"https://example.com/uploads/referee-photo.png\",\n  \"aadharFrontUrl\": \"https://example.com/uploads/referee-aadhar-front.png\",\n  \"aadharBackUrl\": \"https://example.com/uploads/referee-aadhar-back.png\",\n  \"verificationToken\": \"{{verificationToken}}\",\n  \"acceptTerms\": true\n}"
@@ -281,7 +329,7 @@
           }
         },
         {
-          "name": "Register — Volunteer",
+          "name": "Register \u2014 Volunteer",
           "event": [
             {
               "listen": "test",
@@ -297,7 +345,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"fullName\": \"Test Volunteer\",\n  \"fatherName\": \"Father Name\",\n  \"motherName\": \"Mother Name\",\n  \"aadharNumber\": \"123456789012\",\n  \"maritalStatus\": \"SINGLE\",\n  \"email\": \"testvolunteer01@example.com\",\n  \"phone\": \"9999999999\",\n  \"alternatePhone\": \"8888888888\",\n  \"address\": \"Full home address\",\n  \"gender\": \"MALE\",\n  \"dateOfBirth\": \"1995-01-15T00:00:00.000Z\",\n  \"stateId\": \"{{stateId}}\",\n  \"districtId\": \"{{districtId}}\",\n  \"tShirtSize\": \"M\",\n  \"hasDisability\": false,\n  \"photoUrl\": \"https://example.com/uploads/volunteer-photo.png\",\n  \"aadharFrontUrl\": \"https://example.com/uploads/volunteer-aadhar-front.png\",\n  \"aadharBackUrl\": \"https://example.com/uploads/volunteer-aadhar-back.png\",\n  \"verificationToken\": \"{{verificationToken}}\",\n  \"acceptTerms\": true\n}"
@@ -306,10 +359,15 @@
           }
         },
         {
-          "name": "Register — Training Center",
+          "name": "Register \u2014 Training Center",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"testtc01@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"phone\": \"9999999999\",\n  \"name\": \"Test Training Center\",\n  \"address\": \"Full training center address\",\n  \"stateId\": \"{{stateId}}\",\n  \"districtId\": \"{{districtId}}\",\n  \"headName\": \"Head Name\",\n  \"headAadharNumber\": \"123456789012\",\n  \"registrarNumber\": null,\n  \"registrationCertificateUrl\": null,\n  \"headPassportPhotoUrl\": \"https://example.com/uploads/tc-head-photo.png\",\n  \"headAadharFrontUrl\": \"https://example.com/uploads/tc-aadhar-front.png\",\n  \"headAadharBackUrl\": \"https://example.com/uploads/tc-aadhar-back.png\",\n  \"verificationToken\": \"{{verificationToken}}\",\n  \"acceptTerms\": true\n}"
@@ -323,7 +381,7 @@
       "name": "Payments",
       "item": [
         {
-          "name": "POST — create Razorpay order",
+          "name": "POST \u2014 create Razorpay order",
           "event": [
             {
               "listen": "test",
@@ -341,8 +399,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -352,12 +416,18 @@
           }
         },
         {
-          "name": "POST — verify payment (client signature)",
+          "name": "POST \u2014 verify payment (client signature)",
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -367,29 +437,44 @@
           }
         },
         {
-          "name": "GET — my payments",
+          "name": "GET \u2014 my payments",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "url": "{{baseUrl}}/payments/me"
           }
-        }
-        ,
+        },
         {
-          "name": "GET — my state payment config (state admin)",
+          "name": "GET \u2014 my state payment config (state admin)",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "url": "{{baseUrl}}/payments/state-config"
           }
         },
         {
-          "name": "PUT — upsert my state payment config (state admin)",
+          "name": "PUT \u2014 upsert my state payment config (state admin)",
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -399,20 +484,31 @@
           }
         },
         {
-          "name": "GET — state payment config by stateId (own state admin)",
+          "name": "GET \u2014 state payment config by stateId (own state admin)",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "url": "{{baseUrl}}/payments/state-config/{{stateId}}"
           }
         },
         {
-          "name": "PUT — upsert state payment config by stateId (own state admin)",
+          "name": "PUT \u2014 upsert state payment config by stateId (own state admin)",
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -422,20 +518,31 @@
           }
         },
         {
-          "name": "GET — list state payment configs (national)",
+          "name": "GET \u2014 list state payment configs (national)",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "url": "{{baseUrl}}/payments/state-configs?page=1&pageSize=20"
           }
         },
         {
-          "name": "PUT — upsert state payment config (national)",
+          "name": "PUT \u2014 upsert state payment config (national)",
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -450,11 +557,14 @@
       "name": "Admin users",
       "item": [
         {
-          "name": "GET — list users (national, paginated)",
+          "name": "GET \u2014 list users (national, paginated)",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/admin/users?page=1&pageSize=20&userType=PLAYER&status=PENDING"
           }
@@ -465,21 +575,27 @@
       "name": "Dashboard",
       "item": [
         {
-          "name": "GET — stats (scoped by role)",
+          "name": "GET \u2014 stats (scoped by role)",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/dashboard/stats"
           }
         },
         {
-          "name": "GET — overview cards (scoped by role)",
+          "name": "GET \u2014 overview cards (scoped by role)",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/dashboard/overview"
           }
@@ -490,36 +606,54 @@
       "name": "Domains",
       "item": [
         {
-          "name": "GET — state by domain name (public)",
+          "name": "GET \u2014 state by domain name (public)",
           "request": {
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/domains/public/by-domain-name?domainName=pb.dummy.gatka.in",
-              "host": ["{{baseUrl}}"],
-              "path": ["domains", "public", "by-domain-name"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "domains",
+                "public",
+                "by-domain-name"
+              ],
               "query": [
-                { "key": "domainName", "value": "pb.dummy.gatka.in" }
+                {
+                  "key": "domainName",
+                  "value": "pb.dummy.gatka.in"
+                }
               ]
             }
           }
         },
         {
-          "name": "GET — list state domains (national)",
+          "name": "GET \u2014 list state domains (national)",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/domains"
           }
         },
         {
-          "name": "PATCH — update state domain (national)",
+          "name": "PATCH \u2014 update state domain (national)",
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -534,37 +668,46 @@
       "name": "User directory (hierarchy)",
       "item": [
         {
-          "name": "GET — list players",
+          "name": "GET \u2014 list players",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/users/players?page=1&pageSize=20&status=PENDING"
           }
         },
         {
-          "name": "GET — list coaches",
+          "name": "GET \u2014 list coaches",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/users/coaches?page=1&pageSize=20"
           }
         },
         {
-          "name": "GET — list officials (coaches + referees)",
+          "name": "GET \u2014 list officials (coaches + referees)",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/users/officials?page=1&pageSize=20"
           }
         },
         {
-          "name": "GET public — list accepted referees (name, state, district)",
+          "name": "GET public \u2014 list accepted referees (name, state, district)",
           "request": {
             "method": "GET",
             "header": [],
@@ -572,92 +715,122 @@
           }
         },
         {
-          "name": "GET — list referees",
+          "name": "GET \u2014 list referees",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/users/referees?page=1&pageSize=20"
           }
         },
         {
-          "name": "GET — list volunteer registrations",
+          "name": "GET \u2014 list volunteer registrations",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/volunteer-registrations?page=1&pageSize=20"
           }
         },
         {
-          "name": "GET — volunteer registration by id",
+          "name": "GET \u2014 volunteer registration by id",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/volunteer-registrations/{{volunteerRegistrationId}}"
           }
         },
         {
-          "name": "GET — list training centers (accounts)",
+          "name": "GET \u2014 list training centers (accounts)",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/users/training-centers?page=1&pageSize=20"
           }
         },
         {
-          "name": "GET — list district admins",
+          "name": "GET \u2014 list district admins",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/users/district-admins?page=1&pageSize=20"
           }
         },
         {
-          "name": "GET — list state admins",
+          "name": "GET \u2014 list state admins",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/users/state-admins?page=1&pageSize=20"
           }
         },
         {
-          "name": "GET — list national admins",
+          "name": "GET \u2014 list national admins",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/users/national-admins?page=1&pageSize=20"
           }
         },
         {
-          "name": "GET — user detail by id",
+          "name": "GET \u2014 user detail by id",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/users/{{userId}}"
           }
         },
         {
-          "name": "PATCH — set password for user (hierarchy)",
+          "name": "PATCH \u2014 set password for user (hierarchy)",
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -672,7 +845,7 @@
       "name": "Banners",
       "item": [
         {
-          "name": "GET public — active banners",
+          "name": "GET public \u2014 active banners",
           "request": {
             "method": "GET",
             "header": [],
@@ -680,7 +853,7 @@
           }
         },
         {
-          "name": "GET public — by state path (same as ?stateId)",
+          "name": "GET public \u2014 by state path (same as ?stateId)",
           "request": {
             "method": "GET",
             "header": [],
@@ -688,7 +861,7 @@
           }
         },
         {
-          "name": "GET admin — all banners",
+          "name": "GET admin \u2014 all banners",
           "request": {
             "method": "GET",
             "header": [
@@ -701,7 +874,7 @@
           }
         },
         {
-          "name": "POST admin — create banner",
+          "name": "POST admin \u2014 create banner",
           "event": [
             {
               "listen": "test",
@@ -722,7 +895,10 @@
                 "key": "Authorization",
                 "value": "Bearer {{accessToken}}"
               },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -732,7 +908,7 @@
           }
         },
         {
-          "name": "GET admin — banner by id",
+          "name": "GET admin \u2014 banner by id",
           "request": {
             "method": "GET",
             "header": [
@@ -745,7 +921,7 @@
           }
         },
         {
-          "name": "PATCH admin — update banner",
+          "name": "PATCH admin \u2014 update banner",
           "request": {
             "method": "PATCH",
             "header": [
@@ -753,7 +929,10 @@
                 "key": "Authorization",
                 "value": "Bearer {{accessToken}}"
               },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -763,7 +942,7 @@
           }
         },
         {
-          "name": "DELETE admin — banner",
+          "name": "DELETE admin \u2014 banner",
           "request": {
             "method": "DELETE",
             "header": [
@@ -778,7 +957,7 @@
       ]
     },
     {
-      "name": "Uploads — R2",
+      "name": "Uploads \u2014 R2",
       "item": [
         {
           "name": "POST backend upload (multipart)",
@@ -788,8 +967,16 @@
             "body": {
               "mode": "formdata",
               "formdata": [
-                { "key": "prefix", "value": "banners", "type": "text" },
-                { "key": "file", "type": "file", "src": [] }
+                {
+                  "key": "prefix",
+                  "value": "banners",
+                  "type": "text"
+                },
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
               ]
             },
             "url": "{{baseUrl}}/uploads/r2/upload"
@@ -799,7 +986,12 @@
           "name": "POST presign PUT",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"contentType\": \"image/png\",\n  \"prefix\": \"banners\"\n}"
@@ -816,10 +1008,21 @@
           "name": "POST /profile-photos/me (multipart)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "body": {
               "mode": "formdata",
-              "formdata": [{ "key": "file", "type": "file", "src": [] }]
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
             },
             "url": "{{baseUrl}}/profile-photos/me"
           }
@@ -834,8 +1037,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -849,8 +1058,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -865,7 +1080,7 @@
       "name": "State Registrations",
       "item": [
         {
-          "name": "POST — submit state registration",
+          "name": "POST \u2014 submit state registration",
           "event": [
             {
               "listen": "test",
@@ -883,7 +1098,10 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -893,32 +1111,44 @@
           }
         },
         {
-          "name": "GET — list state registrations (national, paginated)",
+          "name": "GET \u2014 list state registrations (national, paginated)",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/state-registrations?page=1&pageSize=20&status=PENDING"
           }
         },
         {
-          "name": "GET — state registration by stateId",
+          "name": "GET \u2014 state registration by stateId",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/state-registrations/state/{{stateId}}"
           }
         },
         {
-          "name": "PATCH — approve/reject state registration",
+          "name": "PATCH \u2014 approve/reject state registration",
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -928,12 +1158,18 @@
           }
         },
         {
-          "name": "PATCH — accept/reject state registration (decision)",
+          "name": "PATCH \u2014 accept/reject state registration (decision)",
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -948,7 +1184,7 @@
       "name": "District Registrations",
       "item": [
         {
-          "name": "POST — submit district registration",
+          "name": "POST \u2014 submit district registration",
           "event": [
             {
               "listen": "test",
@@ -966,7 +1202,10 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -976,32 +1215,44 @@
           }
         },
         {
-          "name": "GET — list district registrations (paginated)",
+          "name": "GET \u2014 list district registrations (paginated)",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/district-registrations?page=1&pageSize=20&status=PENDING"
           }
         },
         {
-          "name": "GET — district registration by districtId",
+          "name": "GET \u2014 district registration by districtId",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/district-registrations/district/{{districtId}}"
           }
         },
         {
-          "name": "PATCH — approve/reject district registration",
+          "name": "PATCH \u2014 approve/reject district registration",
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1016,21 +1267,27 @@
       "name": "Volunteer Registrations",
       "item": [
         {
-          "name": "GET — list volunteer registrations",
+          "name": "GET \u2014 list volunteer registrations",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/volunteer-registrations?page=1&pageSize=20&status=REGISTERED"
           }
         },
         {
-          "name": "GET — volunteer registration by id",
+          "name": "GET \u2014 volunteer registration by id",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/volunteer-registrations/{{volunteerRegistrationId}}"
           }
@@ -1041,7 +1298,7 @@
       "name": "Gallery",
       "item": [
         {
-          "name": "GET public — gallery by state",
+          "name": "GET public \u2014 gallery by state",
           "request": {
             "method": "GET",
             "header": [],
@@ -1049,17 +1306,20 @@
           }
         },
         {
-          "name": "GET admin — all gallery images",
+          "name": "GET admin \u2014 all gallery images",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/gallery"
           }
         },
         {
-          "name": "POST — add gallery image",
+          "name": "POST \u2014 add gallery image",
           "event": [
             {
               "listen": "test",
@@ -1075,8 +1335,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1086,11 +1352,14 @@
           }
         },
         {
-          "name": "DELETE — remove gallery image",
+          "name": "DELETE \u2014 remove gallery image",
           "request": {
             "method": "DELETE",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/gallery/{{galleryImageId}}"
           }
@@ -1101,7 +1370,7 @@
       "name": "Messages",
       "item": [
         {
-          "name": "GET public — messages by state",
+          "name": "GET public \u2014 messages by state",
           "request": {
             "method": "GET",
             "header": [],
@@ -1109,17 +1378,20 @@
           }
         },
         {
-          "name": "GET admin — all messages",
+          "name": "GET admin \u2014 all messages",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/messages?stateId={{stateId}}"
           }
         },
         {
-          "name": "POST — create message",
+          "name": "POST \u2014 create message",
           "event": [
             {
               "listen": "test",
@@ -1135,8 +1407,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1146,22 +1424,31 @@
           }
         },
         {
-          "name": "GET — message by id",
+          "name": "GET \u2014 message by id",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/messages/{{messageId}}"
           }
         },
         {
-          "name": "PATCH — update message",
+          "name": "PATCH \u2014 update message",
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1171,11 +1458,14 @@
           }
         },
         {
-          "name": "DELETE — remove message",
+          "name": "DELETE \u2014 remove message",
           "request": {
             "method": "DELETE",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/messages/{{messageId}}"
           }
@@ -1186,7 +1476,7 @@
       "name": "About us",
       "item": [
         {
-          "name": "GET public — about us by state (query)",
+          "name": "GET public \u2014 about us by state (query)",
           "request": {
             "method": "GET",
             "header": [],
@@ -1194,7 +1484,7 @@
           }
         },
         {
-          "name": "GET public — about us by state (path)",
+          "name": "GET public \u2014 about us by state (path)",
           "request": {
             "method": "GET",
             "header": [],
@@ -1202,7 +1492,7 @@
           }
         },
         {
-          "name": "GET public — about us by state id (short path)",
+          "name": "GET public \u2014 about us by state id (short path)",
           "request": {
             "method": "GET",
             "header": [],
@@ -1210,17 +1500,20 @@
           }
         },
         {
-          "name": "GET admin — list (stateId optional)",
+          "name": "GET admin \u2014 list (stateId optional)",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/about-us/admin?stateId={{stateId}}"
           }
         },
         {
-          "name": "POST — create about us",
+          "name": "POST \u2014 create about us",
           "event": [
             {
               "listen": "test",
@@ -1237,33 +1530,48 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"stateId\": \"{{stateId}}\",\n  \"logoUrl\": \"https://example.com/logo.png\",\n  \"stateTitle\": \"Gatka Association Punjab\",\n  \"stateTitleNative\": \"ਗਤਕਾ\",\n  \"phoneNo\": \"+91 9876543210\",\n  \"email\": \"contact@example.com\",\n  \"fbUrl\": \"https://facebook.com/example\",\n  \"ytUrl\": \"https://youtube.com/example\",\n  \"instaUrl\": \"https://instagram.com/example\",\n  \"address\": \"123 Stadium Road, City\"\n}"
+              "raw": "{\n  \"stateId\": \"{{stateId}}\",\n  \"logoUrl\": \"https://example.com/logo.png\",\n  \"stateTitle\": \"Gatka Association Punjab\",\n  \"stateTitleNative\": \"\u0a17\u0a24\u0a15\u0a3e\",\n  \"phoneNo\": \"+91 9876543210\",\n  \"email\": \"contact@example.com\",\n  \"fbUrl\": \"https://facebook.com/example\",\n  \"ytUrl\": \"https://youtube.com/example\",\n  \"instaUrl\": \"https://instagram.com/example\",\n  \"address\": \"123 Stadium Road, City\"\n}"
             },
             "url": "{{baseUrl}}/about-us"
           }
         },
         {
-          "name": "GET — about us by id",
+          "name": "GET \u2014 about us by id",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/about-us/{{aboutUsId}}"
           }
         },
         {
-          "name": "PATCH — update about us",
+          "name": "PATCH \u2014 update about us",
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1273,11 +1581,14 @@
           }
         },
         {
-          "name": "DELETE — remove about us",
+          "name": "DELETE \u2014 remove about us",
           "request": {
             "method": "DELETE",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/about-us/{{aboutUsId}}"
           }
@@ -1288,7 +1599,7 @@
       "name": "Age categories",
       "item": [
         {
-          "name": "GET public — active age categories",
+          "name": "GET public \u2014 active age categories",
           "request": {
             "method": "GET",
             "header": [],
@@ -1296,15 +1607,20 @@
           }
         },
         {
-          "name": "GET admin — all age categories (national)",
+          "name": "GET admin \u2014 all age categories (national)",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "url": "{{baseUrl}}/age-categories/admin?page=1&pageSize=50"
           }
         },
         {
-          "name": "POST — create age category (national)",
+          "name": "POST \u2014 create age category (national)",
           "event": [
             {
               "listen": "test",
@@ -1320,8 +1636,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1331,12 +1653,18 @@
           }
         },
         {
-          "name": "PATCH — update age category (national)",
+          "name": "PATCH \u2014 update age category (national)",
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1346,10 +1674,15 @@
           }
         },
         {
-          "name": "DELETE — age category (national)",
+          "name": "DELETE \u2014 age category (national)",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "url": "{{baseUrl}}/age-categories/{{ageCategoryId}}"
           }
         }
@@ -1359,7 +1692,7 @@
       "name": "States",
       "item": [
         {
-          "name": "GET public — enabled states",
+          "name": "GET public \u2014 enabled states",
           "request": {
             "method": "GET",
             "header": [],
@@ -1367,7 +1700,7 @@
           }
         },
         {
-          "name": "GET public — enabled states + accepted registration + payment config",
+          "name": "GET public \u2014 enabled states + accepted registration + payment config",
           "event": [
             {
               "listen": "test",
@@ -1389,27 +1722,33 @@
           }
         },
         {
-          "name": "GET all — states (national admin)",
+          "name": "GET all \u2014 states (national admin)",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/states?page=1&pageSize=50"
           }
         },
         {
-          "name": "GET — state by id (relations)",
+          "name": "GET \u2014 state by id (relations)",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/states/{{stateId}}"
           }
         },
         {
-          "name": "POST — create state (national admin)",
+          "name": "POST \u2014 create state (national admin)",
           "event": [
             {
               "listen": "test",
@@ -1425,8 +1764,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1436,12 +1781,18 @@
           }
         },
         {
-          "name": "PATCH — update state (enable/disable/rename)",
+          "name": "PATCH \u2014 update state (enable/disable/rename)",
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1451,22 +1802,31 @@
           }
         },
         {
-          "name": "GET — state payment config (own state admin)",
+          "name": "GET \u2014 state payment config (own state admin)",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/states/{{stateId}}/payment-config"
           }
         },
         {
-          "name": "PUT — upsert state payment config (own state admin)",
+          "name": "PUT \u2014 upsert state payment config (own state admin)",
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1481,7 +1841,7 @@
       "name": "Districts",
       "item": [
         {
-          "name": "GET public — enabled districts by state",
+          "name": "GET public \u2014 enabled districts by state",
           "request": {
             "method": "GET",
             "header": [],
@@ -1489,7 +1849,7 @@
           }
         },
         {
-          "name": "GET public — enabled districts + accepted district registration",
+          "name": "GET public \u2014 enabled districts + accepted district registration",
           "event": [
             {
               "listen": "test",
@@ -1511,27 +1871,33 @@
           }
         },
         {
-          "name": "GET admin — all districts by state",
+          "name": "GET admin \u2014 all districts by state",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/districts/by-state/{{stateId}}?page=1&pageSize=50"
           }
         },
         {
-          "name": "GET — district by id (relations)",
+          "name": "GET \u2014 district by id (relations)",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/districts/{{districtId}}"
           }
         },
         {
-          "name": "POST — create district (stateId in body)",
+          "name": "POST \u2014 create district (stateId in body)",
           "event": [
             {
               "listen": "test",
@@ -1548,8 +1914,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1559,12 +1931,18 @@
           }
         },
         {
-          "name": "PATCH — update district (id in body)",
+          "name": "PATCH \u2014 update district (id in body)",
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1574,12 +1952,18 @@
           }
         },
         {
-          "name": "POST — bulk add districts under state",
+          "name": "POST \u2014 bulk add districts under state",
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1589,7 +1973,7 @@
           }
         },
         {
-          "name": "POST — create district under state",
+          "name": "POST \u2014 create district under state",
           "event": [
             {
               "listen": "test",
@@ -1605,8 +1989,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1616,12 +2006,18 @@
           }
         },
         {
-          "name": "PATCH — update district (enable/disable/rename)",
+          "name": "PATCH \u2014 update district (enable/disable/rename)",
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1637,66 +2033,107 @@
       "description": "Mark attendance: roles COACH, TRAINING_CENTER, DISTRICT_ADMIN, STATE_ADMIN, NATIONAL_ADMIN. `date` is ISO calendar date `YYYY-MM-DD`. Types: TOURNAMENT (optional `competitionId`), CAMP (optional `campId`), TC_DAILY (optional `trainingCenterId` for a player at a TC). Competition summary: DISTRICT_ADMIN, STATE_ADMIN, NATIONAL_ADMIN only.",
       "item": [
         {
-          "name": "GET — report (training center + date)",
+          "name": "GET \u2014 report (training center + date)",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "url": "{{baseUrl}}/attendance/report?trainingCenterId={{trainingCenterId}}&date=2026-04-24"
           }
         },
         {
-          "name": "GET — report (competition, optional event + date)",
+          "name": "GET \u2014 report (camp, optional date)",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
-            "url": "{{baseUrl}}/attendance/report?competitionId={{competitionId}}&date=2026-04-24"
-          }
-        },
-        {
-          "name": "GET — report (camp, optional date)",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "url": "{{baseUrl}}/attendance/report?campId={{campId}}&date=2026-04-24"
           }
         },
         {
-          "name": "POST — bulk mark attendance",
+          "name": "POST \u2014 bulk mark attendance",
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"items\": [\n    {\n      \"userId\": \"{{userId}}\",\n      \"date\": \"2026-04-24\",\n      \"type\": \"TOURNAMENT\",\n      \"present\": true,\n      \"competitionId\": \"{{competitionId}}\"\n    }\n  ]\n}"
+              "raw": "{\n  \"items\": [\n    {\n      \"userId\": \"{{userId}}\",\n      \"date\": \"2026-04-24\",\n      \"type\": \"TC_DAILY\",\n      \"present\": true,\n      \"trainingCenterId\": \"{{trainingCenterId}}\"\n    }\n  ]\n}"
             },
             "url": "{{baseUrl}}/attendance/bulk"
           }
         },
         {
-          "name": "POST — mark attendance (tournament)",
+          "name": "POST \u2014 mark competition attendance",
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"date\": \"2026-04-24\",\n  \"type\": \"TOURNAMENT\",\n  \"present\": true,\n  \"competitionId\": \"{{competitionId}}\",\n  \"notes\": \"optional\"\n}"
+              "raw": "{\n  \"competitionId\": \"{{competitionId}}\",\n  \"eventId\": \"{{eventId}}\",\n  \"userId\": \"{{userId}}\",\n  \"present\": true,\n  \"notes\": \"optional\"\n}"
             },
-            "url": "{{baseUrl}}/attendance"
+            "url": "{{baseUrl}}/competition-attendance"
           }
         },
         {
-          "name": "POST — mark attendance (camp)",
+          "name": "POST \u2014 bulk mark competition attendance",
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"competitionId\": \"{{competitionId}}\",\n  \"eventId\": \"{{eventId}}\",\n  \"items\": [\n    { \"userId\": \"{{userId}}\", \"present\": true }\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/competition-attendance/bulk"
+          }
+        },
+        {
+          "name": "POST \u2014 mark attendance (camp)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1706,12 +2143,18 @@
           }
         },
         {
-          "name": "POST — mark attendance (training center daily)",
+          "name": "POST \u2014 mark attendance (training center daily)",
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1721,42 +2164,63 @@
           }
         },
         {
-          "name": "GET — list attendance for user",
+          "name": "GET \u2014 list attendance for user",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "url": "{{baseUrl}}/attendance/user/{{userId}}"
           }
         },
         {
-          "name": "GET — tournament attendance summary (competition)",
+          "name": "GET \u2014 competition attendance report",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
-            "url": "{{baseUrl}}/attendance/competition/{{competitionId}}/summary"
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/competition-attendance/report?competitionId={{competitionId}}&eventId={{eventId}}"
           }
         }
       ]
     },
     {
-      "name": "Competitions — aggregate results",
-      "description": "Organization-level 1st/2nd/3rd by competition level: DISTRICT → training centers, STATE → districts, NATIONAL → states. One winner in firstPlace; secondPlace and thirdPlace are arrays (ties).",
+      "name": "Competitions \u2014 aggregate results",
+      "description": "Organization-level 1st/2nd/3rd by competition level: DISTRICT \u2192 training centers, STATE \u2192 districts, NATIONAL \u2192 states. One winner in firstPlace; secondPlace and thirdPlace are arrays (ties).",
       "item": [
         {
-          "name": "GET — aggregate results",
+          "name": "GET \u2014 aggregate results",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "url": "{{baseUrl}}/competitions/{{competitionId}}/aggregate-results"
           }
         },
         {
-          "name": "POST — set aggregate results (replace)",
+          "name": "POST \u2014 set aggregate results (replace)",
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1768,7 +2232,7 @@
       ]
     },
     {
-      "name": "Reference — existing endpoints",
+      "name": "Reference \u2014 existing endpoints",
       "item": [
         {
           "name": "Event groups",
@@ -1778,7 +2242,7 @@
           }
         },
         {
-          "name": "Settings — Global (auth)",
+          "name": "Settings \u2014 Global (auth)",
           "request": {
             "method": "GET",
             "header": [
@@ -1791,12 +2255,18 @@
           }
         },
         {
-          "name": "Settings — PATCH membership expiry date (super national)",
+          "name": "Settings \u2014 PATCH membership expiry date (super national)",
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1806,7 +2276,7 @@
           }
         },
         {
-          "name": "Settings — GET role payment fees (public)",
+          "name": "Settings \u2014 GET role payment fees (public)",
           "request": {
             "method": "GET",
             "header": [],
@@ -1814,12 +2284,18 @@
           }
         },
         {
-          "name": "Settings — PATCH role payment fees (national admin)",
+          "name": "Settings \u2014 PATCH role payment fees (national admin)",
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1834,42 +2310,67 @@
       "name": "Memberships",
       "item": [
         {
-          "name": "GET — my memberships",
+          "name": "GET \u2014 my memberships",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "url": "{{baseUrl}}/memberships/me"
           }
         },
         {
-          "name": "GET — list all memberships (admin)",
+          "name": "GET \u2014 list all memberships (admin)",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "url": "{{baseUrl}}/memberships?page=1&pageSize=20&status=ACTIVE"
           }
         },
         {
-          "name": "GET — memberships by userId (admin)",
+          "name": "GET \u2014 memberships by userId (admin)",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "url": "{{baseUrl}}/memberships/user/{{userId}}"
           }
         },
         {
-          "name": "GET — single membership (admin)",
+          "name": "GET \u2014 single membership (admin)",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "url": "{{baseUrl}}/memberships/{{membershipId}}"
           }
         },
         {
-          "name": "POST — trigger membership expiry (national admin)",
+          "name": "POST \u2014 trigger membership expiry (national admin)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "url": "{{baseUrl}}/memberships/expire"
           }
         }

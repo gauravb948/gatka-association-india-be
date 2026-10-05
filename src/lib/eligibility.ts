@@ -2,7 +2,7 @@ import type { CompetitionLevel, Gender } from "@prisma/client";
 import * as playerRepository from "../repositories/player.repository.js";
 import * as participationRepository from "../repositories/participation.repository.js";
 import * as competitionRepository from "../repositories/competition.repository.js";
-import * as attendanceRepository from "../repositories/attendance.repository.js";
+import * as competitionAttendanceRepository from "../repositories/competitionAttendance.repository.js";
 import { prisma } from "./prisma.js";
 import { AppError } from "./errors.js";
 import { fitsAgeCategory } from "./age.js";
@@ -223,18 +223,20 @@ export async function assertPlayerFitsTournamentEventAge(
 
 export async function assertAttendanceForCertificate(
   competitionId: string,
+  eventId: string,
   playerUserId: string
 ) {
   const comp = await competitionRepository.findByIdBasic(competitionId);
   if (!comp) throw new AppError(404, "Competition not found");
-  const days = await attendanceRepository.findTournamentPresentForPlayer(
+  const present = await competitionAttendanceRepository.findPresentForPlayerEvent(
     competitionId,
+    eventId,
     playerUserId
   );
-  if (days.length === 0) {
+  if (!present) {
     throw new AppError(
       400,
-      "Certificate requires tournament attendance",
+      "Certificate requires attendance for this event",
       "ATTENDANCE_REQUIRED"
     );
   }
