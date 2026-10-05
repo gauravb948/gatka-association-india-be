@@ -694,7 +694,7 @@ export function findByIdBasic(id: string) {
 type CompetitionParticipantDeleteCounts = {
   participations: number;
   tournamentRegistrations: number;
-  attendance: number;
+  competitionAttendance: number;
   results: number;
   aggregateStandings: number;
 };
@@ -712,7 +712,7 @@ async function deleteCompetitionParticipantRows(
     ? { user: { playerProfile: playerProfileWhere } }
     : {};
 
-  const [participations, tournamentRegistrations, attendance, results, aggregateStandings] =
+  const [participations, tournamentRegistrations, competitionAttendance, results, aggregateStandings] =
     await Promise.all([
       tx.participationRecord.deleteMany({
         where: { competitionId, ...playerUserFilter },
@@ -720,7 +720,7 @@ async function deleteCompetitionParticipantRows(
       tx.tournamentRegistration.deleteMany({
         where: { competitionId, ...playerUserFilter },
       }),
-      tx.attendance.deleteMany({
+      tx.competitionAttendance.deleteMany({
         where: { competitionId, ...attendanceUserFilter },
       }),
       tx.competitionResult.deleteMany({
@@ -733,7 +733,7 @@ async function deleteCompetitionParticipantRows(
   return {
     participations: participations.count,
     tournamentRegistrations: tournamentRegistrations.count,
-    attendance: attendance.count,
+    competitionAttendance: competitionAttendance.count,
     results: results.count,
     aggregateStandings: aggregateStandings.count,
   };

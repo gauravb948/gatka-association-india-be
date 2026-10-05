@@ -942,7 +942,10 @@ model GeneratedCertificate {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
-  @@unique([competitionId, eventId, playerUserId, kind])
+  /// Default constraint name is 64 chars (over Postgres's 63-byte identifier limit);
+  /// Postgres silently truncates it to this on creation. Pinned explicitly so Prisma's
+  /// expected name matches what's actually in the database everywhere.
+  @@unique([competitionId, eventId, playerUserId, kind], map: "GeneratedCertificate_competitionId_eventId_playerUserId_kind_ke")
   @@index([competitionId, eventId, kind])
   @@index([playerUserId])
 }

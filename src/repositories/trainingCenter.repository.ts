@@ -76,6 +76,7 @@ export type TrainingCenterDeleteCounts = {
   participations: number;
   tournamentRegistrations: number;
   attendance: number;
+  competitionAttendance: number;
   results: number;
   payments: number;
   notices: number;
@@ -154,6 +155,14 @@ export function deleteTrainingCenterWithPlayers(id: string): Promise<TrainingCen
               }
             : { trainingCenterId: id },
       });
+      const competitionAttendance =
+        userIds.length > 0
+          ? await tx.competitionAttendance.deleteMany({
+              where: {
+                OR: [{ userId: { in: userIds } }, { markedById: { in: userIds } }],
+              },
+            })
+          : { count: 0 };
       const notices =
         userIds.length > 0
           ? await tx.notice.deleteMany({ where: { authorId: { in: userIds } } })
@@ -197,6 +206,7 @@ export function deleteTrainingCenterWithPlayers(id: string): Promise<TrainingCen
         participations,
         tournamentRegistrations,
         attendance: attendance.count,
+        competitionAttendance: competitionAttendance.count,
         results,
         payments,
         notices: notices.count,
