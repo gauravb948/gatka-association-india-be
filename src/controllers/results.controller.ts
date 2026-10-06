@@ -11,6 +11,7 @@ import { assertCanViewCompetitionScopedReport } from "../lib/competitionManageme
 import { actorPlayerProfileScopeWhere } from "../lib/competitionParticipation.js";
 import { buildResultListItems, genderLabel } from "../lib/competitionResultList.js";
 import { buildCompetitionWinnersForExport } from "../lib/competitionWinnersExport.js";
+import { orgColumnLabelForLevel } from "../lib/competitionAccreditationExport.js";
 import * as generatedCertificateRepository from "../repositories/generatedCertificate.repository.js";
 import {
   competitionResultBodySchema,
@@ -180,7 +181,7 @@ export async function exportXlsx(req: Request, res: Response, next: NextFunction
       { header: "Father Name", key: "father", width: 28 },
       { header: "Date of Birth", key: "dob", width: 16 },
       { header: "Aadhar Number", key: "aadhar", width: 18 },
-      { header: "District", key: "district", width: 20 },
+      { header: orgColumnLabelForLevel(comp.level), key: "org", width: 20 },
       { header: "Event", key: "event", width: 28 },
       { header: "Position", key: "position", width: 12 },
       { header: "Gender", key: "gender", width: 10 },
@@ -193,7 +194,7 @@ export async function exportXlsx(req: Request, res: Response, next: NextFunction
         father: r.fatherName ?? "",
         dob: r.dateOfBirth.toISOString().slice(0, 10),
         aadhar: r.aadharNumber ?? "",
-        district: r.districtName,
+        org: r.organisation,
         event: r.eventName,
         position: r.rankLabel,
         gender: genderLabel(r.gender),

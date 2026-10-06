@@ -2,6 +2,7 @@ import type { CompetitionLevel, Gender, Prisma } from "@prisma/client";
 import { prisma } from "./prisma.js";
 import { aggregateUnitTypeForLevel } from "./competitionAggregateUnits.js";
 import { rankLabelForBand } from "./certificateLayout.js";
+import { organisationForLevel } from "./competitionAccreditationExport.js";
 
 export type CompetitionWinnerRow = {
   playerUserId: string;
@@ -9,7 +10,8 @@ export type CompetitionWinnerRow = {
   fatherName: string | null;
   dateOfBirth: Date;
   aadharNumber: string | null;
-  districtName: string;
+  /** Training Center for DISTRICT-level competitions, District for STATE, State for NATIONAL. */
+  organisation: string;
   eventName: string;
   rankLabel: string;
   gender: Gender;
@@ -83,7 +85,9 @@ export async function buildCompetitionWinnersForExport(params: {
               stateId: true,
               districtId: true,
               trainingCenterId: true,
+              state: { select: { name: true } },
               district: { select: { name: true } },
+              trainingCenter: { select: { name: true } },
             },
           },
         },
@@ -108,7 +112,7 @@ export async function buildCompetitionWinnersForExport(params: {
       fatherName: profile.fatherName,
       dateOfBirth: profile.dateOfBirth,
       aadharNumber: profile.aadharNumber,
-      districtName: profile.district.name,
+      organisation: organisationForLevel(level, profile),
       eventName: p.event.name,
       rankLabel: rankLabelForBand(rankBand),
       gender: profile.gender,

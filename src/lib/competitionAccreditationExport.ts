@@ -40,7 +40,7 @@ export function orgColumnLabelForLevel(level: CompetitionLevel): AccreditationOr
   return "Training Center";
 }
 
-function organisationForLevel(
+export function organisationForLevel(
   level: CompetitionLevel,
   profile: {
     state: { name: string } | null;
