@@ -24,5 +24,6 @@ resultsRouter.get(
 resultsRouter.get(
   "/competition/:competitionId/export.xlsx",
   requireAuth,
+  requireRoles("DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),
   resultsController.exportXlsx
 );

@@ -3,7 +3,7 @@ import type { ResultListContext } from "../repositories/competitionAggregateStan
 import { enrichByUnitType } from "../repositories/competitionAggregateStanding.repository.js";
 import { ageGroupLabel } from "./competitionAgeWiseReport.js";
 
-function genderLabel(gender: Gender): string {
+export function genderLabel(gender: Gender): string {
   if (gender === "MALE" || gender === "BOYS") return "Male";
   if (gender === "FEMALE" || gender === "GIRLS") return "Female";
   return "Open";

@@ -44,17 +44,6 @@ export function findManyForPdfExport(competitionId: string) {
   });
 }
 
-export function findManyForXlsxExport(competitionId: string) {
-  return prisma.competitionResult.findMany({
-    where: { competitionId },
-    include: {
-      event: { include: { eventGroup: { include: { ageCategory: true } } } },
-      playerUser: { include: { playerProfile: true } },
-    },
-    orderBy: [{ eventId: "asc" }, { rank: "asc" }],
-  });
-}
-
 export function findUniqueForVerify(
   competitionId: string,
   eventId: string,

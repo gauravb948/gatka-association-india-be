@@ -4,8 +4,13 @@ import ExcelJS from "exceljs";
 import QRCode from "qrcode";
 import * as competitionResultRepository from "../repositories/competitionResult.repository.js";
 import * as competitionAggregateStandingRepository from "../repositories/competitionAggregateStanding.repository.js";
+import * as competitionRepository from "../repositories/competition.repository.js";
+import { AppError } from "../lib/errors.js";
 import { assertAttendanceForCertificate } from "../lib/eligibility.js";
-import { buildResultListItems } from "../lib/competitionResultList.js";
+import { assertCanViewCompetitionScopedReport } from "../lib/competitionManagementScope.js";
+import { actorPlayerProfileScopeWhere } from "../lib/competitionParticipation.js";
+import { buildResultListItems, genderLabel } from "../lib/competitionResultList.js";
+import { buildCompetitionWinnersForExport } from "../lib/competitionWinnersExport.js";
 import * as generatedCertificateRepository from "../repositories/generatedCertificate.repository.js";
 import {
   competitionResultBodySchema,
@@ -150,38 +155,57 @@ export async function exportPdf(req: Request, res: Response, next: NextFunction)
   }
 }
 
+/** Exports individual winning players (unit podium, same rule as winner certificates). */
 export async function exportXlsx(req: Request, res: Response, next: NextFunction) {
   try {
-    const rows = await competitionResultRepository.findManyForXlsxExport(
+    const actor = req.dbUser!;
+    const comp = await competitionRepository.findByIdForPlayerEligibility(
       req.params.competitionId
     );
+    if (!comp) throw new AppError(404, "Competition not found");
+    await assertCanViewCompetitionScopedReport(actor, comp);
+
+    const rows = await buildCompetitionWinnersForExport({
+      competitionId: comp.id,
+      level: comp.level,
+      playerProfileWhere: actorPlayerProfileScopeWhere(actor),
+    });
+
     const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet("Results");
+    const ws = wb.addWorksheet("Winners");
     ws.columns = [
-      { header: "AgeGroup", key: "age", width: 20 },
-      { header: "EventGroup", key: "eg", width: 24 },
-      { header: "Event", key: "ev", width: 28 },
-      { header: "Player", key: "pl", width: 28 },
-      { header: "Rank", key: "rk", width: 8 },
-      { header: "Score", key: "sc", width: 12 },
+      { header: "Sr No", key: "sr", width: 8 },
+      { header: "Certificate No", key: "cert", width: 18 },
+      { header: "Name", key: "name", width: 28 },
+      { header: "Father Name", key: "father", width: 28 },
+      { header: "Date of Birth", key: "dob", width: 16 },
+      { header: "Aadhar Number", key: "aadhar", width: 18 },
+      { header: "District", key: "district", width: 20 },
+      { header: "Event", key: "event", width: 28 },
+      { header: "Position", key: "position", width: 12 },
+      { header: "Gender", key: "gender", width: 10 },
     ];
-    for (const r of rows) {
+    rows.forEach((r, idx) => {
       ws.addRow({
-        age: r.event.eventGroup.ageCategory.name,
-        eg: `${r.event.eventGroup.segment} (${r.event.eventGroup.gender})`,
-        ev: r.event.name,
-        pl: r.playerUser.playerProfile?.fullName ?? r.playerUser.email,
-        rk: r.rank,
-        sc: r.score,
+        sr: idx + 1,
+        cert: "",
+        name: r.fullName,
+        father: r.fatherName ?? "",
+        dob: r.dateOfBirth.toISOString().slice(0, 10),
+        aadhar: r.aadharNumber ?? "",
+        district: r.districtName,
+        event: r.eventName,
+        position: r.rankLabel,
+        gender: genderLabel(r.gender),
       });
-    }
+    });
     res.setHeader(
       "Content-Type",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     );
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="results-${req.params.competitionId}.xlsx"`
+      `attachment; filename="winners-${comp.id}.xlsx"`
     );
     await wb.xlsx.write(res);
     res.end();
