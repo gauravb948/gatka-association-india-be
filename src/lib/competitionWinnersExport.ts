@@ -1,7 +1,6 @@
 import type { CompetitionLevel, Gender, Prisma } from "@prisma/client";
 import { prisma } from "./prisma.js";
 import { aggregateUnitTypeForLevel } from "./competitionAggregateUnits.js";
-import { rankLabelForBand } from "./certificateLayout.js";
 import { organisationForLevel } from "./competitionAccreditationExport.js";
 
 export type CompetitionWinnerRow = {
@@ -26,10 +25,19 @@ function playerUnitId(
   return profile.stateId;
 }
 
+/** Export uses ordinal positions (First/Second/Third) rather than the Gold/Silver/Bronze
+ * labels used on printed certificates (certificateLayout.ts's rankLabelForBand). */
+function positionLabel(rankBand: number): string {
+  if (rankBand === 1) return "First";
+  if (rankBand === 2) return "Second";
+  if (rankBand === 3) return "Third";
+  return "Participant";
+}
+
 function rankOrder(label: string): number {
-  if (label === "Gold") return 0;
-  if (label === "Silver") return 1;
-  if (label === "Bronze") return 2;
+  if (label === "First") return 0;
+  if (label === "Second") return 1;
+  if (label === "Third") return 2;
   return 3;
 }
 
@@ -114,7 +122,7 @@ export async function buildCompetitionWinnersForExport(params: {
       aadharNumber: profile.aadharNumber,
       organisation: organisationForLevel(level, profile),
       eventName: p.event.name,
-      rankLabel: rankLabelForBand(rankBand),
+      rankLabel: positionLabel(rankBand),
       gender: profile.gender,
     });
   }

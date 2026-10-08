@@ -11,6 +11,7 @@ import { assertCanViewCompetitionScopedReport } from "../lib/competitionManageme
 import { actorPlayerProfileScopeWhere } from "../lib/competitionParticipation.js";
 import { buildResultListItems, genderLabel } from "../lib/competitionResultList.js";
 import { buildCompetitionWinnersForExport } from "../lib/competitionWinnersExport.js";
+import { buildCompetitionParticipantsForExport } from "../lib/competitionParticipantsExport.js";
 import { orgColumnLabelForLevel } from "../lib/competitionAccreditationExport.js";
 import * as generatedCertificateRepository from "../repositories/generatedCertificate.repository.js";
 import {
@@ -207,6 +208,63 @@ export async function exportXlsx(req: Request, res: Response, next: NextFunction
     res.setHeader(
       "Content-Disposition",
       `attachment; filename="winners-${comp.id}.xlsx"`
+    );
+    await wb.xlsx.write(res);
+    res.end();
+  } catch (e) {
+    next(e);
+  }
+}
+
+/** Exports every participant (not just winners) — same columns minus Position. */
+export async function exportParticipantsXlsx(req: Request, res: Response, next: NextFunction) {
+  try {
+    const actor = req.dbUser!;
+    const comp = await competitionRepository.findByIdForPlayerEligibility(
+      req.params.competitionId
+    );
+    if (!comp) throw new AppError(404, "Competition not found");
+    await assertCanViewCompetitionScopedReport(actor, comp);
+
+    const rows = await buildCompetitionParticipantsForExport({
+      competitionId: comp.id,
+      level: comp.level,
+      playerProfileWhere: actorPlayerProfileScopeWhere(actor),
+    });
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Participants");
+    ws.columns = [
+      { header: "Sr No", key: "sr", width: 8 },
+      { header: "Certificate No", key: "cert", width: 18 },
+      { header: "Name", key: "name", width: 28 },
+      { header: "Father Name", key: "father", width: 28 },
+      { header: "Date of Birth", key: "dob", width: 16 },
+      { header: "Aadhar Number", key: "aadhar", width: 18 },
+      { header: orgColumnLabelForLevel(comp.level), key: "org", width: 20 },
+      { header: "Event", key: "event", width: 28 },
+      { header: "Gender", key: "gender", width: 10 },
+    ];
+    rows.forEach((r, idx) => {
+      ws.addRow({
+        sr: idx + 1,
+        cert: "",
+        name: r.fullName,
+        father: r.fatherName ?? "",
+        dob: r.dateOfBirth.toISOString().slice(0, 10),
+        aadhar: r.aadharNumber ?? "",
+        org: r.organisation,
+        event: r.eventName,
+        gender: genderLabel(r.gender),
+      });
+    });
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="participants-${comp.id}.xlsx"`
     );
     await wb.xlsx.write(res);
     res.end();
