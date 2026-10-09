@@ -965,14 +965,17 @@ model Notice {
 }
 
 model NationalNotice {
-  id          String   @id @default("singleton")
-  title       String
+  id          String   @id @default(cuid())
   body        String
   display     Boolean  @default(true)
+  sortOrder   Int      @default(0)
   updatedById String?
   updatedBy   User?    @relation("NationalNoticeUpdatedBy", fields: [updatedById], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([display])
+  @@index([sortOrder])
 }
 
 model OtpCode {

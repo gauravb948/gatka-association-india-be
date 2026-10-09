@@ -4,7 +4,8 @@ import * as noticeRepository from "../repositories/notice.repository.js";
 import * as nationalNoticeRepository from "../repositories/nationalNotice.repository.js";
 import { AppError } from "../lib/errors.js";
 import {
-  nationalNoticeBodySchema,
+  nationalNoticeCreateBodySchema,
+  nationalNoticePatchBodySchema,
   noticeBodySchema,
   noticeListQuerySchema,
 } from "../validators/notice.validators.js";
@@ -84,28 +85,69 @@ export async function remove(req: Request, res: Response, next: NextFunction) {
   }
 }
 
-/** `GET /notices/national` — public singleton national notice (may be null). */
-export async function getNational(_req: Request, res: Response, next: NextFunction) {
+/** `GET /notices/national` — public: every display=true notice, ordered for the home-page slider. */
+export async function listNationalPublic(_req: Request, res: Response, next: NextFunction) {
   try {
-    const row = await nationalNoticeRepository.get();
+    const rows = await nationalNoticeRepository.findManyPublicActive();
+    res.json(rows);
+  } catch (e) {
+    next(e);
+  }
+}
+
+/** `GET /notices/national/admin` — every notice, regardless of display (national admin). */
+export async function listNationalAdmin(_req: Request, res: Response, next: NextFunction) {
+  try {
+    const rows = await nationalNoticeRepository.findManyForAdmin();
+    res.json(rows);
+  } catch (e) {
+    next(e);
+  }
+}
+
+/** `POST /notices/national` — create a national notice message (national admin). */
+export async function createNational(req: Request, res: Response, next: NextFunction) {
+  try {
+    const u = req.dbUser!;
+    const body = nationalNoticeCreateBodySchema.parse(req.body);
+    const row = await nationalNoticeRepository.create({
+      body: body.body,
+      display: body.display ?? true,
+      sortOrder: body.sortOrder ?? 0,
+      updatedById: u.id,
+    });
+    res.status(201).json(row);
+  } catch (e) {
+    next(e);
+  }
+}
+
+/** `PATCH /notices/national/:id` — update a national notice message (national admin). */
+export async function patchNational(req: Request, res: Response, next: NextFunction) {
+  try {
+    const u = req.dbUser!;
+    const existing = await nationalNoticeRepository.findById(req.params.id);
+    if (!existing) throw new AppError(404, "National notice not found");
+    const body = nationalNoticePatchBodySchema.parse(req.body);
+    const row = await nationalNoticeRepository.update(existing.id, {
+      ...(body.body !== undefined ? { body: body.body } : {}),
+      ...(body.display !== undefined ? { display: body.display } : {}),
+      ...(body.sortOrder !== undefined ? { sortOrder: body.sortOrder } : {}),
+      updatedById: u.id,
+    });
     res.json(row);
   } catch (e) {
     next(e);
   }
 }
 
-/** `PUT /notices/national` — upsert the singleton national notice (national admin). */
-export async function upsertNational(req: Request, res: Response, next: NextFunction) {
+/** `DELETE /notices/national/:id` — remove a national notice message (national admin). */
+export async function removeNational(req: Request, res: Response, next: NextFunction) {
   try {
-    const u = req.dbUser!;
-    const body = nationalNoticeBodySchema.parse(req.body);
-    const row = await nationalNoticeRepository.upsert({
-      title: body.title,
-      body: body.body,
-      display: body.display,
-      updatedById: u.id,
-    });
-    res.json(row);
+    const existing = await nationalNoticeRepository.findById(req.params.id);
+    if (!existing) throw new AppError(404, "National notice not found");
+    await nationalNoticeRepository.remove(existing.id);
+    res.status(204).end();
   } catch (e) {
     next(e);
   }

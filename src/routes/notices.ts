@@ -4,13 +4,31 @@ import * as noticesController from "../controllers/notices.controller.js";
 
 export const noticesRouter = Router();
 
-// Public singleton national notice
-noticesRouter.get("/national", noticesController.getNational);
-noticesRouter.put(
+// National notices — public list (display=true only) + national-admin CRUD
+noticesRouter.get("/national", noticesController.listNationalPublic);
+noticesRouter.get(
+  "/national/admin",
+  requireAuth,
+  requireRoles("NATIONAL_ADMIN"),
+  noticesController.listNationalAdmin
+);
+noticesRouter.post(
   "/national",
   requireAuth,
   requireRoles("NATIONAL_ADMIN"),
-  noticesController.upsertNational
+  noticesController.createNational
+);
+noticesRouter.patch(
+  "/national/:id",
+  requireAuth,
+  requireRoles("NATIONAL_ADMIN"),
+  noticesController.patchNational
+);
+noticesRouter.delete(
+  "/national/:id",
+  requireAuth,
+  requireRoles("NATIONAL_ADMIN"),
+  noticesController.removeNational
 );
 
 // Hierarchy notices

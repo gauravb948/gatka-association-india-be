@@ -24,9 +24,14 @@ export const noticeListQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 
-/** Body for upserting the singleton national notice (national admin only). */
-export const nationalNoticeBodySchema = z.object({
-  title: z.string().trim().min(1),
+export const nationalNoticeCreateBodySchema = z.object({
   body: z.string().trim().min(1),
-  display: z.boolean(),
+  display: z.boolean().optional(),
+  sortOrder: z.number().int().optional(),
+});
+
+export const nationalNoticePatchBodySchema = z.object({
+  body: z.string().trim().min(1).optional(),
+  display: z.boolean().optional(),
+  sortOrder: z.number().int().optional(),
 });
