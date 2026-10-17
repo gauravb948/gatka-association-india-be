@@ -100,6 +100,8 @@ export async function list(req: Request, res: Response, next: NextFunction) {
         search: q.search,
         level: q.level,
         session: q.session,
+        stateId: q.stateId,
+        districtId: q.districtId,
       }
     );
     let grouped = await buildResultListItems(ctx);

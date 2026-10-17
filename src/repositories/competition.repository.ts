@@ -209,7 +209,14 @@ export function competitionResultsVisibilityWhere(user: {
 
 export function buildResultsListCompetitionFilter(
   user: { role: Role; stateId: string | null; districtId: string | null },
-  opts?: { competitionId?: string; search?: string; level?: CompetitionLevel; session?: number }
+  opts?: {
+    competitionId?: string;
+    search?: string;
+    level?: CompetitionLevel;
+    session?: number;
+    stateId?: string;
+    districtId?: string;
+  }
 ): Prisma.CompetitionWhereInput | null {
   const visibility = competitionResultsVisibilityWhere(user);
   if (visibility === null) return null;
@@ -222,7 +229,12 @@ export function buildResultsListCompetitionFilter(
     parts.push({ level: opts.level });
   }
   const base = parts.length === 1 ? parts[0]! : { AND: parts };
-  return withSessionYear(withNameContains(base, opts?.search), opts?.session);
+  const geoScoped = withGeoScope(base, {
+    stateId: opts?.stateId,
+    districtId: opts?.districtId,
+    level: opts?.level,
+  });
+  return withSessionYear(withNameContains(geoScoped, opts?.search), opts?.session);
 }
 
 const defaultCompetitionInclude = {

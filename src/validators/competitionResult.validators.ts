@@ -27,6 +27,8 @@ export const resultListQuerySchema = z.object({
   competitionId: z.string().min(1).optional(),
   level: z.enum(["NATIONAL", "STATE", "DISTRICT"]).optional(),
   session: optionalYear,
+  stateId: optionalSearch,
+  districtId: optionalSearch,
   ageGroup: optionalSearch,
   event: optionalSearch,
   certificates: z.enum(["generated", "missing"]).optional(),

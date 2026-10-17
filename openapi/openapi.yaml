@@ -5004,6 +5004,14 @@ paths:
           name: competitionId
           schema: { type: string }
           description: Optional filter to a single competition
+        - in: query
+          name: stateId
+          schema: { type: string }
+          description: Only competitions held in this state (same rule as `GET /competitions/me?stateId=`)
+        - in: query
+          name: districtId
+          schema: { type: string }
+          description: Only competitions held in this district
       responses:
         "200":
           description: OK
