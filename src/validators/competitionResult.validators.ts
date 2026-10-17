@@ -31,3 +31,21 @@ export const resultListQuerySchema = z.object({
   event: optionalSearch,
   certificates: z.enum(["generated", "missing"]).optional(),
 });
+
+const optionalId = z.preprocess((v) => {
+  if (v === undefined || v === null) return undefined;
+  const s = String(v).trim();
+  return s.length > 0 ? s : undefined;
+}, z.string().optional());
+
+/** Geography filters shared by the competition Excel exports and their preview. */
+export const resultExportQuerySchema = z.object({
+  stateId: optionalId,
+  districtId: optionalId,
+  trainingCenterId: optionalId,
+});
+
+/** Query for `GET /results/competition/:id/export-preview`. */
+export const resultExportPreviewQuerySchema = resultExportQuerySchema.extend({
+  kind: z.enum(["winners", "participants"]),
+});

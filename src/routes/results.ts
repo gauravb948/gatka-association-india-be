@@ -33,3 +33,15 @@ resultsRouter.get(
   requireRoles("DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),
   resultsController.exportParticipantsXlsx
 );
+resultsRouter.get(
+  "/competition/:competitionId/export-filters",
+  requireAuth,
+  requireRoles("DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),
+  resultsController.exportFilters
+);
+resultsRouter.get(
+  "/competition/:competitionId/export-preview",
+  requireAuth,
+  requireRoles("DISTRICT_ADMIN", "STATE_ADMIN", "NATIONAL_ADMIN"),
+  resultsController.exportPreview
+);

@@ -8,16 +8,83 @@ import * as competitionRepository from "../repositories/competition.repository.j
 import { AppError } from "../lib/errors.js";
 import { assertAttendanceForCertificate } from "../lib/eligibility.js";
 import { assertCanViewCompetitionScopedReport } from "../lib/competitionManagementScope.js";
-import { actorPlayerProfileScopeWhere } from "../lib/competitionParticipation.js";
-import { buildResultListItems, genderLabel } from "../lib/competitionResultList.js";
+import { buildResultListItems, genderLabel, groupResultItemsByCompetition } from "../lib/competitionResultList.js";
 import { buildCompetitionWinnersForExport } from "../lib/competitionWinnersExport.js";
 import { buildCompetitionParticipantsForExport } from "../lib/competitionParticipantsExport.js";
 import { orgColumnLabelForLevel } from "../lib/competitionAccreditationExport.js";
+import {
+  buildExportGeoTree,
+  filenameSlug,
+  resolveExportPlayerProfileWhere,
+} from "../lib/competitionExportFilters.js";
 import * as generatedCertificateRepository from "../repositories/generatedCertificate.repository.js";
 import {
   competitionResultBodySchema,
+  resultExportPreviewQuerySchema,
+  resultExportQuerySchema,
   resultListQuerySchema,
 } from "../validators/competitionResult.validators.js";
+
+function exportFilename(kind: "winners" | "participants", competitionId: string, labels: string[]) {
+  const suffix = filenameSlug(labels);
+  return `${kind}-${competitionId}${suffix ? `-${suffix}` : ""}.xlsx`;
+}
+
+async function loadCompetitionForExport(req: Request) {
+  const actor = req.dbUser!;
+  const comp = await competitionRepository.findByIdForPlayerEligibility(req.params.competitionId);
+  if (!comp) throw new AppError(404, "Competition not found");
+  await assertCanViewCompetitionScopedReport(actor, comp);
+  return { actor, comp };
+}
+
+const EXPORT_PREVIEW_ROWS = 10;
+
+/** Geography (State → District → TC) of players who took part, limited to the caller's scope. */
+export async function exportFilters(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { actor, comp } = await loadCompetitionForExport(req);
+    const states = await buildExportGeoTree(actor, comp.id);
+    res.json({ competitionId: comp.id, competition: comp.name, level: comp.level, states });
+  } catch (e) {
+    next(e);
+  }
+}
+
+/** Row count and first rows for the same filters the Excel download would apply. */
+export async function exportPreview(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { actor, comp } = await loadCompetitionForExport(req);
+    const { kind, ...filters } = resultExportPreviewQuerySchema.parse(req.query);
+    const resolved = await resolveExportPlayerProfileWhere(actor, filters);
+    const params = {
+      competitionId: comp.id,
+      level: comp.level,
+      playerProfileWhere: resolved.playerProfileWhere,
+    };
+    const rows =
+      kind === "winners"
+        ? await buildCompetitionWinnersForExport(params)
+        : await buildCompetitionParticipantsForExport(params);
+    res.json({
+      kind,
+      orgColumnLabel: orgColumnLabelForLevel(comp.level),
+      total: rows.length,
+      rows: rows.slice(0, EXPORT_PREVIEW_ROWS).map((r) => ({
+        name: r.fullName,
+        fatherName: r.fatherName ?? "",
+        dateOfBirth: r.dateOfBirth.toISOString().slice(0, 10),
+        aadharNumber: r.aadharNumber ?? "",
+        organisation: r.organisation,
+        event: r.eventName,
+        position: "rankLabel" in r ? r.rankLabel : null,
+        gender: genderLabel(r.gender),
+      })),
+    });
+  } catch (e) {
+    next(e);
+  }
+}
 
 export async function list(req: Request, res: Response, next: NextFunction) {
   try {
@@ -83,11 +150,13 @@ export async function list(req: Request, res: Response, next: NextFunction) {
       );
     }
 
-    const total = withCerts.length;
+    const byCompetition = groupResultItemsByCompetition(withCerts);
+    const total = byCompetition.length;
     const skip = (q.page - 1) * q.pageSize;
-    const pageItems = withCerts.slice(skip, skip + q.pageSize).map((item, index) => ({
+    const pageItems = byCompetition.slice(skip, skip + q.pageSize).map((group, index) => ({
       srNo: skip + index + 1,
-      ...item,
+      ...group,
+      events: group.events.map((event, eventIndex) => ({ srNo: eventIndex + 1, ...event })),
     }));
     const totalPages = total === 0 ? 0 : Math.ceil(total / q.pageSize);
     res.json({
@@ -167,10 +236,12 @@ export async function exportXlsx(req: Request, res: Response, next: NextFunction
     if (!comp) throw new AppError(404, "Competition not found");
     await assertCanViewCompetitionScopedReport(actor, comp);
 
+    const filters = resultExportQuerySchema.parse(req.query);
+    const resolved = await resolveExportPlayerProfileWhere(actor, filters);
     const rows = await buildCompetitionWinnersForExport({
       competitionId: comp.id,
       level: comp.level,
-      playerProfileWhere: actorPlayerProfileScopeWhere(actor),
+      playerProfileWhere: resolved.playerProfileWhere,
     });
 
     const wb = new ExcelJS.Workbook();
@@ -207,7 +278,7 @@ export async function exportXlsx(req: Request, res: Response, next: NextFunction
     );
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="winners-${comp.id}.xlsx"`
+      `attachment; filename="${exportFilename("winners", comp.id, resolved.labels)}"`
     );
     await wb.xlsx.write(res);
     res.end();
@@ -226,10 +297,12 @@ export async function exportParticipantsXlsx(req: Request, res: Response, next: 
     if (!comp) throw new AppError(404, "Competition not found");
     await assertCanViewCompetitionScopedReport(actor, comp);
 
+    const filters = resultExportQuerySchema.parse(req.query);
+    const resolved = await resolveExportPlayerProfileWhere(actor, filters);
     const rows = await buildCompetitionParticipantsForExport({
       competitionId: comp.id,
       level: comp.level,
-      playerProfileWhere: actorPlayerProfileScopeWhere(actor),
+      playerProfileWhere: resolved.playerProfileWhere,
     });
 
     const wb = new ExcelJS.Workbook();
@@ -264,7 +337,7 @@ export async function exportParticipantsXlsx(req: Request, res: Response, next: 
     );
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="participants-${comp.id}.xlsx"`
+      `attachment; filename="${exportFilename("participants", comp.id, resolved.labels)}"`
     );
     await wb.xlsx.write(res);
     res.end();

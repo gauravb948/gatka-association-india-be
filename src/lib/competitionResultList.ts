@@ -41,6 +41,53 @@ export type ResultListItem = {
   date: string | null;
 };
 
+export type ResultListEventItem = ResultListItem & {
+  winnerCertificateCount: number;
+  participantCertificateCount: number;
+};
+
+export type ResultListCompetitionGroup = {
+  competitionId: string;
+  competition: string;
+  level: ResultListItem["level"];
+  eventCount: number;
+  lastResultDate: string | null;
+  winnerCertificateCount: number;
+  participantCertificateCount: number;
+  events: ResultListEventItem[];
+};
+
+/** Groups event rows by competition, keeping the incoming order of first appearance. */
+export function groupResultItemsByCompetition(
+  items: ResultListEventItem[]
+): ResultListCompetitionGroup[] {
+  const groups = new Map<string, ResultListCompetitionGroup>();
+  for (const item of items) {
+    let group = groups.get(item.competitionId);
+    if (!group) {
+      group = {
+        competitionId: item.competitionId,
+        competition: item.competition,
+        level: item.level,
+        eventCount: 0,
+        lastResultDate: null,
+        winnerCertificateCount: 0,
+        participantCertificateCount: 0,
+        events: [],
+      };
+      groups.set(item.competitionId, group);
+    }
+    group.events.push(item);
+    group.eventCount += 1;
+    group.winnerCertificateCount += item.winnerCertificateCount;
+    group.participantCertificateCount += item.participantCertificateCount;
+    if (item.date && (!group.lastResultDate || Date.parse(item.date) > Date.parse(group.lastResultDate))) {
+      group.lastResultDate = item.date;
+    }
+  }
+  return [...groups.values()];
+}
+
 export async function buildResultListItems(ctx: ResultListContext): Promise<ResultListItem[]> {
   const standingsByKey = new Map<string, ResultListContext["standings"]>();
   for (const row of ctx.standings) {

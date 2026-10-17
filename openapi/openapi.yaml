@@ -1633,12 +1633,15 @@ components:
     ResultListItem:
       type: object
       required:
-        [srNo, competitionId, eventId, competition, ageGroup, eventGroup, event, gold, silver, bronze, date]
+        [srNo, competitionId, eventId, competition, level, ageGroup, eventGroup, event, gold, silver, bronze, date, winnerCertificateCount, participantCertificateCount]
       properties:
-        srNo: { type: integer, minimum: 1 }
+        srNo: { type: integer, minimum: 1, description: Position within the competition's events }
         competitionId: { type: string }
         eventId: { type: string }
         competition: { type: string }
+        level: { type: string, enum: [NATIONAL, STATE, DISTRICT] }
+        winnerCertificateCount: { type: integer, minimum: 0 }
+        participantCertificateCount: { type: integer, minimum: 0 }
         ageGroup: { type: string }
         eventGroup: { type: string, description: "e.g. Saif (Male)" }
         event: { type: string }
@@ -1659,13 +1662,33 @@ components:
           format: date-time
           nullable: true
           description: Latest aggregate standing update for this event, if any
+    ResultListCompetition:
+      type: object
+      required:
+        [srNo, competitionId, competition, level, eventCount, lastResultDate, winnerCertificateCount, participantCertificateCount, events]
+      properties:
+        srNo: { type: integer, minimum: 1 }
+        competitionId: { type: string }
+        competition: { type: string }
+        level: { type: string, enum: [NATIONAL, STATE, DISTRICT] }
+        eventCount: { type: integer, minimum: 0 }
+        lastResultDate:
+          type: string
+          format: date-time
+          nullable: true
+          description: Latest aggregate standing update across the listed events
+        winnerCertificateCount: { type: integer, minimum: 0 }
+        participantCertificateCount: { type: integer, minimum: 0 }
+        events:
+          type: array
+          items: { $ref: "#/components/schemas/ResultListItem" }
     ResultListResponse:
       type: object
       required: [items, page, pageSize, total, totalPages]
       properties:
         items:
           type: array
-          items: { $ref: "#/components/schemas/ResultListItem" }
+          items: { $ref: "#/components/schemas/ResultListCompetition" }
         page: { type: integer, minimum: 1 }
         pageSize: { type: integer, minimum: 1, maximum: 100 }
         total: { type: integer, minimum: 0 }
@@ -4959,10 +4982,13 @@ paths:
       security: [{ bearerAuth: [] }]
       summary: List competition results (dashboard table)
       description: >
-        Paginated per-event aggregate results from `CompetitionAggregateStanding`. For each competition
-        that has at least one saved result, returns one row for every event in the competition's age scope
+        Paginated, competition-wise aggregate results from `CompetitionAggregateStanding`. Each item is
+        one competition with at least one saved result and carries its per-event rows in `events`
         (including events without winners yet). Gold/silver/bronze are unit names for ranks 1/2/3.
-        Scoped to the caller's admin hierarchy.
+        Pagination and `total` count competitions. Filters apply to events; competitions with no
+        matching event are omitted. Scoped to the caller's admin hierarchy.
+        Whole-competition Excel downloads: `/results/competition/{competitionId}/export.xlsx` (winners)
+        and `/results/competition/{competitionId}/export-participants.xlsx` (all participants).
       parameters:
         - in: query
           name: page
@@ -4998,7 +5024,80 @@ paths:
   /results/competition/{competitionId}/export.xlsx:
     get:
       security: [{ bearerAuth: [] }]
-      summary: Excel export (age/event group columns)
+      summary: Excel export of winners for the whole competition
+      parameters:
+        - in: query
+          name: stateId
+          schema: { type: string }
+          description: Only players of this state. Must be inside the caller's scope.
+        - in: query
+          name: districtId
+          schema: { type: string }
+          description: Only players of this district. Must belong to `stateId` when both are sent (400 INVALID_GEO_FILTER otherwise).
+        - in: query
+          name: trainingCenterId
+          schema: { type: string }
+          description: Only players of this training center. Must belong to `districtId` / `stateId` when sent.
+      responses:
+        "200": { description: Excel workbook }
+        "400": { description: Inconsistent State/District/TC filter }
+        "403": { description: Filter outside the caller's scope }
+  /results/competition/{competitionId}/export-participants.xlsx:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Excel export of all participants for the whole competition
+      parameters:
+        - in: query
+          name: stateId
+          schema: { type: string }
+          description: Only players of this state. Must be inside the caller's scope.
+        - in: query
+          name: districtId
+          schema: { type: string }
+          description: Only players of this district. Must belong to `stateId` when both are sent (400 INVALID_GEO_FILTER otherwise).
+        - in: query
+          name: trainingCenterId
+          schema: { type: string }
+          description: Only players of this training center. Must belong to `districtId` / `stateId` when sent.
+      responses:
+        "200": { description: Excel workbook }
+        "400": { description: Inconsistent State/District/TC filter }
+        "403": { description: Filter outside the caller's scope }
+  /results/competition/{competitionId}/export-filters:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: State > District > Training Center options for the Excel export filters
+      description: >
+        Distinct geography of players who took part in the competition, limited to the caller's scope.
+        Returns `{ competitionId, competition, level, states: [{ id, name, districts: [{ id, name, trainingCenters: [{ id, name }] }] }] }`.
+      responses:
+        "200": { description: OK }
+        "403": { description: Role cannot view this report }
+        "404": { description: Competition not found }
+  /results/competition/{competitionId}/export-preview:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Row count and first 10 rows the Excel export would contain
+      parameters:
+        - in: query
+          name: kind
+          required: true
+          schema: { type: string, enum: [winners, participants] }
+        - in: query
+          name: stateId
+          schema: { type: string }
+        - in: query
+          name: districtId
+          schema: { type: string }
+        - in: query
+          name: trainingCenterId
+          schema: { type: string }
+      responses:
+        "200":
+          description: >
+            `{ kind, orgColumnLabel, total, rows: [{ name, fatherName, dateOfBirth, aadharNumber, organisation, event, position (winners only), gender }] }`
+        "400": { description: Inconsistent filter or missing kind }
+        "403": { description: Filter outside the caller's scope }
   /notices/inbox:
     get:
       security: [{ bearerAuth: [] }]
