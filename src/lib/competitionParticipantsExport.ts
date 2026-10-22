@@ -22,14 +22,17 @@ export type CompetitionParticipantRow = {
 export async function buildCompetitionParticipantsForExport(params: {
   competitionId: string;
   level: CompetitionLevel;
+  /** Only this event; omit for every event of the competition. */
+  eventId?: string;
   playerProfileWhere?: Prisma.PlayerProfileWhereInput;
 }): Promise<CompetitionParticipantRow[]> {
-  const { competitionId, level, playerProfileWhere } = params;
+  const { competitionId, level, eventId, playerProfileWhere } = params;
 
   const participations = await prisma.participationRecord.findMany({
     where: {
       competitionId,
       participated: true,
+      ...(eventId ? { eventId } : {}),
       ...(playerProfileWhere && Object.keys(playerProfileWhere).length > 0
         ? { playerUser: { playerProfile: playerProfileWhere } }
         : {}),

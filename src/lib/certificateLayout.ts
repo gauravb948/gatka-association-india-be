@@ -150,9 +150,9 @@ export function mmToPt(mm: number): number {
 }
 
 export function rankLabelForBand(rankBand: number): string {
-  if (rankBand === 1) return "Gold";
-  if (rankBand === 2) return "Silver";
-  if (rankBand === 3) return "Bronze";
+  if (rankBand === 1) return "First";
+  if (rankBand === 2) return "Second";
+  if (rankBand === 3) return "Third";
   return "Participant";
 }
 

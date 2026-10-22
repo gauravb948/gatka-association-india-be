@@ -245,7 +245,7 @@ export async function buildCertificateRecipients(params: {
 
   recipients.sort((a, b) => {
     const rankOrder = (label: string) =>
-      label === "Gold" ? 0 : label === "Silver" ? 1 : label === "Bronze" ? 2 : 3;
+      label === "First" ? 0 : label === "Second" ? 1 : label === "Third" ? 2 : 3;
     const byRank = rankOrder(a.rankLabel) - rankOrder(b.rankLabel);
     if (byRank !== 0) return byRank;
     return a.fullName.localeCompare(b.fullName);

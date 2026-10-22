@@ -6,6 +6,7 @@ import * as competitionResultRepository from "../repositories/competitionResult.
 import * as competitionAggregateStandingRepository from "../repositories/competitionAggregateStanding.repository.js";
 import * as competitionRepository from "../repositories/competition.repository.js";
 import { AppError } from "../lib/errors.js";
+import { prisma } from "../lib/prisma.js";
 import { assertAttendanceForCertificate } from "../lib/eligibility.js";
 import { assertCanViewCompetitionScopedReport } from "../lib/competitionManagementScope.js";
 import { buildResultListItems, genderLabel, groupResultItemsByCompetition } from "../lib/competitionResultList.js";
@@ -24,6 +25,13 @@ import {
   resultExportQuerySchema,
   resultListQuerySchema,
 } from "../validators/competitionResult.validators.js";
+
+async function resolveExportEvent(eventId: string | undefined) {
+  if (!eventId) return null;
+  const event = await prisma.event.findUnique({ where: { id: eventId }, select: { id: true, name: true } });
+  if (!event) throw new AppError(404, "Event not found");
+  return event;
+}
 
 function exportFilename(kind: "winners" | "participants", competitionId: string, labels: string[]) {
   const suffix = filenameSlug(labels);
@@ -55,11 +63,13 @@ export async function exportFilters(req: Request, res: Response, next: NextFunct
 export async function exportPreview(req: Request, res: Response, next: NextFunction) {
   try {
     const { actor, comp } = await loadCompetitionForExport(req);
-    const { kind, ...filters } = resultExportPreviewQuerySchema.parse(req.query);
+    const { kind, eventId, ...filters } = resultExportPreviewQuerySchema.parse(req.query);
     const resolved = await resolveExportPlayerProfileWhere(actor, filters);
+    const event = await resolveExportEvent(eventId);
     const params = {
       competitionId: comp.id,
       level: comp.level,
+      eventId: event?.id,
       playerProfileWhere: resolved.playerProfileWhere,
     };
     const rows =
@@ -238,11 +248,13 @@ export async function exportXlsx(req: Request, res: Response, next: NextFunction
     if (!comp) throw new AppError(404, "Competition not found");
     await assertCanViewCompetitionScopedReport(actor, comp);
 
-    const filters = resultExportQuerySchema.parse(req.query);
+    const { eventId, ...filters } = resultExportQuerySchema.parse(req.query);
     const resolved = await resolveExportPlayerProfileWhere(actor, filters);
+    const event = await resolveExportEvent(eventId);
     const rows = await buildCompetitionWinnersForExport({
       competitionId: comp.id,
       level: comp.level,
+      eventId: event?.id,
       playerProfileWhere: resolved.playerProfileWhere,
     });
 
@@ -280,7 +292,7 @@ export async function exportXlsx(req: Request, res: Response, next: NextFunction
     );
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="${exportFilename("winners", comp.id, resolved.labels)}"`
+      `attachment; filename="${exportFilename("winners", comp.id, [...resolved.labels, ...(event ? [event.name] : [])])}"`
     );
     await wb.xlsx.write(res);
     res.end();
@@ -299,11 +311,13 @@ export async function exportParticipantsXlsx(req: Request, res: Response, next: 
     if (!comp) throw new AppError(404, "Competition not found");
     await assertCanViewCompetitionScopedReport(actor, comp);
 
-    const filters = resultExportQuerySchema.parse(req.query);
+    const { eventId, ...filters } = resultExportQuerySchema.parse(req.query);
     const resolved = await resolveExportPlayerProfileWhere(actor, filters);
+    const event = await resolveExportEvent(eventId);
     const rows = await buildCompetitionParticipantsForExport({
       competitionId: comp.id,
       level: comp.level,
+      eventId: event?.id,
       playerProfileWhere: resolved.playerProfileWhere,
     });
 
@@ -339,7 +353,7 @@ export async function exportParticipantsXlsx(req: Request, res: Response, next: 
     );
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="${exportFilename("participants", comp.id, resolved.labels)}"`
+      `attachment; filename="${exportFilename("participants", comp.id, [...resolved.labels, ...(event ? [event.name] : [])])}"`
     );
     await wb.xlsx.write(res);
     res.end();

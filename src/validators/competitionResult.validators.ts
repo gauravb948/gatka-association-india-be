@@ -40,11 +40,13 @@ const optionalId = z.preprocess((v) => {
   return s.length > 0 ? s : undefined;
 }, z.string().optional());
 
-/** Geography filters shared by the competition Excel exports and their preview. */
+/** Filters shared by the competition Excel exports and their preview (geography and a single event). */
 export const resultExportQuerySchema = z.object({
   stateId: optionalId,
   districtId: optionalId,
   trainingCenterId: optionalId,
+  /** Limit the export to one event of the competition. */
+  eventId: optionalId,
 });
 
 /** Query for `GET /results/competition/:id/export-preview`. */

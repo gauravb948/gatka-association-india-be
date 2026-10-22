@@ -1633,7 +1633,7 @@ components:
     ResultListItem:
       type: object
       required:
-        [srNo, competitionId, eventId, competition, level, ageGroup, eventGroup, event, gold, silver, bronze, date, winnerCertificateCount, participantCertificateCount]
+        [srNo, competitionId, eventId, competition, level, ageGroup, eventGroup, event, first, second, third, date, winnerCertificateCount, participantCertificateCount]
       properties:
         srNo: { type: integer, minimum: 1, description: Position within the competition's events }
         competitionId: { type: string }
@@ -1645,15 +1645,15 @@ components:
         ageGroup: { type: string }
         eventGroup: { type: string, description: "e.g. Saif (Male)" }
         event: { type: string }
-        gold:
+        first:
           type: string
           nullable: true
           description: Single first-place unit name
-        silver:
+        second:
           type: string
           nullable: true
           description: Single second-place unit name
-        bronze:
+        third:
           type: array
           items: { type: string }
           description: Third-place unit names
@@ -4984,11 +4984,12 @@ paths:
       description: >
         Paginated, competition-wise aggregate results from `CompetitionAggregateStanding`. Each item is
         one competition with at least one saved result and carries its per-event rows in `events`
-        (including events without winners yet). Gold/silver/bronze are unit names for ranks 1/2/3.
+        (including events without winners yet). First/second/third are unit names for ranks 1/2/3.
         Pagination and `total` count competitions. Filters apply to events; competitions with no
         matching event are omitted. Scoped to the caller's admin hierarchy.
-        Whole-competition Excel downloads: `/results/competition/{competitionId}/export.xlsx` (winners)
+        Excel downloads: `/results/competition/{competitionId}/export.xlsx` (winners)
         and `/results/competition/{competitionId}/export-participants.xlsx` (all participants).
+        Both cover the whole competition, or a single event with `?eventId=`.
       parameters:
         - in: query
           name: page
@@ -5046,6 +5047,10 @@ paths:
           name: trainingCenterId
           schema: { type: string }
           description: Only players of this training center. Must belong to `districtId` / `stateId` when sent.
+        - in: query
+          name: eventId
+          schema: { type: string }
+          description: Limit the export to a single event of the competition (404 if the event does not exist).
       responses:
         "200": { description: Excel workbook }
         "400": { description: Inconsistent State/District/TC filter }
@@ -5067,6 +5072,10 @@ paths:
           name: trainingCenterId
           schema: { type: string }
           description: Only players of this training center. Must belong to `districtId` / `stateId` when sent.
+        - in: query
+          name: eventId
+          schema: { type: string }
+          description: Limit the export to a single event of the competition (404 if the event does not exist).
       responses:
         "200": { description: Excel workbook }
         "400": { description: Inconsistent State/District/TC filter }
@@ -5100,6 +5109,10 @@ paths:
         - in: query
           name: trainingCenterId
           schema: { type: string }
+        - in: query
+          name: eventId
+          schema: { type: string }
+          description: Limit the export to a single event of the competition (404 if the event does not exist).
       responses:
         "200":
           description: >

@@ -35,9 +35,9 @@ export type ResultListItem = {
   ageGroup: string;
   eventGroup: string;
   event: string;
-  gold: string | null;
-  silver: string | null;
-  bronze: string[];
+  first: string | null;
+  second: string | null;
+  third: string[];
   date: string | null;
 };
 
@@ -114,20 +114,20 @@ export async function buildResultListItems(ctx: ResultListContext): Promise<Resu
             ? "DISTRICT"
             : "STATE");
 
-      const first = eventStandings
+      const firstPlace = eventStandings
         .filter((r) => r.rankBand === 1)
         .sort((a, b) => a.tieOrder - b.tieOrder);
-      const second = eventStandings
+      const secondPlace = eventStandings
         .filter((r) => r.rankBand === 2)
         .sort((a, b) => a.tieOrder - b.tieOrder);
-      const third = eventStandings
+      const thirdPlace = eventStandings
         .filter((r) => r.rankBand === 3)
         .sort((a, b) => a.tieOrder - b.tieOrder);
 
       const unitIds = [
-        ...first.map((r) => r.unitId),
-        ...second.map((r) => r.unitId),
-        ...third.map((r) => r.unitId),
+        ...firstPlace.map((r) => r.unitId),
+        ...secondPlace.map((r) => r.unitId),
+        ...thirdPlace.map((r) => r.unitId),
       ];
       let enriched = unitCache.get(unitType);
       if (!enriched) {
@@ -156,9 +156,9 @@ export async function buildResultListItems(ctx: ResultListContext): Promise<Resu
         ageGroup: event.eventGroup.ageCategory.name,
         eventGroup: formatEventGroupLabel(event.eventGroup.segment, event.eventGroup.gender),
         event: event.name,
-        gold: first[0] ? nameFor(first[0].unitId) : null,
-        silver: second[0] ? nameFor(second[0].unitId) : null,
-        bronze: third.map((r) => nameFor(r.unitId)),
+        first: firstPlace[0] ? nameFor(firstPlace[0].unitId) : null,
+        second: secondPlace[0] ? nameFor(secondPlace[0].unitId) : null,
+        third: thirdPlace.map((r) => nameFor(r.unitId)),
         date: latest?.toISOString() ?? null,
       });
     }

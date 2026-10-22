@@ -2,6 +2,7 @@ import type { CompetitionLevel, Gender, Prisma } from "@prisma/client";
 import { prisma } from "./prisma.js";
 import { aggregateUnitTypeForLevel } from "./competitionAggregateUnits.js";
 import { organisationForLevel } from "./competitionAccreditationExport.js";
+import { rankLabelForBand } from "./certificateLayout.js";
 
 export type CompetitionWinnerRow = {
   playerUserId: string;
@@ -25,15 +26,6 @@ function playerUnitId(
   return profile.stateId;
 }
 
-/** Export uses ordinal positions (First/Second/Third) rather than the Gold/Silver/Bronze
- * labels used on printed certificates (certificateLayout.ts's rankLabelForBand). */
-function positionLabel(rankBand: number): string {
-  if (rankBand === 1) return "First";
-  if (rankBand === 2) return "Second";
-  if (rankBand === 3) return "Third";
-  return "Participant";
-}
-
 function rankOrder(label: string): number {
   if (label === "First") return 0;
   if (label === "Second") return 1;
@@ -48,13 +40,15 @@ function rankOrder(label: string): number {
 export async function buildCompetitionWinnersForExport(params: {
   competitionId: string;
   level: CompetitionLevel;
+  /** Only this event; omit for every event of the competition. */
+  eventId?: string;
   playerProfileWhere?: Prisma.PlayerProfileWhereInput;
 }): Promise<CompetitionWinnerRow[]> {
-  const { competitionId, level, playerProfileWhere } = params;
+  const { competitionId, level, eventId, playerProfileWhere } = params;
   const unitType = aggregateUnitTypeForLevel(level);
 
   const standings = await prisma.competitionAggregateStanding.findMany({
-    where: { competitionId, unitType, rankBand: { in: [1, 2, 3] } },
+    where: { competitionId, unitType, rankBand: { in: [1, 2, 3] }, ...(eventId ? { eventId } : {}) },
     select: { eventId: true, unitId: true, rankBand: true },
   });
   if (standings.length === 0) return [];
@@ -122,7 +116,7 @@ export async function buildCompetitionWinnersForExport(params: {
       aadharNumber: profile.aadharNumber,
       organisation: organisationForLevel(level, profile),
       eventName: p.event.name,
-      rankLabel: positionLabel(rankBand),
+      rankLabel: rankLabelForBand(rankBand),
       gender: profile.gender,
     });
   }
