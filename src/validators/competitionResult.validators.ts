@@ -30,6 +30,7 @@ export const resultListQuerySchema = z.object({
   stateId: optionalSearch,
   districtId: optionalSearch,
   ageGroup: optionalSearch,
+  gender: z.enum(["MALE", "FEMALE", "OPEN"]).optional(),
   event: optionalSearch,
   certificates: z.enum(["generated", "missing"]).optional(),
 });

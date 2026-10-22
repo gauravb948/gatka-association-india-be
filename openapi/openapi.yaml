@@ -1633,7 +1633,7 @@ components:
     ResultListItem:
       type: object
       required:
-        [srNo, competitionId, eventId, competition, level, ageGroup, eventGroup, event, first, second, third, date, winnerCertificateCount, participantCertificateCount]
+        [srNo, competitionId, eventId, competition, level, ageGroup, eventGroup, gender, event, first, second, third, date, winnerCertificateCount, participantCertificateCount]
       properties:
         srNo: { type: integer, minimum: 1, description: Position within the competition's events }
         competitionId: { type: string }
@@ -1644,6 +1644,7 @@ components:
         participantCertificateCount: { type: integer, minimum: 0 }
         ageGroup: { type: string }
         eventGroup: { type: string, description: "e.g. Saif (Male)" }
+        gender: { type: string, enum: [MALE, FEMALE, OPEN] }
         event: { type: string }
         first:
           type: string
@@ -5013,6 +5014,10 @@ paths:
           name: districtId
           schema: { type: string }
           description: Only competitions held in this district
+        - in: query
+          name: gender
+          schema: { type: string, enum: [MALE, FEMALE, OPEN] }
+          description: Only events of this gender band (boys count as MALE, girls as FEMALE)
       responses:
         "200":
           description: OK
@@ -5034,6 +5039,9 @@ paths:
     get:
       security: [{ bearerAuth: [] }]
       summary: Excel export of winners for the whole competition
+      description: >
+        Columns: Sr No, Certificate No, Name, Father Name, Date of Birth, Aadhar Number, organisation,
+        Event, Age Category, Position, Gender.
       parameters:
         - in: query
           name: stateId
@@ -5059,6 +5067,9 @@ paths:
     get:
       security: [{ bearerAuth: [] }]
       summary: Excel export of all participants for the whole competition
+      description: >
+        Columns: Sr No, Certificate No, Name, Father Name, Date of Birth, Aadhar Number, organisation,
+        Event, Age Category, Gender.
       parameters:
         - in: query
           name: stateId
@@ -5116,7 +5127,7 @@ paths:
       responses:
         "200":
           description: >
-            `{ kind, orgColumnLabel, total, rows: [{ name, fatherName, dateOfBirth, aadharNumber, organisation, event, position (winners only), gender }] }`
+            `{ kind, orgColumnLabel, total, rows: [{ name, fatherName, dateOfBirth, aadharNumber, organisation, event, ageCategory, position (winners only), gender }] }`
         "400": { description: Inconsistent filter or missing kind }
         "403": { description: Filter outside the caller's scope }
   /notices/inbox:

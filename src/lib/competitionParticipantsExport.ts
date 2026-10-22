@@ -11,6 +11,8 @@ export type CompetitionParticipantRow = {
   /** Training Center for DISTRICT-level competitions, District for STATE, State for NATIONAL. */
   organisation: string;
   eventName: string;
+  /** Age category of the event's group, e.g. "Sub Junior". */
+  ageCategory: string;
   gender: Gender;
 };
 
@@ -40,7 +42,7 @@ export async function buildCompetitionParticipantsForExport(params: {
     select: {
       playerUserId: true,
       eventId: true,
-      event: { select: { name: true } },
+      event: { select: { name: true, eventGroup: { select: { ageCategory: { select: { name: true } } } } } },
       playerUser: {
         select: {
           playerProfile: {
@@ -76,6 +78,7 @@ export async function buildCompetitionParticipantsForExport(params: {
       aadharNumber: profile.aadharNumber,
       organisation: organisationForLevel(level, profile),
       eventName: p.event.name,
+      ageCategory: p.event.eventGroup.ageCategory.name,
       gender: profile.gender,
     });
   }

@@ -87,6 +87,7 @@ export async function exportPreview(req: Request, res: Response, next: NextFunct
         aadharNumber: r.aadharNumber ?? "",
         organisation: r.organisation,
         event: r.eventName,
+        ageCategory: r.ageCategory,
         position: "rankLabel" in r ? r.rankLabel : null,
         gender: genderLabel(r.gender),
       })),
@@ -129,6 +130,9 @@ export async function list(req: Request, res: Response, next: NextFunction) {
 
     if (q.ageGroup) {
       grouped = grouped.filter((item) => item.ageGroup === q.ageGroup);
+    }
+    if (q.gender) {
+      grouped = grouped.filter((item) => item.gender === q.gender);
     }
     if (q.event) {
       const needle = q.event.toLowerCase();
@@ -269,6 +273,7 @@ export async function exportXlsx(req: Request, res: Response, next: NextFunction
       { header: "Aadhar Number", key: "aadhar", width: 18 },
       { header: orgColumnLabelForLevel(comp.level), key: "org", width: 20 },
       { header: "Event", key: "event", width: 28 },
+      { header: "Age Category", key: "ageCategory", width: 18 },
       { header: "Position", key: "position", width: 12 },
       { header: "Gender", key: "gender", width: 10 },
     ];
@@ -282,6 +287,7 @@ export async function exportXlsx(req: Request, res: Response, next: NextFunction
         aadhar: r.aadharNumber ?? "",
         org: r.organisation,
         event: r.eventName,
+        ageCategory: r.ageCategory,
         position: r.rankLabel,
         gender: genderLabel(r.gender),
       });
@@ -332,6 +338,7 @@ export async function exportParticipantsXlsx(req: Request, res: Response, next: 
       { header: "Aadhar Number", key: "aadhar", width: 18 },
       { header: orgColumnLabelForLevel(comp.level), key: "org", width: 20 },
       { header: "Event", key: "event", width: 28 },
+      { header: "Age Category", key: "ageCategory", width: 18 },
       { header: "Gender", key: "gender", width: 10 },
     ];
     rows.forEach((r, idx) => {
@@ -344,6 +351,7 @@ export async function exportParticipantsXlsx(req: Request, res: Response, next: 
         aadhar: r.aadharNumber ?? "",
         org: r.organisation,
         event: r.eventName,
+        ageCategory: r.ageCategory,
         gender: genderLabel(r.gender),
       });
     });

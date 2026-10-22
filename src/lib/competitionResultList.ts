@@ -9,6 +9,15 @@ export function genderLabel(gender: Gender): string {
   return "Open";
 }
 
+/** Gender band of an event group: boys count as male, girls as female, everything else as open. */
+export type ResultGenderBand = "MALE" | "FEMALE" | "OPEN";
+
+export function genderBand(gender: Gender): ResultGenderBand {
+  if (gender === "MALE" || gender === "BOYS") return "MALE";
+  if (gender === "FEMALE" || gender === "GIRLS") return "FEMALE";
+  return "OPEN";
+}
+
 export function formatEventGroupLabel(segment: string, gender: Gender): string {
   return `${segment} (${genderLabel(gender)})`;
 }
@@ -34,6 +43,7 @@ export type ResultListItem = {
   level: import("@prisma/client").CompetitionLevel;
   ageGroup: string;
   eventGroup: string;
+  gender: ResultGenderBand;
   event: string;
   first: string | null;
   second: string | null;
@@ -155,6 +165,7 @@ export async function buildResultListItems(ctx: ResultListContext): Promise<Resu
         level: comp.level,
         ageGroup: event.eventGroup.ageCategory.name,
         eventGroup: formatEventGroupLabel(event.eventGroup.segment, event.eventGroup.gender),
+        gender: genderBand(event.eventGroup.gender),
         event: event.name,
         first: firstPlace[0] ? nameFor(firstPlace[0].unitId) : null,
         second: secondPlace[0] ? nameFor(secondPlace[0].unitId) : null,
