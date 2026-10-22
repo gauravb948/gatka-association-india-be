@@ -1,5 +1,6 @@
 import type { CompetitionLevel, Gender, Prisma } from "@prisma/client";
 import { prisma } from "./prisma.js";
+import { ageGroupLabel } from "./competitionAgeWiseReport.js";
 import { aggregateUnitTypeForLevel } from "./competitionAggregateUnits.js";
 import { organisationForLevel } from "./competitionAccreditationExport.js";
 import { rankLabelForBand } from "./certificateLayout.js";
@@ -13,8 +14,8 @@ export type CompetitionWinnerRow = {
   /** Training Center for DISTRICT-level competitions, District for STATE, State for NATIONAL. */
   organisation: string;
   eventName: string;
-  /** Age category of the event's group, e.g. "Sub Junior". */
-  ageCategory: string;
+  /** Age group of the event, e.g. "U19" or "U25" (same label as the age-wise reports). */
+  ageGroup: string;
   rankLabel: string;
   gender: Gender;
 };
@@ -76,7 +77,7 @@ export async function buildCompetitionWinnersForExport(params: {
     select: {
       playerUserId: true,
       eventId: true,
-      event: { select: { name: true, eventGroup: { select: { ageCategory: { select: { name: true } } } } } },
+      event: { select: { name: true, eventGroup: { select: { ageCategory: { select: { name: true, ageTo: true } } } } } },
       playerUser: {
         select: {
           playerProfile: {
@@ -118,7 +119,7 @@ export async function buildCompetitionWinnersForExport(params: {
       aadharNumber: profile.aadharNumber,
       organisation: organisationForLevel(level, profile),
       eventName: p.event.name,
-      ageCategory: p.event.eventGroup.ageCategory.name,
+      ageGroup: ageGroupLabel(p.event.eventGroup.ageCategory),
       rankLabel: rankLabelForBand(rankBand),
       gender: profile.gender,
     });

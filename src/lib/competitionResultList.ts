@@ -42,6 +42,8 @@ export type ResultListItem = {
   competition: string;
   level: import("@prisma/client").CompetitionLevel;
   ageGroup: string;
+  /** Short age label used in Excel exports, e.g. "U19". */
+  ageGroupCode: string;
   eventGroup: string;
   gender: ResultGenderBand;
   event: string;
@@ -164,6 +166,7 @@ export async function buildResultListItems(ctx: ResultListContext): Promise<Resu
         competition: comp.name,
         level: comp.level,
         ageGroup: event.eventGroup.ageCategory.name,
+        ageGroupCode: ageGroupLabel(event.eventGroup.ageCategory),
         eventGroup: formatEventGroupLabel(event.eventGroup.segment, event.eventGroup.gender),
         gender: genderBand(event.eventGroup.gender),
         event: event.name,

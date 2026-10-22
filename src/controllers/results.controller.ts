@@ -87,7 +87,7 @@ export async function exportPreview(req: Request, res: Response, next: NextFunct
         aadharNumber: r.aadharNumber ?? "",
         organisation: r.organisation,
         event: r.eventName,
-        ageCategory: r.ageCategory,
+        ageGroup: r.ageGroup,
         position: "rankLabel" in r ? r.rankLabel : null,
         gender: genderLabel(r.gender),
       })),
@@ -273,7 +273,7 @@ export async function exportXlsx(req: Request, res: Response, next: NextFunction
       { header: "Aadhar Number", key: "aadhar", width: 18 },
       { header: orgColumnLabelForLevel(comp.level), key: "org", width: 20 },
       { header: "Event", key: "event", width: 28 },
-      { header: "Age Category", key: "ageCategory", width: 18 },
+      { header: "Age Group", key: "ageGroup", width: 14 },
       { header: "Position", key: "position", width: 12 },
       { header: "Gender", key: "gender", width: 10 },
     ];
@@ -287,7 +287,7 @@ export async function exportXlsx(req: Request, res: Response, next: NextFunction
         aadhar: r.aadharNumber ?? "",
         org: r.organisation,
         event: r.eventName,
-        ageCategory: r.ageCategory,
+        ageGroup: r.ageGroup,
         position: r.rankLabel,
         gender: genderLabel(r.gender),
       });
@@ -338,7 +338,7 @@ export async function exportParticipantsXlsx(req: Request, res: Response, next: 
       { header: "Aadhar Number", key: "aadhar", width: 18 },
       { header: orgColumnLabelForLevel(comp.level), key: "org", width: 20 },
       { header: "Event", key: "event", width: 28 },
-      { header: "Age Category", key: "ageCategory", width: 18 },
+      { header: "Age Group", key: "ageGroup", width: 14 },
       { header: "Gender", key: "gender", width: 10 },
     ];
     rows.forEach((r, idx) => {
@@ -351,7 +351,7 @@ export async function exportParticipantsXlsx(req: Request, res: Response, next: 
         aadhar: r.aadharNumber ?? "",
         org: r.organisation,
         event: r.eventName,
-        ageCategory: r.ageCategory,
+        ageGroup: r.ageGroup,
         gender: genderLabel(r.gender),
       });
     });

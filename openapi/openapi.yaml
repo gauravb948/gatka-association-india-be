@@ -1633,7 +1633,7 @@ components:
     ResultListItem:
       type: object
       required:
-        [srNo, competitionId, eventId, competition, level, ageGroup, eventGroup, gender, event, first, second, third, date, winnerCertificateCount, participantCertificateCount]
+        [srNo, competitionId, eventId, competition, level, ageGroup, ageGroupCode, eventGroup, gender, event, first, second, third, date, winnerCertificateCount, participantCertificateCount]
       properties:
         srNo: { type: integer, minimum: 1, description: Position within the competition's events }
         competitionId: { type: string }
@@ -1643,6 +1643,7 @@ components:
         winnerCertificateCount: { type: integer, minimum: 0 }
         participantCertificateCount: { type: integer, minimum: 0 }
         ageGroup: { type: string }
+        ageGroupCode: { type: string, description: "Short age label used in Excel exports, e.g. U19" }
         eventGroup: { type: string, description: "e.g. Saif (Male)" }
         gender: { type: string, enum: [MALE, FEMALE, OPEN] }
         event: { type: string }
@@ -5041,7 +5042,7 @@ paths:
       summary: Excel export of winners for the whole competition
       description: >
         Columns: Sr No, Certificate No, Name, Father Name, Date of Birth, Aadhar Number, organisation,
-        Event, Age Category, Position, Gender.
+        Event, Age Group (e.g. U19), Position, Gender.
       parameters:
         - in: query
           name: stateId
@@ -5069,7 +5070,7 @@ paths:
       summary: Excel export of all participants for the whole competition
       description: >
         Columns: Sr No, Certificate No, Name, Father Name, Date of Birth, Aadhar Number, organisation,
-        Event, Age Category, Gender.
+        Event, Age Group (e.g. U19), Gender.
       parameters:
         - in: query
           name: stateId
@@ -5127,7 +5128,7 @@ paths:
       responses:
         "200":
           description: >
-            `{ kind, orgColumnLabel, total, rows: [{ name, fatherName, dateOfBirth, aadharNumber, organisation, event, ageCategory, position (winners only), gender }] }`
+            `{ kind, orgColumnLabel, total, rows: [{ name, fatherName, dateOfBirth, aadharNumber, organisation, event, ageGroup, position (winners only), gender }] }`
         "400": { description: Inconsistent filter or missing kind }
         "403": { description: Filter outside the caller's scope }
   /notices/inbox:
